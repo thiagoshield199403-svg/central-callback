@@ -1,0 +1,74 @@
+﻿CENTRAL DE CALLBACK - RECONHECIMENTO AUTOMATICO DA MENSAGEM (1.0.2-web-dev, 04/11/2026)
+======================================================================================
+
+1. POR QUE NAO FUNCIONAVA (auditoria)
+- A mensagem era escolhida so pelo SUBTIPO, e o subtipo (detectarSubtipo) lia apenas o campo "Submotivos".
+- Nos CSVs reais do ADMS esse campo traz so a SIGLA (FE, DF, RV, NT). Resultado: 62 de 62 chamadas com a mensagem generica.
+- O relato do cliente esta no campo "Comentario", depois de "OBS:" (ou "COMENTARIOS:"), misturado com campos que nao
+  sao a ocorrencia: REFERENCIA (pontos de referencia), ENDERECO, BAIRRO, CIDADE, UC, COND CLIMA, ROTEIRO, TEL, PROTOCOLO,
+  "GERADO VIA URA". Esse campo nao era lido. O campo "Motivo" e uma categoria geral do ADMS (mesma informacao da sigla).
+
+2. CAMPOS USADOS AGORA
+- Submotivos: o texto (sem as siglas) e o subtipo ja reconhecido pela regra existente.
+- Comentario: so o trecho livre (depois de OBS:/COMENTARIOS:), sem referencia, endereco, clima, telefone e protocolo.
+  Exemplo: um povoado chamado "Baixa ..." na referencia NAO vira "tensao baixa"; uma "Rua do Fogo" NAO vira incendio.
+- Sigla/Motivo: so como ultimo recurso (FE -> falta de energia).
+O registro original do CSV nao e alterado. O tipo e o subtipo usados nas metricas/exportacao NAO mudaram.
+
+3. ORDEM DE DECISAO
+ 1. Subtipo de RISCO no submotivo, ou regra de RISCO no texto (R1-R6) -> mensagem de risco. Risco sempre prevalece.
+ 2. Subtipo reconhecido no texto do submotivo (regra existente).
+ 3. Primeira regra de palavra-chave que casar no texto (N1-N16, das mais especificas para as gerais).
+ 4. Sigla FE sem outra indicacao -> "Falta de energia — residencia".
+ 5. Nada confiavel -> mensagem generica aprovada.
+ Trava de seguranca: chamada RV (risco de vida) nunca recebe mensagem comum automaticamente (fica a generica).
+ A mensagem e PRE-SELECIONADA ao abrir o atendimento; o operador pode trocar; nada e enviado automaticamente.
+ O painel mostra o motivo da sugestao (ex.: palavra-chave no texto: "cabo + partido" (regra R1)).
+
+4. REGRAS (geradas do codigo js/nucleo.js; todos os grupos precisam aparecer; * = variacoes da palavra; sem acentos)
+R1 [RISCO] -> Condutor partido :: (CABO(s) | FIO(s) | CONDUTOR(es) | FIACAO | REDE) E (PARTID(o/a/s) | ROMPID(o/a/s) | ARREBENTAD(o/a/s) | CAID(o/a/s) | NO CHAO)
+R2 [RISCO] -> Choque elétrico :: (CHOQUE(s) | ELETRIFICAD(o/a/s))
+R3 [RISCO] -> Incêndio :: (INCENDIO* | FOGO | CHAMA(s))
+R4 [RISCO] -> Faíscas no ramal de serviço :: (FAISCA* | CENTELHA*) E (RAMAL | RAMAIS)
+R5 [RISCO] -> Faíscas na rede :: (FAISCA* | CENTELHA*)
+R6 [RISCO] -> Poste abalroado :: (POSTE(s)) E (ABALROAD(o/a/s) | BATID(o/a/s) | BATEU | BATERAM | ATINGID(o/a/s) | DERRUBAD(o/a/s) | COLISAO | ACIDENTE)
+N1 -> Poste com ferragens expostas :: (FERRAGE* | VERGALH*)
+N2 -> Transformador com vazamento de óleo :: (OLEO) E (TRANSFORMADOR* | TRAFO(s) | VAZAND* | VAZAMENTO*)
+N3 -> Defeito no transformador :: (TRANSFORMADOR* | TRAFO(s))
+N4 -> Poste inclinado :: (POSTE(s)) E (INCLINAD(o/a/s) | TORT(o/a/s) | ENTORTAD(o/a/s) | PENDENDO | CAINDO | TOMBANDO)
+N5 -> Poste auxiliar quebrado :: (POSTE AUXILIAR | POSTINHO)
+N6 -> Condutor desnivelado :: (CABO(s) | FIO(s) | CONDUTOR(es) | FIACAO | REDE) E (DESNIVE* | FROUX(o/a/s) | ARRIAD(o/a/s) | MUITO BAIX(o/a/s))
+N7 -> Árvore na rede :: (ARVORE(s) | GALHO(s) | GALHADA | COQUEIRO(s) | PALMEIRA(s) | BAMBU*)
+N8 -> Objeto estranho na rede :: (OBJETO(s) | PIPA(s) | PAPAGAIO(s) | LONA(s))
+N9 -> Inversão de fase :: (INVERSAO DE FASE(s) | FASE(s) INVERTIDA(s) | AO CONTRARIO | SENTIDO CONTRARIO)
+N10 -> Defeito no disjuntor :: (DISJUNTOR*) E (DEFEITO* | QUEBRAD(o/a/s) | DESARMA* | ESQUENTA* | QUEIMAD(o/a/s) | DERRETID(o/a/s) | ESTRAGAD(o/a/s) | NAO ARMA | NAO LIGA)
+N11 -> Problema no ramal de serviço :: (RAMAL | RAMAIS)
+N12 -> Oscilação de energia :: (OSCILA* | PISCAND(o/a) | PISCA PISCA | VAI E VOLTA | VAI E VEM | CAI E VOLTA)
+N13 -> Tensão alta :: (TENSAO ALTA | SOBRETENSAO | VOLTAGEM ALTA)
+N14 -> Tensão baixa :: (TENSAO BAIXA | SUBTENSAO | VOLTAGEM BAIXA | ENERGIA FRACA | LUZ FRACA)
+N15 -> Falta de energia geral — confirmação com vizinhos :: (FALTA DE ENERGI* | SEM ENERGI* | FALTA DE LUZ | SEM LUZ | ENERGIA FALTOU | LUZ FALTOU | FALTOU (a) (ENERGIA|LUZ) | NAO HA ENERGI* | NAO TEM ENERGI* | SEM FORNECIMENTO | APAGAO | ACABOU (a) (ENERGIA|LUZ) | QUEDA DE ENERGIA) E (GERAL | COLETIV(o/a/s) | VIZINH* | RUA TODA | TODA A RUA | BAIRRO TODO | TODO O BAIRRO | LOCALIDADE)
+N16 -> Falta de energia — residência :: (FALTA DE ENERGI* | SEM ENERGI* | FALTA DE LUZ | SEM LUZ | ENERGIA FALTOU | LUZ FALTOU | FALTOU (a) (ENERGIA|LUZ) | NAO HA ENERGI* | NAO TEM ENERGI* | SEM FORNECIMENTO | APAGAO | ACABOU (a) (ENERGIA|LUZ) | QUEDA DE ENERGIA)
+Fontes: termos dos subtipos da Central (7.3), regras da BETA de 31/10 (recuperada) e expressoes vistas nos CSVs reais.
+
+5. RESULTADO NOS CSVs REAIS (01/02/03.csv, 62 comunicacoes; so contagens e o termo reconhecido)
+ Antes: 62 genericas. Agora: 56 especificas, 6 genericas (3 RV, 2 DF e 1 NT sem nenhum texto).
+  28  FE -> Falta de energia (sigla, sem texto)          13  FE -> Falta de energia (texto: sem energia, faltou energia...)
+   7  FE -> Falta de energia geral (geral/coletiva/vizinhanca)   2  FE -> Oscilacao (oscilando)
+   2  DF -> Inversao de fase                                     2  DF -> Transformador com vazamento de oleo
+   2  RV/DF -> Condutor partido ("cabo ... partido": risco prevalece)
+ Exemplos reais ANONIMIZADOS (estrutura e expressoes reais; nomes, numeros e locais trocados) - todos com teste automatico:
+  FE "...OBS: CABO DE AT PARTIDO TEL ..."                        -> Condutor partido (R1)
+  DF "...OBS: TROCAR TRANSFORMADOR, O MESMO ESTA VAZANDO OLEO"   -> Transformador com vazamento de oleo (N2)
+  DF "...OBS: DF-INVERSAO-DE-FASE GERADO VIA URA..."             -> Inversao de fase (N9)
+  FE "...OBS: FALTA DE ENERGICA LOCAL E VIZINHANCA..."           -> Falta de energia geral (N15; erro de digitacao aceito)
+  FE "...OBS: FALTA DE ENERGIA GERAL, APOS CARRETA PASSAR..."    -> Falta de energia geral (N15)
+  DF "...OBS: CABO DE ALTA TENSAO DESNIVELADO"                   -> Condutor desnivelado (N6; "alta tensao" nao e "tensao alta")
+  FE "...OBS: ESTOU SEM ENERGIA..."                              -> Falta de energia (N16)
+  FE "...OBS: ...APENAS COM UMA FASE FUNCIONANDO"                -> Falta de energia (sigla) + aviso de suspeita de falta de fase
+  RV sem texto                                                  -> Generica (trava de risco de vida)
+
+6. LIMITACOES
+- Reconhecimento por termos: pode haver falso positivo/negativo (ex.: negacoes como "nao ha cabo partido" nao sao tratadas).
+- RV + texto comum (ex.: "galho na rede" numa chamada RV) fica com a generica: o operador escolhe a mensagem.
+- "Poste com ferragens expostas" nao e tratado como risco (nao ha regra de risco existente para ele).
+- Novas expressoes podem ser incluidas em N.REGRAS_MENSAGEM (js/nucleo.js), com teste correspondente em testes/testes.js.

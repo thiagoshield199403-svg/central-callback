@@ -1,0 +1,169 @@
+CENTRAL DE CALLBACK COI - 1.0.2-web-dev (COPIA DE DESENVOLVIMENTO) - RELATORIO DAS ALTERACOES
+==============================================================================================
+Data: 04/11/2026. Base: 1.0.1-web (05_ENTREGA). Backup integral antes das alteracoes:
+06_BACKUP_web_1.0.1_antes_alteracoes_03-11 (13 arquivos, MANIFESTO_SHA256.txt; conferido intacto ao final).
+A versao de uso (05_ENTREGA) NAO foi alterada. Esta copia NAO foi publicada. Aguarda autorizacao.
+
+1. ARQUIVOS
+Alterados: js\modelos.js (catalogo novo, gerado do JSON original com trocas conferidas), js\nucleo.js (catalogo agrupado,
+  data/hora, indicacao de risco, agrupamento, resumo na previa), js\servico.js (agrupamento gravado na importacao,
+  grupos() e detalhe do grupo), js\app.js (tabela por incidente, coluna Data e hora, avisos, painel com as comunicacoes,
+  mensagens agrupadas, banco separado de desenvolvimento), index.html (coluna), css\estilo.css (avisos),
+  testes\testes.js (13 testes novos; 1 ajustado), LEIA-ME.txt, docs\LIMITACOES-E-PENDENCIAS.txt.
+Novos: exemplos\navegador-chamadas-CONTINGENCIA-FICTICIO.csv, docs\ALTERACOES-1.0.2.txt,
+  docs\historico-mensagens\modelos-mensagem-1.0.1-ORIGINAL.json (copia integral, mesmo SHA-256 do original),
+  docs\historico-mensagens\MENSAGENS-ANTES-E-DEPOIS.txt.
+Armazenamento: esta copia usa o banco "central-callback-coi-dev"; os dados da versao em uso ("central-callback-coi")
+  nao sao lidos nem gravados. Os dados gravados pela 1.0.1 continuam legiveis (esquema 1 mantido; teste de compatibilidade).
+
+2. MENSAGENS (detalhe completo, antes e depois: docs\historico-mensagens\MENSAGENS-ANTES-E-DEPOIS.txt)
+Adicionadas (2):
+ - "Falta de energia geral — confirmacao com vizinhos" (texto exato da especificacao).
+ - "Poste com ferragens expostas" (texto exato; foto so "caso seja seguro"; orienta nao se aproximar).
+ Ambas so por escolha do operador: nenhuma regra de classificacao foi alterada.
+Modificadas:
+ - Generica (fallback, manual_atualizacao): "Ola, aqui e a Energisa. Estamos entrando em contato referente a uma
+   solicitacao que voce registrou conosco. Voce poderia nos fornecer mais informacoes sobre a situacao?"
+   (titulo: "Solicitacao nao identificada — pedir mais informacoes"). Continua sendo o fallback quando nao ha subtipo.
+ - As outras 20 manuais e as 4 nao manuais: cabecalho "{saudacao}! Aqui e a Central de Comunicacao do COI, pelo
+   WhatsApp do {polo}." trocado por "Ola, aqui e a Energisa."; retirado " ou envie SAIR para nao receber mais
+   mensagens."; o restante (orientacoes especificas de cada ocorrencia) foi mantido palavra por palavra.
+   Ficou a frase "Responda esta mensagem para continuar o atendimento." (nao e o "SAIR"; retirar se a Operacao preferir).
+ - Titulos limpos (sem "Manual —" e "(perguntas da beta; validar E-9)"); o titulo anterior fica gravado no registro.
+Preservado: cada registro guarda texto_anterior e nome_anterior; o JSON original esta integro no historico.
+Lista do operador: 8 assuntos em ordem alfabetica e titulos em ordem alfabetica dentro de cada assunto:
+ Choque, faiscas e incendio | Falta de energia | Geral | Poste | Ramal, medicao e disjuntor | Rede e condutores |
+ Tensao e oscilacao | Transformador. Prioridade (marcada "⚠ PRIORIDADE", sem mudar a ordem) = modelos dos subtipos de
+ risco ja existentes: choque eletrico, condutor partido, faiscas na rede, faiscas no ramal, incendio, poste abalroado.
+
+3. REGRAS PRESERVADAS (sem alteracao)
+Leitor CSV 1.0.1 (preambulo "Filtrar"), tipo pela sigla (RV/FE/NT/DF/OT), subtipo so pelo texto do submotivo,
+escolha automatica da mensagem pelo subtipo, telefones (celular/fixo/comentario com confirmacao), estados iniciais,
+callback com registro explicito e meio, tentativa sem sucesso, contato invalido, reabertura com justificativa,
+WhatsApp so abre o link (nao conta tentativa, operador envia), um lote por vez, SHA-256 previa x importacao,
+CALL unica no dia com melhor resultado, metricas POR CALL, exportacao de 14 colunas sem dados pessoais (inalterada),
+encerramento de lote/dia, protecao contra formula, bloqueio de rede.
+
+4. DATA E HORA
+Campo: "Horario da call" do CSV do ADMS = momento em que a comunicacao do cliente foi registrada.
+Como foi identificado (CSVs reais 01-03.csv, 62 linhas, so contagens): preenchido e valido em 62/62; "Recebido ADMS"
+e sempre POSTERIOR (62/62) = entrada no ADMS, nao usado; "Horario Agendado" vem preenchido, mas o significado nao esta
+documentado: nao usado. Nao e horario de importacao nem de callback. Exibicao: dd/mm/aaaa hh:mm:ss (coluna "Data e hora"
+e detalhe). No incidente agrupado: horario da comunicacao principal; o painel mostra o horario de cada comunicacao.
+O CSV nao tem um campo separado de "abertura do incidente": o horario exibido e o da comunicacao.
+
+5. AGRUPAMENTO DE INCIDENTES
+- Feito na importacao, sem acao do operador. Chave = numero do Incidente do ADMS. Nunca por UC, nome ou descricao.
+  Comunicacao sem incidente fica sozinha. "ID do Incidente Pai" nao junta incidentes (vazio nos CSVs reais).
+- Uma linha por incidente, com: CALL e dados da comunicacao principal, "N comunicacoes", Data e hora da principal,
+  classificacao da principal, situacao da principal e "x/N com callback".
+- Principal: 1) maior indicacao de risco; 2) sem risco, a MAIS RECENTE; 3) empate: a primeira do arquivo.
+  Risco (nivel 2) = regras ja existentes: sigla RV, emergencia = Sim, ou subtipo de risco.
+  Indicio (nivel 1) = termos das regras existentes (subtipos de risco da Central e regras de risco da BETA) no
+  comentario/submotivo; NAO reclassifica, so avisa e prioriza para conferencia.
+- Avisos: "INCIDENTE COM MULTIPLAS COMUNICACOES — N REGISTROS"; "ATENCAO: EXISTE COMUNICACAO COM INDICACAO DE RISCO —
+  VERIFICAR PRIORITARIAMENTE." (com a origem de cada indicacao); "POSSIVEL OCORRENCIA GERAL" (2+ comunicacoes de
+  falta de energia de unidades diferentes no incidente) e "POSSIVEL FALTA DE FASE" (citada no texto) - ambos "nao confirmado".
+- Nada e descartado: todas as comunicacoes continuam no lote; o painel lista todas e permite abrir cada uma para
+  WhatsApp/callback; filtro e busca consideram todas. Callback e metricas continuam por CALL.
+- Ordem da tabela: incidentes com risco primeiro; depois pela comunicacao principal mais recente.
+- Nos CSVs reais: 62 comunicacoes -> 39 linhas; 10 incidentes com multiplas comunicacoes (33 comunicacoes, maior = 6);
+  4 indicacoes de risco por RV e 1 indicio no texto ("cabo partido" num registro de falta de energia); 4 citam falta de fase.
+
+6. TESTES (resultados reais: 00_inventario\testes_1.0.2-web-dev.txt)
+Edge 156 e Chrome 156, copia de desenvolvimento:
+- testes.html (sem flags): 54/54 (41 anteriores + 13 novos: saudacao em todas, sem SAIR/Central/polo, conteudo
+  anterior preservado, textos exatos das novas, ordem alfabetica e prioridade, data/hora, agrupamento de 5, principal
+  com risco, principal mais recente, indicio no texto, mesma UC nao agrupa, sem incidente nao agrupa, avisos possiveis,
+  servico grava agrupamento e metricas por CALL, compatibilidade com dados da 1.0.1).
+- Interface ponta a ponta (index.html com cliques reais): 54/54 etapas - abertura, previa, coluna Data e hora,
+  agrupamento, principal por risco e por recencia, avisos, mesma UC, sem incidente, painel com 5 comunicacoes,
+  saudacao, lista alfabetica (23, 6 prioridades), 2 novas mensagens, WhatsApp manual, callback, tentativa, contato
+  invalido, reabertura, filtro e busca, persistencia ao reabrir, encerrar lote, reimportacao sem duplicar,
+  exportacao 14 colunas sem dados pessoais, encerrar dia (definitiva v2).
+- index.html sem flags: abre, coluna Data e hora presente, rede bloqueada.
+- CSVs reais: mesma leitura da 1.0.1 (62 chamadas, 0 erros, mesmos tipos/estados) + agrupamento acima.
+Comparacao com a anterior: backup 1.0.1 testes 41/41 (Edge e Chrome) e interface 41/41; versao de uso inalterada.
+
+7. NAO CRIADOS
+Nenhum .exe, .bat, .cmd, .ps1, .py ou servidor na aplicacao (verificado na pasta). Ferramentas de teste (navegador em
+modo automatico) ficaram fora da pasta da aplicacao.
+
+8. LIMITACOES E PONTOS PARA VALIDACAO
+1. Textos das mensagens continuam pendentes de validacao (E-9), incluindo as 2 novas e a frase "Responda esta mensagem".
+2. "Poste com ferragens expostas" NAO foi marcada como prioridade nem ligada a classificacao (sem regra existente).
+3. Indicio de risco no texto pode ter falso positivo/negativo (busca por termos); por isso so avisa, nao classifica.
+4. "Possivel ocorrencia geral" e "possivel falta de fase" sao avisos de conferencia, nunca confirmacao.
+5. Agrupamento vale dentro do lote aberto. Incidente que aparece em outro CSV do mesmo dia: cada CALL ja e controlada
+   (contada uma vez no dia), mas os lotes nao sao exibidos juntos.
+6. A ordem da tabela mudou (risco primeiro, depois mais recente); antes seguia a ordem do arquivo.
+7. Callback e por comunicacao (CALL): registrar a principal nao marca as demais do incidente. Confirmar com a Operacao
+   se deve continuar assim.
+8. A exportacao de indicadores nao ganhou indicadores de incidentes (mantida igual para nao afetar o Power BI).
+9. Promocao para uso: trocar BANCO_BASE para "central-callback-coi" e EM_DESENVOLVIMENTO para false em js\app.js
+   (assim a versao de uso continua com os dados atuais) - somente apos autorizacao.
+
+==============================================================================================
+REFINAMENTO 1.0.2 (04/11/2026) - VISUAL, CLASSIFICACAO, INDICADORES, SHAREPOINT (documentado), CREDITOS
+Backup antes do refinamento: 08_BACKUP_dev_1.0.2_antes_refinamento (17 arquivos, conferido intacto).
+Resultados: 00_inventario\testes_1.0.2-web-dev_refinamento.txt
+
+R1. TABELA COMPACTA (medido em 1366x768, mesmo CSV ficticio)
+  1.0.1: 38,9 px por linha, 9 linhas visiveis | 1.0.2 antes: 115,4 px, 2 visiveis | agora: 27,9 px, 17 visiveis (todas).
+  Como: avisos viraram etiquetas curtas (texto completo no tooltip e no painel), celulas em uma linha com reticencias,
+  fonte 12,5 px, etiquetas 11 px, indicadores menores, cabecalhos/cartoes com menos espaco.
+  Colunas: Incidente | Data e hora | Motivo / subtipo | Cliente | Telefone | Localizacao | Tent. | Situacao | Acoes.
+  CALL: nao aparece na tabela; continua interna (duplicidade, historico, agrupamento, auditoria, busca, painel e data-call).
+  Localizacao: campo "Localizacao" do CSV (endereco da ocorrencia/cliente), da comunicacao principal.
+  Incidente agrupado: "N comunicacoes" + link "Ver comunicacoes" (abre o painel com todas) + "⚠ RISCO" +
+  "suspeita: ocorrencia geral" / "suspeita: falta de fase".
+  Defeito antigo corrigido: 4 atributos style="..." eram bloqueados pela politica de seguranca (desde a 1.0.1);
+  viraram classes CSS.
+R2. MENSAGEM PRE-SELECIONADA POR PALAVRAS-CHAVE: ver docs\RECONHECIMENTO-MENSAGENS.txt (auditoria, regras, exemplos).
+  Nos CSVs reais: de 62 genericas para 56 especificas + 6 genericas (sem texto). Metricas/exportacao nao mudaram.
+  O mesmo motor alimenta o indicio de risco (nivel 1) do agrupamento, agora sobre o texto limpo (sem referencia/endereco).
+R3. INCIDENTES REPETIDOS: regra aprovada mantida (risco > mais recente; nunca por UC/telefone/descricao). 6 cenarios
+  testados: varias FE; FE + oscilacao; FE + cabo partido (7 comunicacoes); risco antigo x comum recente; risco recente;
+  incidentes distintos com mesma UC/telefone/descricao.
+R4. INDICADORES EM TEMPO REAL: lotes encerrados + lote em andamento pela mesma regra do encerramento (CALL unica, melhor
+  resultado), calculados em memoria a cada registro (callback, tentativa, contato invalido, reabertura). Nenhuma gravacao
+  extra (teste confirma a revisao do banco inalterada). A exportacao continua com os lotes encerrados (nota na tela).
+  "Normalizacao" nao existe nesta versao (pendencia da 1.2.0), por isso nao ha indicador dela.
+R5. INDICADOR DE ENCERRAMENTO: cartao compacto "encerrados/importados · ✓ lote N as HH:MM" (tooltip com chamadas,
+  callbacks e pendentes do ultimo lote), destaque por alguns segundos e confirmacao "✓ Lote N encerrado: ...".
+  Cada lote conta uma vez (id unico; encerrar de novo e recusado).
+R6. SHAREPOINT: nao implementado; documentado em docs\INTEGRACAO-SHAREPOINT-FUTURA.txt. Campo de operador agora
+  rotulado "Operador (informativo)".
+R7. RODAPE: "Criado por Thiago Araujo — COI Sergipe." Credito dos filtros: AGUARDANDO o nome confirmado pelo
+  responsavel (marcador em index.html; nada inventado).
+Arquivos alterados: js\nucleo.js, js\servico.js, js\app.js, index.html, css\estilo.css, testes\testes.js;
+  novos: docs\RECONHECIMENTO-MENSAGENS.txt, docs\INTEGRACAO-SHAREPOINT-FUTURA.txt. js\modelos.js e js\armazenamento.js
+  nao mudaram; esquema do IndexedDB nao mudou.
+Testes (Edge 156 e Chrome 156): testes.html 69/69; interface ponta a ponta 56/56 etapas; index.html sem flags OK;
+  CSVs reais com a mesma leitura (62 comunicacoes, 39 linhas). Versao de uso (05_ENTREGA) intacta; nada publicado.
+
+AJUSTE FINAL DA TABELA (04/11/2026) - so visual; backup: 09_BACKUP_dev_1.0.2_antes_ajuste_tabela
+- Coluna Incidente: de 607 px para 186 px. Mostra numero + "N com." (clicavel: abre as comunicacoes) + "⚠" (risco grave).
+- Etiquetas "suspeita: falta de fase" e "suspeita: ocorrencia geral" sairam da tabela. As regras continuam iguais: as
+  suspeitas aparecem no tooltip da quantidade (contorno amarelo quando existem) e nos avisos do painel.
+- Sem rolagem horizontal: larguras fixas (Incidente 186, Data 124, Telefone 112, Tent. 40, Situacao 150, Acoes 56 px);
+  Motivo, Cliente e Localizacao dividem o restante; textos longos com reticencias e texto completo no tooltip.
+  Medido (Edge e Chrome): 0 px de rolagem horizontal em 1366x768, 1920x1080, 1280x720 e 1200x800; nenhuma celula
+  essencial cortada (incidente com 13 comunicacoes + risco, data/hora, telefone, tentativas, situacao, acoes).
+- Marcador de telefone achado no comentario: "*" (tooltip explica), para nao confundir com "com.".
+- Arquivos alterados: index.html, css\estilo.css, js\app.js. Regras, mensagens, agrupamento, IndexedDB e exportacao
+  inalterados (mesmo hash). Testes: 69/69 e interface 59/59 em Edge e Chrome. Resultado:
+  00_inventario\testes_1.0.2-web-dev_ajuste_tabela.txt
+
+ORDENACAO CRONOLOGICA (04/11/2026) - backup: 10_BACKUP_dev_1.0.2_antes_ordenacao
+SUBSTITUI a regra anterior "risco primeiro" (secao 5 e limitacao 6 acima).
+- Ordem da tabela: SEMPRE pela data e hora ("Horario da call" do CSV do ADMS) da comunicacao PRINCIPAL, do mais recente
+  para o mais antigo. Vale para todos, inclusive risco de vida: risco NAO muda a posicao (so o alerta ⚠).
+- Selecao da comunicacao principal inalterada: risco grave primeiro; sem risco, a mais recente. A linha usa o horario dela.
+- Empate de horario: numero do incidente (crescente, numerico), depois a chave; sem horario vai para o fim.
+- Aplicada na importacao e a cada atualizacao da tabela (a lista e recalculada); registros originais nao sao alterados.
+- Arquivos: js\nucleo.js (so a ordenacao dos grupos) e testes\testes.js (5 testes novos). Mensagens, classificacao,
+  indicadores e layout inalterados.
+- Testes (Edge e Chrome): 74/74; interface 61/61 (ordem cronologica e datas decrescentes na tela); sem rolagem horizontal.
+  CSVs reais: ordem cronologica nos 3 arquivos, com os riscos intercalados pela data. Resultado:
+  00_inventario\testes_1.0.2-web-dev_ordenacao.txt

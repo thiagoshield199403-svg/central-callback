@@ -1,0 +1,55 @@
+CENTRAL DE CALLBACK COI 1.0.1-web / 1.0.2-web-dev - LIMITACOES DO MODELO "SO NAVEGADOR" E PENDENCIAS
+====================================================================================
+Data: 04/11/2026. Limitacoes especificas da 1.0.2 (agrupamento, data/hora, mensagens): ver docs\ALTERACOES-1.0.2.txt, secao 8.
+
+A. O QUE MUDOU EM RELACAO A VERSAO COM SERVIDOR (1.0.0)
+Recurso                          1.0.0 (Python + .bat)                 1.0.1-web (index.html)
+Inicializacao                    INICIAR_CENTRAL.bat + python.exe      duplo clique no index.html
+Servidor / processo em 2o plano  uvicorn em 127.0.0.1:8765             nenhum
+Banco                            SQLite (central\dados\callback.db)    IndexedDB do navegador
+Importacao CSV                   leitor Python                         leitor JS (mesmas regras + correcao 1.0.1)
+SHA-256 previa x importacao      sim                                   sim (SHA-256 em JS puro, testado com vetores NIST)
+Pseudonimo da CALL no dia        HMAC-SHA256                           HMAC-SHA256 (RFC 4231 testado)
+Exportacao                       grava na pasta configurada            download, ou pasta escolhida (Edge/Chrome)
+WhatsApp                         link web.whatsapp.com, envio manual   igual: so abre o link; o operador envia
+Rede                             so 127.0.0.1                          bloqueada pela politica de seguranca da pagina
+
+B. LIMITACOES (verificadas nos testes; nenhuma exigiu servidor)
+1. Navegador: testado no Edge 156 e Chrome 156. Firefox e outros nao foram testados (o armazenamento local em
+   arquivos abertos do disco pode nao funcionar). Se o armazenamento faltar, a Central mostra o aviso e nao abre.
+2. Dados presos ao navegador/perfil: ficam no perfil do usuario no Edge OU no Chrome (nao sao compartilhados entre
+   os dois). Trocar de navegador no meio do dia = comecar vazio no outro. Use sempre o mesmo navegador.
+3. Limpar dados de navegacao, ou politica da TI que apague dados ao fechar o navegador, APAGA o dia em andamento.
+   O resultado oficial e o CSV exportado: exporte ao encerrar cada lote/dia. (Na 1.0.0 o banco era um arquivo.)
+4. Janela anonima/InPrivate: os dados somem ao fechar. Nao usar.
+5. No Chromium (Edge/Chrome), paginas abertas do disco (file://) podem compartilhar o mesmo armazenamento: duas copias
+   da pasta no mesmo computador e perfil podem usar os MESMOS dados (nao verificado nesta rodada). Mantenha uma
+   unica copia por perfil de usuario e nao mova a pasta no meio do dia.
+6. Exportacao: o navegador nao grava sozinho numa pasta. Padrao = Downloads. A pasta escolhida (SharePoint
+   sincronizado) depende de permissao do navegador, que pode ser pedida de novo. Nunca sobrescreve arquivo existente.
+7. Apagamento dos dados pessoais: ao encerrar o lote, os dados sao removidos do armazenamento (teste confirma que nao
+   aparecem mais no registro gravado). Nao ha "secure_delete" no navegador: fragmentos podem permanecer no disco ate
+   o navegador compactar seus arquivos internos. A protecao e a conta do Windows. Avaliar com a LGPD (pendencia L-1).
+8. Varias abas: permitido, mas uma acao numa aba desatualizada e recusada ("alterados em outra aba") e a tela recarrega.
+   Nada e sobrescrito em silencio.
+9. Pop-up: o WhatsApp Web abre em nova aba; se o navegador bloquear, permita pop-ups para arquivos locais.
+10. Copiar texto: se a area de transferencia for bloqueada, o texto fica selecionado para Ctrl+C.
+11. Fuso: data do dia e horarios pelo fuso America/Maceio (Sergipe), como na 1.0.0.
+12. Testes visuais: a interface foi testada automaticamente (cliques, formularios, arquivo, recarga). Um teste visual
+    manual de um operador ainda e recomendado antes do piloto.
+
+C. PENDENCIAS (nao resolvidas nesta versao - nada foi inventado)
+1. Candidata 1.2.0 e distribuicao 1.1.0: NAO encontradas neste computador (Downloads, Desktop, Documentos, OneDrive,
+   Recentes, unidades I:, S:; L: pesquisada so por nome). Sem o codigo delas, NAO foram reconstruidos:
+   - classificacao por codigo de motivo/submotivo (508/509 falta de energia, 503/505 condutor/ramal partido, 510 oscilacao);
+   - as 23 mensagens, titulos limpos, 13 situacoes de risco com fotos opcionais, avisos de seguranca antes das fotos;
+   - normalizacao apos callback e taxa de resolucao = normalizacoes / callbacks x 100;
+   - fallback de download, creditos e link SharePoint manual da 1.2.0.
+   Onde procurar: outro computador, OneDrive/SharePoint, e-mail, pendrive ou o computador do COI que roda a 1.2.0.
+2. Os CSVs reais do ADMS (01/02/03.csv de 01/11) trazem no Submotivo SO SIGLAS (FE, DF, RV, NT), sem codigos
+   numericos nem texto. Resultado: subtipo "nao identificado" e mensagem generica nas 62 chamadas. A classificacao
+   por codigo precisa de uma fonte dos codigos (outra coluna/visao do ADMS ou a tabela da 1.2.0). Pendencia E-1.
+3. Textos das mensagens: sao os 21 modelos manuais da 1.0.0 (JSON oficial, sem alteracao). Os textos aprovados da
+   1.2.0 (e os da BETA de 31/10, que pedem fotos em 13 situacoes) precisam de validacao (E-9) antes de entrar.
+4. Teste num computador corporativo do COI: politica de armazenamento do navegador, pop-ups, WhatsApp Web,
+   permissao de pasta do SharePoint (T-1).

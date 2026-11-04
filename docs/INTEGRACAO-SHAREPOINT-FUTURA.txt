@@ -1,0 +1,45 @@
+CENTRAL DE CALLBACK - INTEGRACAO FUTURA COM O SHAREPOINT (DOCUMENTACAO; NADA IMPLEMENTADO)
+==========================================================================================
+Data: 04/11/2026. Situacao atual (mantida): "EXPORTAR INDICADORES DO DIA" gera um CSV agregado que o navegador baixa
+(ou grava na pasta escolhida, ex.: biblioteca do SharePoint sincronizada pelo OneDrive). A Central continua funcionando
+sozinha, sem rede, sem login e sem credenciais locais.
+
+1. OBJETIVO
+Operador clica "Exportar indicadores" -> os indicadores vao para o SharePoint corporativo -> a identidade AUTENTICADA da
+organizacao identifica quem exportou -> o Power BI mostra quantos callbacks cada operador realizou.
+
+2. REGRAS (decisao do projeto)
+- O nome digitado no campo "Operador (informativo)" NAO e identidade oficial. Continua no CSV apenas como informacao.
+- Nao simular autenticacao, nao criar usuarios/senhas locais, nao inventar identificacao corporativa.
+- Nada de dados pessoais de clientes no SharePoint e nenhuma CALL individual: so indicadores agregados.
+
+3. DADOS AGREGADOS (ja produzidos hoje; formato longo, 14 colunas, sem dados pessoais)
+id_exportacao; chave_consolidacao (id do dia); versao; substitui_id_exportacao; definitiva (sim/nao); data_operacional;
+instalacao (id aleatorio da estacao); estacao; operador (INFORMATIVO); polo; indicador; dimensao; valor; exportado_em.
+Indicadores: lotes, chamadas_processadas, callbacks_realizados, pendencias_contabilizadas, sem_telefone,
+contatos_invalidos, tentativas, chamadas_em_mais_de_um_lote, percentual_callbacks, chamadas_por_motivo,
+chamadas_por_subtipo. Regra Power BI: por chave_consolidacao, usar a maior versao (doc 19).
+A futura identidade corporativa deve ser uma coluna NOVA (ex.: exportado_por_upn), preenchida pelo SharePoint/Entra ID,
+nunca pela Central.
+
+4. COMO O OPERADOR CORPORATIVO PODE SER RECONHECIDO (opcoes, da mais simples para a mais complexa)
+A) Biblioteca do SharePoint sincronizada pelo OneDrive (sem codigo novo):
+   o operador grava o CSV na pasta sincronizada; o SharePoint registra "Criado por"/"Modificado por" com a CONTA
+   CORPORATIVA de quem esta logado no OneDrive. O Power BI (conector "Pasta do SharePoint") le o arquivo e a coluna de
+   autor. Identidade garantida pelo Microsoft 365, nao pela Central. Recomendada como primeiro passo.
+B) Upload pelo navegador ("Carregar" na biblioteca): mesmo efeito de autoria; manual.
+C) Power Automate: fluxo disparado quando um arquivo chega na biblioteca -> le o autor e grava numa lista/tabela de
+   indicadores com a coluna de identidade. Sem codigo na Central.
+D) Envio direto pela Central (Microsoft Graph + MSAL.js): exige registro de aplicativo no Entra ID (TI), consentimento
+   de administrador, permissoes de gravacao no site e a Central hospedada em endereco HTTPS (o login MSAL nao aceita
+   pagina aberta de arquivo local "file://" como endereco de retorno). Isso muda o modelo de distribuicao (pagina
+   hospedada no SharePoint/Teams ou Static Web Apps). So depois de aprovacao da TI.
+
+5. REQUISITOS A CONFIRMAR COM TI / GESTAO
+- Biblioteca CENTRAL_CALLBACK/INDICADORES (T-2): quem grava, quem le, retencao.
+- Politica de sincronizacao do OneDrive nos computadores do COI.
+- Para a opcao D: registro de app, escopos (Sites.Selected recomendado), consentimento, hospedagem HTTPS.
+- LGPD (L-1): confirmar que so dados agregados vao ao SharePoint.
+
+6. O QUE NAO FOI FEITO NESTA ETAPA
+Nenhuma chamada de rede, nenhum login, nenhum codigo de SharePoint/Graph. O CSP da pagina continua bloqueando conexoes.
