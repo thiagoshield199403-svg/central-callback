@@ -1,0 +1,225 @@
+{
+  "_descricao": "Modelos iniciais de mensagem da Central (ponto de partida, editáveis em Administração → Mensagens). Variáveis: {saudacao} {protocolo} {incidente} {polo} {tipo_ocorrencia} {fim_previsto}. Para envio oficial, cada modelo de iniciativa da empresa precisa de um template APROVADO pela Meta (template_meta_nome). Nenhum foi submetido. Etapa 7.3: modelos de envio MANUAL por subtipo, com as perguntas dos modelos da beta e o cabeçalho da Central. Nenhum pede fotografia (evita aproximação do local). Pendentes de validação (E-9). Variável {incidente}: sem incidente, as mensagens NOVAS mostram \"não informado\"; mensagens já gravadas não mudam.",
+  "modelos": [
+    {
+      "codigo": "abertura_padrao",
+      "nome": "Mensagem inicial (geral)",
+      "gatilho": "abertura",
+      "tipo_ocorrencia": null,
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos a sua solicitação (protocolo {protocolo}, ocorrência {incidente}). Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "abertura_risco_de_vida",
+      "nome": "Mensagem inicial — risco de vida (poste abalroado, cabo partido, choque)",
+      "gatilho": "abertura",
+      "tipo_ocorrencia": "risco_de_vida",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos o seu aviso de RISCO (protocolo {protocolo}). Mantenha distância de cabos e postes e não toque em nada. Responda esta mensagem para continuarmos o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "previsao_padrao",
+      "nome": "Previsão de restabelecimento",
+      "gatilho": "previsao",
+      "tipo_ocorrencia": null,
+      "categoria": "utility",
+      "texto": "{saudacao}. Atualização da sua solicitação {protocolo}: a previsão de restabelecimento informada pelo COI é {fim_previsto}. Responda esta mensagem se precisar de ajuda ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "encerramento_padrao",
+      "nome": "Atendimento concluído na Central",
+      "gatilho": "encerramento",
+      "tipo_ocorrencia": null,
+      "categoria": "utility",
+      "texto": "{saudacao}. O atendimento {protocolo} foi concluído pela Central de Comunicação do COI. Se o problema continuar, responda esta mensagem."
+    },
+    {
+      "codigo": "manual_atualizacao",
+      "nome": "Atualização manual (operador)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "categoria": "utility",
+      "texto": "{saudacao}. Temos uma atualização sobre a sua solicitação {protocolo}. Responda esta mensagem para falar com o COI."
+    },
+    {
+      "codigo": "manual_falta_energia",
+      "nome": "Manual — Falta de energia — residência (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "falta_energia",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Estamos verificando sua ocorrência de falta de energia. Sua residência continua sem energia? Já foram realizados os testes no disjuntor interno e no disjuntor na medição? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_condutor_partido",
+      "nome": "Manual — Condutor partido (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "condutor_partido",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência de condutor partido. Por segurança, mantenha distância de cabos e postes e não toque em nada. Existe risco para pessoas ou veículos? Poderia nos dar mais informações? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_poste_abalroado",
+      "nome": "Manual — Poste abalroado (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "poste_abalroado",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a poste. Por segurança, mantenha distância de cabos e postes e não toque em nada. Poderia nos informar se o poste foi atingido por veículo ou se ocorreu algum outro tipo de dano? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_choque_eletrico",
+      "nome": "Manual — Choque elétrico (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "choque_eletrico",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Estamos verificando sua ocorrência relacionada a choque elétrico. Se houver risco de choque, evite tocar no local e mantenha distância até que a situação seja avaliada. Poderia nos informar onde o choque está sendo identificado (dentro da residência, na caixa de medição, no poste da residência ou em poste da Energisa)? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_faiscas_rede",
+      "nome": "Manual — Faíscas na rede (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "faiscas_rede",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a faíscas na rede elétrica. Por segurança, não se aproxime nem toque na rede elétrica. Poderia nos informar se as faíscas continuam ocorrendo e em qual local foram observadas? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_faiscas_ramal",
+      "nome": "Manual — Faíscas no ramal de serviço (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "faiscas_ramal",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a faíscas no ramal de serviço. Por segurança, não se aproxime nem toque nos fios ou equipamentos. Poderia nos informar se as faíscas continuam ocorrendo? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_incendio",
+      "nome": "Manual — Incêndio (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "incendio",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Se houver pessoa ferida, ligue agora para 193 (Bombeiros). Por segurança, mantenha distância de cabos e postes e não toque em nada. O incêndio está na caixa de medição da residência ou na rede elétrica da rua? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_oscilacao",
+      "nome": "Manual — Oscilação de energia (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "oscilacao",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Estamos verificando sua ocorrência de oscilação de energia. Poderia nos informar se a oscilação continua acontecendo? A oscilação ocorre em toda a residência ou apenas em algum ponto específico? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_tensao_alta",
+      "nome": "Manual — Tensão alta (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "tensao_alta",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a tensão alta. Poderia nos informar quais aparelhos ou equipamentos estão apresentando problema? O problema está acontecendo neste momento? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_tensao_baixa",
+      "nome": "Manual — Tensão baixa (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "tensao_baixa",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a tensão baixa. Poderia nos informar quais aparelhos ou equipamentos estão apresentando problema? O problema está acontecendo neste momento? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_defeito_transformador",
+      "nome": "Manual — Defeito no transformador (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "defeito_transformador",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a possível defeito no transformador. Poderia nos informar o que foi observado no equipamento? Foi percebido vazamento de óleo, barulho anormal, fumaça ou alguma outra situação? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_problema_ramal",
+      "nome": "Manual — Problema no ramal de serviço (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "problema_ramal",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente ao ramal de serviço. Poderia nos informar qual problema foi identificado no ramal? Existe algum fio solto, rompido, danificado ou alguma outra situação? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_arvore_rede",
+      "nome": "Manual — Árvore na rede (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "arvore_rede",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a uma árvore na rede elétrica. Poderia nos informar se a árvore está em contato com a rede elétrica ou se existe algum risco para pessoas ou veículos? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_objeto_estranho_rede",
+      "nome": "Manual — Objeto estranho na rede (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "objeto_estranho_rede",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a um objeto estranho na rede elétrica. Poderia nos informar se o objeto é uma árvore, animal ou outro tipo de objeto sobre ou próximo à rede? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_poste_inclinado",
+      "nome": "Manual — Poste inclinado (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "poste_inclinado",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a poste inclinado. Poderia nos informar se o poste pertence à sua residência ou se é um poste da Energisa? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_transformador_oleo",
+      "nome": "Manual — Transformador com vazamento de óleo (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "transformador_oleo",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a transformador com vazamento de óleo. Poderia nos informar o que foi observado no equipamento? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_condutor_desnivelado",
+      "nome": "Manual — Condutor desnivelado (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "condutor_desnivelado",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a condutor desnivelado. Poderia nos dar mais informações sobre a situação? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_defeito_disjuntor",
+      "nome": "Manual — Defeito no disjuntor (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "defeito_disjuntor",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a defeito no disjuntor. Poderia nos informar se o imóvel continua sem energia? O problema está no disjuntor localizado na caixa de medição? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_inversao_fase",
+      "nome": "Manual — Inversão de fase (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "inversao_fase",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a possível inversão de fase. Poderia nos informar qual equipamento ou aparelho está apresentando problema? O problema ocorre, por exemplo, com algum motor funcionando no sentido contrário? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    },
+    {
+      "codigo": "manual_poste_auxiliar_quebrado",
+      "nome": "Manual — Poste auxiliar quebrado (perguntas da beta; validar E-9)",
+      "gatilho": "manual",
+      "tipo_ocorrencia": null,
+      "subtipo_ocorrencia": "poste_auxiliar_quebrado",
+      "categoria": "utility",
+      "texto": "{saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a poste auxiliar. Poderia nos informar a situação do poste e se existe algum risco para pessoas ou veículos? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens."
+    }
+  ]
+}

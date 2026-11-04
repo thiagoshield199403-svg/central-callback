@@ -1,0 +1,193 @@
+﻿MENSAGENS - ANTES E DEPOIS (1.0.1 -> 1.0.2-web-dev), 04/11/2026
+Original integral: modelos-mensagem-1.0.1-ORIGINAL.json (nesta pasta). Validacao dos textos pendente (E-9).
+Mensagens usadas pelo operador = gatilho 'manual' (23). As 4 demais (abertura/previsao/encerramento) nao sao usadas pela Central web; foram padronizadas para coerencia.
+
+=== [abertura_padrao]  gatilho=abertura  grupo=
+  Titulo antes : Mensagem inicial (geral)
+  Titulo agora : Mensagem inicial (geral)
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos a sua solicitação (protocolo {protocolo}, ocorrência {incidente}). Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos a sua solicitação (protocolo {protocolo}, ocorrência {incidente}). Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [abertura_risco_de_vida]  gatilho=abertura  grupo=
+  Titulo antes : Mensagem inicial — risco de vida (poste abalroado, cabo partido, choque)
+  Titulo agora : Mensagem inicial — risco de vida (poste abalroado, cabo partido, choque)
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos o seu aviso de RISCO (protocolo {protocolo}). Mantenha distância de cabos e postes e não toque em nada. Responda esta mensagem para continuarmos o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos o seu aviso de RISCO (protocolo {protocolo}). Mantenha distância de cabos e postes e não toque em nada. Responda esta mensagem para continuarmos o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [previsao_padrao]  gatilho=previsao  grupo=
+  Titulo antes : Previsão de restabelecimento
+  Titulo agora : Previsão de restabelecimento
+  Texto antes  : {saudacao}. Atualização da sua solicitação {protocolo}: a previsão de restabelecimento informada pelo COI é {fim_previsto}. Responda esta mensagem se precisar de ajuda ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Atualização da sua solicitação {protocolo}: a previsão de restabelecimento informada pelo COI é {fim_previsto}. Responda esta mensagem se precisar de ajuda.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [encerramento_padrao]  gatilho=encerramento  grupo=
+  Titulo antes : Atendimento concluído na Central
+  Titulo agora : Atendimento concluído na Central
+  Texto antes  : {saudacao}. O atendimento {protocolo} foi concluído pela Central de Comunicação do COI. Se o problema continuar, responda esta mensagem.
+  Texto agora  : Olá, aqui é a Energisa. O atendimento {protocolo} foi concluído. Se o problema continuar, responda esta mensagem.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_atualizacao]  gatilho=manual  grupo=Geral
+  Titulo antes : Atualização manual (operador)
+  Titulo agora : Solicitação não identificada — pedir mais informações
+  Texto antes  : {saudacao}. Temos uma atualização sobre a sua solicitação {protocolo}. Responda esta mensagem para falar com o COI.
+  Texto agora  : Olá, aqui é a Energisa. Estamos entrando em contato referente a uma solicitação que você registrou conosco. Você poderia nos fornecer mais informações sobre a situação?
+  Alteracao    : 1.0.2: novo texto genérico (fallback) para ocorrência não identificada
+
+=== [manual_falta_energia]  gatilho=manual  grupo=Falta de energia
+  Titulo antes : Manual — Falta de energia — residência (perguntas da beta; validar E-9)
+  Titulo agora : Falta de energia — residência
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Estamos verificando sua ocorrência de falta de energia. Sua residência continua sem energia? Já foram realizados os testes no disjuntor interno e no disjuntor na medição? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Estamos verificando sua ocorrência de falta de energia. Sua residência continua sem energia? Já foram realizados os testes no disjuntor interno e no disjuntor na medição? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_condutor_partido]  gatilho=manual  grupo=Rede e condutores
+  Titulo antes : Manual — Condutor partido (perguntas da beta; validar E-9)
+  Titulo agora : Condutor partido
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência de condutor partido. Por segurança, mantenha distância de cabos e postes e não toque em nada. Existe risco para pessoas ou veículos? Poderia nos dar mais informações? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência de condutor partido. Por segurança, mantenha distância de cabos e postes e não toque em nada. Existe risco para pessoas ou veículos? Poderia nos dar mais informações? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_poste_abalroado]  gatilho=manual  grupo=Poste
+  Titulo antes : Manual — Poste abalroado (perguntas da beta; validar E-9)
+  Titulo agora : Poste abalroado
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a poste. Por segurança, mantenha distância de cabos e postes e não toque em nada. Poderia nos informar se o poste foi atingido por veículo ou se ocorreu algum outro tipo de dano? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente a poste. Por segurança, mantenha distância de cabos e postes e não toque em nada. Poderia nos informar se o poste foi atingido por veículo ou se ocorreu algum outro tipo de dano? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_choque_eletrico]  gatilho=manual  grupo=Choque, faíscas e incêndio
+  Titulo antes : Manual — Choque elétrico (perguntas da beta; validar E-9)
+  Titulo agora : Choque elétrico
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Estamos verificando sua ocorrência relacionada a choque elétrico. Se houver risco de choque, evite tocar no local e mantenha distância até que a situação seja avaliada. Poderia nos informar onde o choque está sendo identificado (dentro da residência, na caixa de medição, no poste da residência ou em poste da Energisa)? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Estamos verificando sua ocorrência relacionada a choque elétrico. Se houver risco de choque, evite tocar no local e mantenha distância até que a situação seja avaliada. Poderia nos informar onde o choque está sendo identificado (dentro da residência, na caixa de medição, no poste da residência ou em poste da Energisa)? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_faiscas_rede]  gatilho=manual  grupo=Choque, faíscas e incêndio
+  Titulo antes : Manual — Faíscas na rede (perguntas da beta; validar E-9)
+  Titulo agora : Faíscas na rede
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a faíscas na rede elétrica. Por segurança, não se aproxime nem toque na rede elétrica. Poderia nos informar se as faíscas continuam ocorrendo e em qual local foram observadas? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente a faíscas na rede elétrica. Por segurança, não se aproxime nem toque na rede elétrica. Poderia nos informar se as faíscas continuam ocorrendo e em qual local foram observadas? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_faiscas_ramal]  gatilho=manual  grupo=Choque, faíscas e incêndio
+  Titulo antes : Manual — Faíscas no ramal de serviço (perguntas da beta; validar E-9)
+  Titulo agora : Faíscas no ramal de serviço
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a faíscas no ramal de serviço. Por segurança, não se aproxime nem toque nos fios ou equipamentos. Poderia nos informar se as faíscas continuam ocorrendo? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente a faíscas no ramal de serviço. Por segurança, não se aproxime nem toque nos fios ou equipamentos. Poderia nos informar se as faíscas continuam ocorrendo? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_incendio]  gatilho=manual  grupo=Choque, faíscas e incêndio
+  Titulo antes : Manual — Incêndio (perguntas da beta; validar E-9)
+  Titulo agora : Incêndio
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Se houver pessoa ferida, ligue agora para 193 (Bombeiros). Por segurança, mantenha distância de cabos e postes e não toque em nada. O incêndio está na caixa de medição da residência ou na rede elétrica da rua? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Se houver pessoa ferida, ligue agora para 193 (Bombeiros). Por segurança, mantenha distância de cabos e postes e não toque em nada. O incêndio está na caixa de medição da residência ou na rede elétrica da rua? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_oscilacao]  gatilho=manual  grupo=Tensão e oscilação
+  Titulo antes : Manual — Oscilação de energia (perguntas da beta; validar E-9)
+  Titulo agora : Oscilação de energia
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Estamos verificando sua ocorrência de oscilação de energia. Poderia nos informar se a oscilação continua acontecendo? A oscilação ocorre em toda a residência ou apenas em algum ponto específico? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Estamos verificando sua ocorrência de oscilação de energia. Poderia nos informar se a oscilação continua acontecendo? A oscilação ocorre em toda a residência ou apenas em algum ponto específico? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_tensao_alta]  gatilho=manual  grupo=Tensão e oscilação
+  Titulo antes : Manual — Tensão alta (perguntas da beta; validar E-9)
+  Titulo agora : Tensão alta
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a tensão alta. Poderia nos informar quais aparelhos ou equipamentos estão apresentando problema? O problema está acontecendo neste momento? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente a tensão alta. Poderia nos informar quais aparelhos ou equipamentos estão apresentando problema? O problema está acontecendo neste momento? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_tensao_baixa]  gatilho=manual  grupo=Tensão e oscilação
+  Titulo antes : Manual — Tensão baixa (perguntas da beta; validar E-9)
+  Titulo agora : Tensão baixa
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a tensão baixa. Poderia nos informar quais aparelhos ou equipamentos estão apresentando problema? O problema está acontecendo neste momento? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente a tensão baixa. Poderia nos informar quais aparelhos ou equipamentos estão apresentando problema? O problema está acontecendo neste momento? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_defeito_transformador]  gatilho=manual  grupo=Transformador
+  Titulo antes : Manual — Defeito no transformador (perguntas da beta; validar E-9)
+  Titulo agora : Defeito no transformador
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a possível defeito no transformador. Poderia nos informar o que foi observado no equipamento? Foi percebido vazamento de óleo, barulho anormal, fumaça ou alguma outra situação? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente a possível defeito no transformador. Poderia nos informar o que foi observado no equipamento? Foi percebido vazamento de óleo, barulho anormal, fumaça ou alguma outra situação? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_problema_ramal]  gatilho=manual  grupo=Ramal, medição e disjuntor
+  Titulo antes : Manual — Problema no ramal de serviço (perguntas da beta; validar E-9)
+  Titulo agora : Problema no ramal de serviço
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente ao ramal de serviço. Poderia nos informar qual problema foi identificado no ramal? Existe algum fio solto, rompido, danificado ou alguma outra situação? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente ao ramal de serviço. Poderia nos informar qual problema foi identificado no ramal? Existe algum fio solto, rompido, danificado ou alguma outra situação? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_arvore_rede]  gatilho=manual  grupo=Rede e condutores
+  Titulo antes : Manual — Árvore na rede (perguntas da beta; validar E-9)
+  Titulo agora : Árvore na rede
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a uma árvore na rede elétrica. Poderia nos informar se a árvore está em contato com a rede elétrica ou se existe algum risco para pessoas ou veículos? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente a uma árvore na rede elétrica. Poderia nos informar se a árvore está em contato com a rede elétrica ou se existe algum risco para pessoas ou veículos? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_objeto_estranho_rede]  gatilho=manual  grupo=Rede e condutores
+  Titulo antes : Manual — Objeto estranho na rede (perguntas da beta; validar E-9)
+  Titulo agora : Objeto estranho na rede
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a um objeto estranho na rede elétrica. Poderia nos informar se o objeto é uma árvore, animal ou outro tipo de objeto sobre ou próximo à rede? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente a um objeto estranho na rede elétrica. Poderia nos informar se o objeto é uma árvore, animal ou outro tipo de objeto sobre ou próximo à rede? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_poste_inclinado]  gatilho=manual  grupo=Poste
+  Titulo antes : Manual — Poste inclinado (perguntas da beta; validar E-9)
+  Titulo agora : Poste inclinado
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a poste inclinado. Poderia nos informar se o poste pertence à sua residência ou se é um poste da Energisa? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente a poste inclinado. Poderia nos informar se o poste pertence à sua residência ou se é um poste da Energisa? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_transformador_oleo]  gatilho=manual  grupo=Transformador
+  Titulo antes : Manual — Transformador com vazamento de óleo (perguntas da beta; validar E-9)
+  Titulo agora : Transformador com vazamento de óleo
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a transformador com vazamento de óleo. Poderia nos informar o que foi observado no equipamento? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente a transformador com vazamento de óleo. Poderia nos informar o que foi observado no equipamento? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_condutor_desnivelado]  gatilho=manual  grupo=Rede e condutores
+  Titulo antes : Manual — Condutor desnivelado (perguntas da beta; validar E-9)
+  Titulo agora : Condutor desnivelado
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a condutor desnivelado. Poderia nos dar mais informações sobre a situação? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente a condutor desnivelado. Poderia nos dar mais informações sobre a situação? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_defeito_disjuntor]  gatilho=manual  grupo=Ramal, medição e disjuntor
+  Titulo antes : Manual — Defeito no disjuntor (perguntas da beta; validar E-9)
+  Titulo agora : Defeito no disjuntor
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a defeito no disjuntor. Poderia nos informar se o imóvel continua sem energia? O problema está no disjuntor localizado na caixa de medição? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente a defeito no disjuntor. Poderia nos informar se o imóvel continua sem energia? O problema está no disjuntor localizado na caixa de medição? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_inversao_fase]  gatilho=manual  grupo=Tensão e oscilação
+  Titulo antes : Manual — Inversão de fase (perguntas da beta; validar E-9)
+  Titulo agora : Inversão de fase
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a possível inversão de fase. Poderia nos informar qual equipamento ou aparelho está apresentando problema? O problema ocorre, por exemplo, com algum motor funcionando no sentido contrário? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente a possível inversão de fase. Poderia nos informar qual equipamento ou aparelho está apresentando problema? O problema ocorre, por exemplo, com algum motor funcionando no sentido contrário? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_poste_auxiliar_quebrado]  gatilho=manual  grupo=Poste
+  Titulo antes : Manual — Poste auxiliar quebrado (perguntas da beta; validar E-9)
+  Titulo agora : Poste auxiliar quebrado
+  Texto antes  : {saudacao}! Aqui é a Central de Comunicação do COI, pelo WhatsApp do {polo}. Recebemos uma ocorrência referente a poste auxiliar. Poderia nos informar a situação do poste e se existe algum risco para pessoas ou veículos? Responda esta mensagem para continuar o atendimento ou envie SAIR para não receber mais mensagens.
+  Texto agora  : Olá, aqui é a Energisa. Recebemos uma ocorrência referente a poste auxiliar. Poderia nos informar a situação do poste e se existe algum risco para pessoas ou veículos? Responda esta mensagem para continuar o atendimento.
+  Alteracao    : 1.0.2: saudação padronizada; sem 'envie SAIR'; sem Central de Comunicação/polo
+
+=== [manual_falta_energia_geral]  gatilho=manual  grupo=Falta de energia
+  Titulo antes : (mensagem nova)
+  Titulo agora : Falta de energia geral — confirmação com vizinhos
+  Texto antes  : (mensagem nova)
+  Texto agora  : Olá, aqui é a Energisa. Estamos entrando em contato referente a uma solicitação de falta de energia. Poderia nos informar se a falta de energia está acontecendo apenas na sua residência ou se os vizinhos da localidade também estão sem energia?
+  Alteracao    : 1.0.2: mensagem nova (seleção manual; não altera a classificação)
+
+=== [manual_poste_ferragens_expostas]  gatilho=manual  grupo=Poste
+  Titulo antes : (mensagem nova)
+  Titulo agora : Poste com ferragens expostas
+  Texto antes  : (mensagem nova)
+  Texto agora  : Olá, aqui é a Energisa. Estamos entrando em contato referente à ocorrência de ferragens expostas em um poste. Para nos ajudar a compreender melhor a situação, poderia enviar uma foto do local, caso seja seguro realizar o registro? Não se aproxime do poste nem toque em estruturas ou componentes da rede elétrica.
+  Alteracao    : 1.0.2: mensagem nova (seleção manual; foto só se for seguro)
+
