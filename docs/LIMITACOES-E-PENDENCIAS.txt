@@ -1,6 +1,7 @@
 CENTRAL DE CALLBACK COI 1.0.1-web / 1.0.2-web-dev - LIMITACOES DO MODELO "SO NAVEGADOR" E PENDENCIAS
 ====================================================================================
 Data: 04/11/2026. Limitacoes especificas da 1.0.2 (agrupamento, data/hora, mensagens): ver docs\ALTERACOES-1.0.2.txt, secao 8.
+Atualizado para a 1.1.0-web-dev: ver o bloco D no fim e docs\ALTERACOES-1.1.0.txt.
 
 A. O QUE MUDOU EM RELACAO A VERSAO COM SERVIDOR (1.0.0)
 Recurso                          1.0.0 (Python + .bat)                 1.0.1-web (index.html)
@@ -53,3 +54,18 @@ C. PENDENCIAS (nao resolvidas nesta versao - nada foi inventado)
    1.2.0 (e os da BETA de 31/10, que pedem fotos em 13 situacoes) precisam de validacao (E-9) antes de entrar.
 4. Teste num computador corporativo do COI: politica de armazenamento do navegador, pop-ups, WhatsApp Web,
    permissao de pasta do SharePoint (T-1).
+
+D. ATUALIZACAO 1.1.0-web-dev (04/11/2026)
+1. Item B.6 (exportacao) substituido: EXPORTAR DO DIA abre a janela "Salvar como" do Windows (Edge/Chrome) com o nome
+   CALLBACK_<POLO>_<dd-mm-aaaa>.csv. O navegador NAO aceita um caminho escrito (W:\...) como pasta inicial: a pasta e
+   escolhida uma vez (Configuracao > Escolher pasta inicial) e lembrada. W: desconectada: a janela abre na pasta
+   padrao, com aviso. Sem a janela (outros navegadores): download para Downloads, com aviso.
+2. Pendencia C.1 parcialmente resolvida com a referencia CENTRAL_CALLBACK (Desktop): normalizacao apos callback e taxa de
+   resolucao (agora "Ocorrencia resolvida com sucesso"), creditos, abertura do turno so com o operador, texto editavel.
+   Continuam pendentes: classificacao por codigo numerico de motivo e as fotos opcionais em situacoes de risco (a
+   referencia tambem nao tem essas regras).
+3. "Servico executado" nao existe na referencia: criado com a mesma regra da normalizacao (so apos callback, uma vez).
+4. Painel: mostra apenas os turnos registrados neste navegador (ate 60 dias encerrados). O consolidado de todos os
+   operadores e no Power BI, com os arquivos exportados.
+5. Testes manuais ainda necessarios no computador do COI: janela Salvar real com a unidade W: corporativa, abertura real
+   do WhatsApp Web e politicas do navegador corporativo (pop-ups, permissao de pasta).

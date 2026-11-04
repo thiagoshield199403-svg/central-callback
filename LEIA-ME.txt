@@ -1,44 +1,53 @@
-CENTRAL DE CALLBACK COI - versao 1.0.2-web-dev (COPIA DE DESENVOLVIMENTO - aplicacao web local)
-=================================================================================================
-ATENCAO: esta copia NAO e a versao de uso. Ela usa um armazenamento separado (central-callback-coi-dev) e mostra
-uma faixa "COPIA DE DESENVOLVIMENTO" no topo. Nao use na operacao sem autorizacao. Novidades: docs\ALTERACOES-1.0.2.txt
-Exemplo de contingencia (ficticio): exemplos\navegador-chamadas-CONTINGENCIA-FICTICIO.csv
+CENTRAL DE CALLBACK COI - versao 1.1.0-web-dev (aplicacao web local - copia em teste, ainda nao publicada)
+=========================================================================================================
+Esta copia usa um armazenamento separado (central-callback-coi-dev) e nao mexe nos dados da versao em uso.
+Novidades e comparacao com a referencia: docs\ALTERACOES-1.1.0.txt
 
 COMO INICIAR
-1. Copie a pasta CENTRAL_CALLBACK_WEB inteira para uma pasta sua (ex.: Documentos).
+1. Copie a pasta inteira para uma pasta sua (ex.: Documentos).
 2. Clique duas vezes em index.html. Ele abre no navegador.
    - Use o Microsoft Edge ou o Google Chrome (testados: versao 156).
-   - Se abrir em outro navegador, clique com o botao direito em index.html > Abrir com > Microsoft Edge.
    - Nao use janela anonima/InPrivate: ao fechar, ela apaga os dados do dia.
-3. Dica: depois de aberto, salve nos Favoritos (Ctrl+D) para abrir rapido nos proximos dias.
+3. Dica: salve nos Favoritos (Ctrl+D) para abrir rapido nos proximos dias.
 
-Nao ha instalacao, executavel, .bat, servidor, Python ou Node.js. Nada roda em segundo plano:
-fechar a aba encerra a Central. Ao abrir de novo, o dia e o lote continuam de onde pararam.
+Nao ha instalacao, executavel, .bat, servidor, Python ou Node.js. Fechar a aba encerra a Central. Ao abrir de novo,
+o turno e o lote continuam de onde pararam.
+
+PRIMEIRA VEZ NO COMPUTADOR
+- Configuracao > Polo padrao (ex.: Aracaju).
+- No primeiro EXPORTAR DO DIA a Central pede, uma unica vez, a pasta de destino OBRIGATORIA:
+  W:\DTEC\DEOP\DECO\CO\USUARIOS\TSA4\CENTRAL DE CALLBACK (so a pasta CENTRAL DE CALLBACK e aceita).
 
 USO DIARIO
-1. Abra o dia (polo e operador).
+1. Abrir o turno: so a sua SIGLA (ex.: TSA4).
 2. Importar CSV do ADMS: escolha o arquivo exportado do Navegador de Chamadas, confira a previa e importe.
-   O CSV atual do ADMS (com a linha "Filtrar: [...]" antes do cabecalho) e aceito.
-3. Trabalhe as chamadas: Abrir WhatsApp Web (abre com o texto pronto; QUEM ENVIA E O OPERADOR),
-   depois registre: Callback realizado / Tentativa sem sucesso / Contato invalido (com o meio: WhatsApp, ligacao, outro).
-4. "Encerrar e limpar o lote": as metricas ficam; os dados dos clientes sao apagados.
-5. Repita 2 a 4 para o proximo CSV.
-6. "Encerrar o dia": gera o arquivo DEFINITIVO de indicadores.
-   EXPORTAR INDICADORES DO DIA pode ser usado a qualquer momento (gera nova versao).
-
-ONDE FICAM OS ARQUIVOS DE INDICADORES
-- Padrao: pasta de Downloads do navegador.
-- Opcional (Edge/Chrome): Configuracao > "Escolher pasta" (ex.: pasta do SharePoint sincronizada pelo OneDrive).
-  O navegador pode pedir permissao de novo a cada dia; se negar, o arquivo e baixado para Downloads.
-- Leve os arquivos para a biblioteca SharePoint CENTRAL_CALLBACK/INDICADORES.
+3. Clique na ocorrencia. Confira a mensagem sugerida (pode trocar e editar o texto).
+   - Telefone do ADMS: "Abrir WhatsApp Web".
+   - ADMS sem telefone: procure o cadastro do cliente no incidente, digite o celular no campo ao lado de
+     "Envio manual" e clique em "Envio manual". Telefone fixo ou invalido nao abre o WhatsApp.
+   - QUEM ENVIA E O OPERADOR. Abrir o WhatsApp nao conta como tentativa nem como callback.
+4. Registre: Callback realizado / Tentativa sem sucesso / Contato invalido (com o meio).
+   Depois do callback: "Servico executado" e/ou "Ocorrencia resolvida com sucesso" (registros independentes).
+   Atalho na lista: a BOLINHA antes de "Abrir" registra a ocorrencia resolvida sem abrir os detalhes
+   (tracejada = falta o callback; vazia = clique para registrar; verde com ✓ = resolvida, clique para desfazer).
+   Errou? "Reabrir (corrigir)" com uma observacao (apaga tambem servico/resolucao daquela chamada).
+5. "Encerrar e limpar o lote": os indicadores ficam; os dados dos clientes sao apagados.
+6. EXPORTAR DO DIA: gera CALLBACK_<POLO>_<data>.csv e abre a janela Salvar do Windows NA PASTA DE DESTINO, com o nome
+   pronto; confirme em Salvar. Salvar fora do destino e recusado. W: indisponivel: "Arquivo NAO salvo no destino"
+   (o arquivo continua guardado na Central; ha copia de contingencia opcional para Downloads). "Encerrar o dia" gera a versao definitiva. O arquivo nao tem dados de clientes.
+7. Botao PAINEL: indicadores de hoje e por dia, operador e polo (turnos feitos neste navegador).
 
 ONDE FICAM OS DADOS
 - No armazenamento local do navegador (IndexedDB), so neste computador e neste perfil do Windows/navegador.
-- "Limpar dados de navegacao" (cookies e dados de sites) APAGA o dia em andamento. Exporte ao fim de cada dia.
+- "Limpar dados de navegacao" APAGA o turno em andamento. Exporte ao fim de cada dia.
 
 TESTE RAPIDO (sem dados reais)
-- exemplos\navegador-chamadas-ADMS2026-FICTICIO.csv (formato atual do ADMS) e
-  exemplos\navegador-chamadas-FICTICIO.csv (formato antigo): dados 100% ficticios.
-- testes\testes.html: abre e roda os testes automaticos (usa um banco de teste separado; nao mexe nos seus dados).
+- exemplos\navegador-chamadas-ADMS2026-FICTICIO.csv, navegador-chamadas-FICTICIO.csv e
+  navegador-chamadas-CONTINGENCIA-FICTICIO.csv: dados 100% ficticios.
+- testes\testes.html: abre e roda os testes automaticos (banco de teste separado; nao mexe nos seus dados).
+- Desenvolvimento (opcional, exige Node.js): node testes\ponta-a-ponta\rodar-testes-unitarios.mjs  e
+  node testes\ponta-a-ponta\e2e.mjs  (testes pela interface, sem janela).
 
 Limitacoes e pendencias: docs\LIMITACOES-E-PENDENCIAS.txt
+
+Criador: Thiago dos Santos Araujo · Filtros ADMS: Any Carolinne dos Santos Muniz

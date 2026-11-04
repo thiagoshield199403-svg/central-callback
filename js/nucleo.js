@@ -5,7 +5,7 @@
 "use strict";
 (function (raiz) {
   const N = {};
-  N.VERSAO = "1.0.2-web-dev";
+  N.VERSAO = "1.1.0-web-dev";
 
   /* ================================================================ texto */
   function semAcento(t) { return String(t ?? "").normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^\x00-\x7f]/g, ""); }
@@ -239,6 +239,17 @@
     const doContato = N.extrairDoContato(valores.contato), numeros = new Set(doContato.map((t) => t.numero));
     return doContato.concat(N.extrairDoComentario(comentario).filter((t) => !numeros.has(t.numero)));
   };
+  /* 1.1.0: telefone digitado pelo operador (envio manual). Aceita com ou sem +55, 0, parênteses, espaços e hífens.
+     Só celular válido abre o WhatsApp: fixo, DDD inexistente, sequência de teste ou quantidade errada de dígitos são recusados. */
+  N.validarTelefoneManual = function (bruto) {
+    const d0 = digitos(bruto || "");
+    if (!d0) return { ok: false, erro: "Digite o telefone com DDD (ex.: 79 99999-1234)." };
+    if (d0.length === 8 || d0.length === 9) return { ok: false, erro: "Falta o DDD: digite o telefone com DDD (ex.: 79 99999-1234)." };
+    const d = N.normalizarTelefone(d0), [tipo, motivo] = N.classificarTelefone(d);
+    if (tipo === "fixo") return { ok: false, fixo: true, numero: d, erro: `${N.formatarTelefone(d)} é telefone FIXO: o WhatsApp só abre para celular. Faça o contato por ligação.` };
+    if (tipo !== "celular") return { ok: false, erro: `Telefone inválido (${motivo}). Confira o número no ADMS.` };
+    return { ok: true, numero: d, exibir: N.formatarTelefone(d) };
+  };
   N.formatarTelefone = function (n) {
     if (!n) return "—";
     if (n.length === 11) return `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}`;
@@ -391,6 +402,35 @@
     return texto;
   };
   N.linkWhatsappWeb = (numero, texto) => `https://web.whatsapp.com/send?phone=55${numero}&text=${encodeURIComponent(texto)}`;
+  /* 1.1.0 (recuperado da referência: mensagens.py com_saudacao/texto_do_operador): o operador pode editar o texto antes de
+     abrir o WhatsApp; a saudação institucional aprovada na Web ("Olá, aqui é a Energisa.") é garantida no início, sem duplicar. */
+  N.SAUDACAO = "Olá, aqui é a Energisa.";
+  N.TEXTO_MAX = 1500;
+  N.comSaudacao = function (texto) {
+    texto = String(texto || "").trim();
+    const inicio = semAcento(texto.slice(0, 40)).toLowerCase().replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim();
+    if (inicio.startsWith("ola aqui e a energisa")) return texto;
+    return texto ? `${N.SAUDACAO} ${texto}` : N.SAUDACAO;
+  };
+  N.textoDoOperador = function (texto) {
+    texto = String(texto || "").replace(/\r\n/g, "\n").trim();
+    if (!texto) throw new Error("O texto da mensagem está vazio.");
+    if (texto.length > N.TEXTO_MAX) throw new Error(`O texto da mensagem passa de ${N.TEXTO_MAX} caracteres.`);
+    return N.comSaudacao(texto);
+  };
+  /* 1.1.0 (recuperado da referência: classificacao.py resumir_localizacao): só exibição na tabela; o texto completo continua
+     no detalhe e no tooltip. 'RUA X_20_LT 3_JATOBA; 10_BARRA DOS COQUEIROS' -> 'JATOBA · BARRA DOS COQUEIROS'. */
+  N.resumirLocalizacao = function (loc) {
+    const t = String(loc || "").split(/\s+/).filter(Boolean).join(" ");
+    if (!t) return "";
+    const partes = t.split(";").map((p) => p.trim()).filter(Boolean);
+    if (partes.length < 2) return t.length <= 48 ? t : t.slice(0, 47) + "…";
+    const cidade = partes[partes.length - 1].replace(/^\d+_/, "").trim(), end = partes[0];
+    const bairro = end.includes("_") ? end.slice(end.lastIndexOf("_") + 1).trim() : "";
+    let itens = [bairro, cidade].filter(Boolean);
+    if (itens.length === 2 && itens[0].toUpperCase() === itens[1].toUpperCase()) itens = itens.slice(0, 1);
+    return itens.join(" · ") || t.slice(0, 48);
+  };
   /* 1.0.2: lista para o operador agrupada por assunto e em ordem alfabética (de assunto e de título, pt-BR).
      "prioridade" = modelo de subtipo de RISCO (regra existente em SUBTIPOS); é só marcação visual, não muda a ordem. */
   const alfa = (a, b) => a.localeCompare(b, "pt-BR", { sensitivity: "base" });
@@ -613,6 +653,29 @@
     return "﻿" + linhas.join("\r\n") + "\r\n";
   };
   N.nomeExportacao = (s, versao) => `indicadores_${s.data_operacional}_${N.nomeSeguro(s.estacao)}_${N.nomeSeguro(s.operador)}_${s.id.slice(0, 8)}_v${versao}.csv`;
+  /* Acima: formato LONGO da 1.0.x (uma linha por indicador), mantido no código para referência. Desde a 1.1.0 o botão
+     EXPORTAR DO DIA e o encerramento do dia geram o arquivo DIÁRIO abaixo. */
+
+  /* ================================================================ 1.1.0: exportação diária (Power BI) */
+  /* Uma linha por turno (dia + polo + operador), só contagens operacionais, sem nome, telefone, UC, endereço, comentário,
+     CALL ou incidente. Percentuais NÃO vão no arquivo (calcular no Power BI a partir das contagens, sem média de média).
+     Consolidação sem dupla contagem: por id_turno, usar só a linha de MAIOR versao (a definitiva é a última). */
+  N.COLUNAS_DIA = ["data", "polo", "operador", "total_chamadas", "callbacks_realizados", "tentativas", "tentativas_sem_sucesso",
+    "contatos_invalidos", "sem_telefone", "servicos_executados", "ocorrencias_resolvidas", "pendencias", "lotes_encerrados",
+    "id_turno", "versao", "definitiva", "exportado_em"];
+  N.linhaDia = (sessao, exp, m) => [sessao.data_operacional, sessao.polo || "", sessao.operador || "", m.chamadas_processadas || 0,
+    m.callbacks_realizados || 0, m.tentativas || 0, m.tentativas_sem_sucesso || 0, m.contatos_invalidos || 0, m.sem_telefone || 0,
+    m.servicos_executados || 0, m.ocorrencias_resolvidas || 0, m.pendencias_contabilizadas || 0, m.lotes || 0,
+    sessao.id, exp.versao, exp.definitiva ? "sim" : "nao", exp.exportado_em];
+  N.csvDia = (linha) => "﻿" + [N.COLUNAS_DIA.join(";"), linha.map((x) => campoCSV(N.seguroPlanilha(x))).join(";")].join("\r\n") + "\r\n";
+  /* Nome: CALLBACK_<POLO>_<dd-mm-aaaa>.csv (ex.: CALLBACK_ARACAJU_04-11-2026.csv). Polo em maiúsculas, sem acento; espaços viram
+     hífen. Segundo turno do mesmo polo no mesmo dia neste navegador: sufixo _T2, _T3... (para não sobrescrever o primeiro). */
+  N.nomeArquivoDia = function (sessao, turno = 1) {
+    const [a, m, d] = String(sessao.data_operacional).split("-");
+    const polo = semAcento(sessao.polo || "").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "SEM-POLO";
+    return `CALLBACK_${polo}_${d}-${m}-${a}${turno > 1 ? "_T" + turno : ""}.csv`;
+  };
+  N.PASTA_EXPORTACAO_SUGERIDA = "W:\\DTEC\\DEOP\\DECO\\CO\\USUÁRIOS\\TSA4\\CENTRAL DE CALLBACK";
 
   raiz.Nucleo = N;
 })(typeof window !== "undefined" ? window : globalThis);

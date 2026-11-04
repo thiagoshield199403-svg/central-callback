@@ -558,19 +558,26 @@
     igual(S.configuracao().estacao, "ESTACAO-B"); // recarregou a versão gravada pela outra aba
     await S.salvarConfiguracao({ estacao: "" }); outra.arm.fechar();
   });
-  await teste("Exportação: 14 colunas, versões, sem dados pessoais, proteção de fórmula", async () => {
-    await abrirDia(S, "Polo Fictício", "=CMD|calc");
+  await teste("1.1.0 Exportação do dia: colunas, valores, versões, sem dados pessoais, proteção de fórmula", async () => {
+    await abrirDia(S, "Aracaju", "=CMD|calc");
     const dem = []; for (let i = 1; i <= 40; i++) dem.push(linha(`CALL ${9000000 + i}`, `INC ${8000000 + i}`, `TELEPHONE: (79) 9${9100 + i}-${1000 + i}`, "Sem energia desde 07:30"));
-    await processarLote(S, gerarCSV(dem), 10);
+    const chs = await importar(S, gerarCSV(dem));
+    for (const c of chs.slice(0, 10)) await S.registrar(c.id, "callback_realizado", "whatsapp");
+    await S.registrarResultado(chs[0].id, "servico_executado"); await S.registrarResultado(chs[0].id, "resolvida");
+    await S.registrarResultado(chs[1].id, "resolvida");
+    await S.registrar(chs[20].id, "sem_sucesso", "ligacao"); await S.registrar(chs[20].id, "sem_sucesso", "whatsapp");
+    await S.registrar(chs[21].id, "contato_invalido", "ligacao");
+    await S.encerrarLote();
     const e1 = await S.exportar(), e2 = await S.exportar();
-    verdade(e1.id !== e2.id && e1.versao === 1 && e2.versao === 2 && e2.substitui_id === e1.id && e1.nome !== e2.nome);
+    verdade(e1.id !== e2.id && e1.versao === 1 && e2.versao === 2 && e2.substitui_id === e1.id);
+    igual([e1.nome, e2.nome], ["CALLBACK_ARACAJU_" + S.sessao().data_operacional.split("-").reverse().join("-") + ".csv", e1.nome]);
     const linhas = S.exportacao(e2.id).conteudo.replace(/^﻿/, "").trimEnd().split("\r\n").map((l) => l.split(";"));
-    igual(linhas[0], N.COLUNAS_EXPORTACAO); igual(linhas[0].length, 14);
-    const reg = linhas.slice(1).map((l) => Object.fromEntries(l.map((v, i) => [linhas[0][i], v])));
-    const ind = Object.fromEntries(reg.filter((r) => !r.dimensao).map((r) => [r.indicador, r.valor]));
-    igual([ind.chamadas_processadas, ind.callbacks_realizados, ind.lotes, ind.percentual_callbacks], ["40", "10", "1", "25.0"]);
-    verdade(reg.every((r) => r.operador.startsWith("'")), "fórmula não neutralizada");
-    verdade(new Set(reg.map((r) => r.chave_consolidacao)).size === 1);
+    igual(linhas[0], N.COLUNAS_DIA); igual(linhas.length, 2, "uma linha por turno");
+    const r = Object.fromEntries(linhas[1].map((v, i) => [linhas[0][i], v]));
+    igual([r.polo, r.total_chamadas, r.callbacks_realizados, r.tentativas, r.tentativas_sem_sucesso, r.contatos_invalidos, r.servicos_executados,
+      r.ocorrencias_resolvidas, r.pendencias, r.lotes_encerrados, r.versao, r.definitiva], ["Aracaju", "40", "10", "13", "2", "1", "1", "2", "29", "1", "2", "nao"]);
+    verdade(r.operador.startsWith("'"), "fórmula não neutralizada");
+    igual(r.id_turno, S.sessao().id);
     const bruto = S.exportacao(e2.id).conteudo.replace(/\b[0-9a-f]{32}\b/g, "<id>");
     for (const p of ["Cliente Fictício", "Rua Exemplo", "FIC_UC_", "CALL 9", "INC 8", "99", "Sem energia desde"]) verdade(!bruto.includes(p), "proibido: " + p);
   });
@@ -584,14 +591,14 @@
     const E = await S.arm.ler(); igual([Object.keys(E.marcas).length, E.sessao, E.lotes.length, E.chamadas.length], [0, null, 0, 0]);
     await falhaCom(() => S.importar("x.csv", loteCSV(1), null), "Abra o dia");
   });
-  await teste("Consolidação Power BI: por chave, só a maior versão (sem dupla contagem)", async () => {
+  await teste("Consolidação Power BI: por id_turno, só a maior versão (sem dupla contagem)", async () => {
     await abrirDia(S);
     await processarLote(S, loteCSV(4), 1); await S.exportar();
     await processarLote(S, loteCSV(4, 10), 2); const fim = await S.encerrarDia();
     const todas = S.E.exportacoes.filter((x) => x.sessao_id === fim.exportacao.sessao_id);
     const maior = Math.max(...todas.map((x) => x.versao)), vale = todas.find((x) => x.versao === maior);
-    const cb = vale.conteudo.split("\r\n").find((l) => l.includes(";callbacks_realizados;")).split(";")[12];
-    igual([todas.length, cb, vale.definitiva], [2, "3", true]);
+    const l = vale.conteudo.trimEnd().split("\r\n"), cab = l[0].replace(/^﻿/, "").split(";"), val = l[1].split(";");
+    igual([todas.length, val[cab.indexOf("callbacks_realizados")], val[cab.indexOf("definitiva")], vale.definitiva], [2, "3", "sim", true]);
   });
 
   await teste("1.0.2 Serviço: importação grava o agrupamento; callbacks e métricas continuam por CALL", async () => {
@@ -682,6 +689,156 @@
     const r = await S.abrirWhatsapp(chs[0].id, "79991000111");
     verdade(decodeURIComponent(r.url.split("text=")[1]).includes("árvore na rede elétrica"), "WhatsApp com a mensagem sugerida");
     await S.encerrarLote();
+  });
+
+  /* ==================================================== 1.1.0 */
+  await teste("1.1.0 Telefone manual: normaliza DDD/+55/0 e aceita só celular válido", () => {
+    const ok = (t) => N.validarTelefoneManual(t);
+    for (const t of ["79 99999-1234", "(79) 99999-1234", "+55 (79) 99999-1234", "5579999991234", "079999991234", " 79-9-9999-1234 "])
+      igual([ok(t).ok, ok(t).numero], [true, "79999991234"], "deveria aceitar " + t);
+    igual(ok("79 99999-1234").exibir, "(79) 99999-1234");
+    verdade(!ok("79 3211-4567").ok && ok("79 3211-4567").fixo && ok("79 3211-4567").erro.includes("FIXO"), "fixo deveria ser recusado");
+    verdade(ok("99999-1234").erro.includes("DDD"), "sem DDD");
+    verdade(ok("").erro.includes("Digite"), "vazio");
+    for (const t of ["20 99999-1234", "79 9999-123456", "79 99999-999", "79 99999-9999", "79 89999-1234", "abc"]) verdade(!ok(t).ok, "deveria recusar " + t);
+  });
+  await teste("1.1.0 Texto editado: saudação aprovada garantida, sem duplicar; limite de tamanho", () => {
+    igual(N.textoDoOperador("Bom dia, tudo certo?"), "Olá, aqui é a Energisa. Bom dia, tudo certo?");
+    igual(N.textoDoOperador("Olá, aqui é a Energisa. Teste"), "Olá, aqui é a Energisa. Teste");
+    igual(N.textoDoOperador("OLA! Aqui e a Energisa. Teste"), "OLA! Aqui e a Energisa. Teste");
+    let erro = null; try { N.textoDoOperador("   "); } catch (e) { erro = e.message; } verdade(erro && erro.includes("vazio"));
+    erro = null; try { N.textoDoOperador("x".repeat(1501)); } catch (e) { erro = e.message; } verdade(erro && erro.includes("1500"));
+  });
+  await teste("1.1.0 Localização resumida (bairro · cidade), igual à referência", () => {
+    igual(N.resumirLocalizacao("RUA X_20_LT 3_JATOBA; 10_BARRA DOS COQUEIROS"), "JATOBA · BARRA DOS COQUEIROS");
+    igual(N.resumirLocalizacao("Rua Exemplo, 1; Bairro Modelo; Cidade Alfa"), "Cidade Alfa");
+    igual(N.resumirLocalizacao("ARACAJU_ARACAJU; 1_ARACAJU"), "ARACAJU");
+    igual(N.resumirLocalizacao(""), "");
+  });
+  await teste("1.1.0 Nome automático do arquivo do dia", () => {
+    igual(N.nomeArquivoDia({ data_operacional: "2026-11-04", polo: "Aracaju" }), "CALLBACK_ARACAJU_04-11-2026.csv");
+    igual(N.nomeArquivoDia({ data_operacional: "2026-11-04", polo: "Nossa Senhora do Socorro" }), "CALLBACK_NOSSA-SENHORA-DO-SOCORRO_04-11-2026.csv");
+    igual(N.nomeArquivoDia({ data_operacional: "2026-11-04", polo: "São Cristóvão / Itabaiana" }), "CALLBACK_SAO-CRISTOVAO-ITABAIANA_04-11-2026.csv");
+    igual(N.nomeArquivoDia({ data_operacional: "2026-11-04", polo: "" }), "CALLBACK_SEM-POLO_04-11-2026.csv");
+    igual(N.nomeArquivoDia({ data_operacional: "2026-11-04", polo: "Aracaju" }, 2), "CALLBACK_ARACAJU_04-11-2026_T2.csv");
+  });
+  await teste("1.1.0 Turno: só a sigla; polo vem da Configuração (pedido só na 1ª vez)", async () => {
+    await reiniciar(S);
+    const poloAntes = S.configuracao().polo;
+    await S.salvarConfiguracao({ polo: "" });
+    await falhaCom(() => S.abrirSessao("", "TSA4"), "polo");
+    await falhaCom(() => S.abrirSessao("Aracaju", "  "), "sigla");
+    await S.abrirSessao("Aracaju", "TSA4");
+    igual([S.sessao().polo, S.sessao().operador, S.configuracao().polo], ["Aracaju", "TSA4", "Aracaju"]);
+    await reiniciar(S);
+    await S.abrirSessao("", "TSA5");
+    igual([S.sessao().polo, S.estado().nome_arquivo_dia.startsWith("CALLBACK_ARACAJU_") && /_T\d+\.csv$/.test(S.estado().nome_arquivo_dia)], ["Aracaju", true]);
+    await reiniciar(S); await S.salvarConfiguracao({ polo: poloAntes });
+  });
+  await teste("1.1.0 Serviço executado e ocorrência resolvida: só após callback, uma vez, independentes; reabrir apaga", async () => {
+    await abrirDia(S);
+    const [a, b] = await importar(S, loteCSV(2));
+    await falhaCom(() => S.registrarResultado(a.id, "resolvida"), "antes de marcar");
+    await falhaCom(() => S.registrarResultado(a.id, "servico_executado"), "antes de marcar");
+    await falhaCom(() => S.registrarResultado(a.id, "outra_coisa"), "desconhecido");
+    await S.registrar(a.id, "callback_realizado", "whatsapp");
+    const r1 = await S.registrarResultado(a.id, "resolvida");
+    igual([r1.estado, !!r1.resolvida_em, r1.servico_executado_em, r1.tentativas.length], ["callback_realizado", true, null, 1], "resolvida não marca serviço nem tentativa");
+    await falhaCom(() => S.registrarResultado(a.id, "resolvida"), "já foi registrado");
+    await S.registrarResultado(a.id, "servico_executado");
+    await S.registrar(b.id, "callback_realizado", "ligacao"); await S.registrarResultado(b.id, "servico_executado");
+    let t = S.estado().metricas_tempo_real;
+    igual([t.callbacks_realizados, t.servicos_executados, t.ocorrencias_resolvidas, t.callbacks_sem_resolucao, t.taxa_resolucao], [2, 2, 1, 1, 50]);
+    const lote = S.estado().lote_em_andamento; igual([lote.servico_executado, lote.resolvida], [2, 1]);
+    const ra = await S.registrar(a.id, "reabrir", null, "registro errado");
+    igual([ra.estado, ra.servico_executado_em, ra.resolvida_em], ["pendente", null, null]);
+    t = S.estado().metricas_tempo_real;
+    igual([t.callbacks_realizados, t.servicos_executados, t.ocorrencias_resolvidas], [1, 1, 0]);
+    await S.encerrarLote();
+  });
+  await teste("1.1.0 Indicadores sem dupla contagem: CALL em 2 lotes conta 1 vez; resolução vale do lote anterior", async () => {
+    await abrirDia(S);
+    let chs = await importar(S, loteCSV(3));
+    await S.registrar(chs[0].id, "callback_realizado", "whatsapp"); await S.registrarResultado(chs[0].id, "resolvida");
+    await S.registrarResultado(chs[0].id, "servico_executado");
+    await S.registrar(chs[1].id, "sem_sucesso", "ligacao");
+    await S.encerrarLote();
+    chs = await importar(S, loteCSV(3)); // mesmas CALLs de novo
+    igual(chs[0].estado, "callback_realizado");
+    await S.registrar(chs[1].id, "sem_sucesso", "whatsapp"); await S.registrar(chs[1].id, "callback_realizado", "whatsapp");
+    const vivo = S.estado().metricas_tempo_real;
+    const m = (await S.encerrarLote()).metricas_dia;
+    igual([m.chamadas_processadas, m.callbacks_realizados, m.ocorrencias_resolvidas, m.servicos_executados, m.tentativas_sem_sucesso, m.pendencias_contabilizadas, m.incidentes_unicos],
+      [3, 2, 1, 1, 2, 1, 3]);
+    igual([vivo.chamadas_processadas, vivo.callbacks_realizados, vivo.ocorrencias_resolvidas, vivo.tentativas_sem_sucesso], [3, 2, 1, 2], "tempo real = encerramento");
+  });
+  await teste("1.1.0 Envio manual: valida, abre o WhatsApp com a mensagem, não conta tentativa/callback e não grava o número", async () => {
+    await abrirDia(S);
+    const [c] = await importar(S, loteCSV(1, 1, { semTelefone: [1] }));
+    igual(c.estado, "sem_telefone");
+    await falhaCom(() => S.abrirWhatsappManual(c.id, "79 3211-4567"), "FIXO");
+    await falhaCom(() => S.abrirWhatsappManual(c.id, "12345"), "inválido");
+    await falhaCom(() => S.abrirWhatsappManual(c.id, "99988-7766"), "DDD");
+    const r = await S.abrirWhatsappManual(c.id, "(79) 98877-6655", "manual_oscilacao");
+    verdade(r.url.startsWith("https://web.whatsapp.com/send?phone=5579988776655&text="), r.url);
+    verdade(decodeURIComponent(r.url.split("text=")[1]).startsWith("Olá, aqui é a Energisa. Estamos verificando sua ocorrência de oscilação"), "mensagem escolhida");
+    const r2 = await S.abrirWhatsappManual(c.id, "79988776655", null, "Texto que o operador editou");
+    igual(decodeURIComponent(r2.url.split("text=")[1]), "Olá, aqui é a Energisa. Texto que o operador editou");
+    const d = S.chamadas()[0];
+    igual([d.estado, d.tentativas.length, !!d.whatsapp_aberto_em, d.whatsapp_manual], ["sem_telefone", 0, true, true]);
+    igual([S.estado().lote_em_andamento.tentativas, S.estado().metricas_tempo_real.callbacks_realizados], [0, 0]);
+    verdade(!JSON.stringify(await S.arm.ler()).includes("88776655"), "o número digitado não pode ser gravado");
+    await S.registrar(c.id, "callback_realizado", "whatsapp");
+    await falhaCom(() => S.abrirWhatsappManual(c.id, "79988776655"), "já registrado");
+    await S.encerrarLote();
+  });
+  await teste("1.1.0 WhatsApp do ADMS usa o texto editado pelo operador", async () => {
+    await abrirDia(S);
+    const [c] = await importar(S, loteCSV(1));
+    const r = await S.abrirWhatsapp(c.id, c.telefones[0].numero, null, false, "Pode confirmar o endereço?");
+    igual(decodeURIComponent(r.url.split("text=")[1]), "Olá, aqui é a Energisa. Pode confirmar o endereço?");
+    await S.encerrarLote();
+  });
+  await teste("1.1.0 Painel: por dia, operador e polo; cada turno uma vez; turno antigo sem o indicador = null", async () => {
+    await reiniciar(S);
+    await S.abrirSessao("Aracaju", "TSA4"); await processarLote(S, loteCSV(4), 2, 1); await S.encerrarDia();
+    await S.abrirSessao("Aracaju", "TSB1"); await processarLote(S, loteCSV(3, 50), 1);
+    const P = S.painel();
+    const hoje = P.por_dia.find((g) => g.chave === S.sessao().data_operacional);
+    verdade(hoje.turnos >= 2 && hoje.chamadas_processadas >= 7);
+    const ops = Object.fromEntries(P.por_operador.map((g) => [g.chave, g]));
+    igual([ops.TSB1.turnos, ops.TSB1.chamadas_processadas, ops.TSB1.callbacks_realizados, ops.TSB1.tentativas_sem_sucesso], [1, 3, 1, 0]);
+    verdade(ops.TSA4.callbacks_realizados >= 2 && ops.TSA4.tentativas_sem_sucesso >= 1);
+    verdade(P.por_polo.some((g) => g.chave === "Aracaju" && g.turnos >= 2));
+    // turno gravado pela versão anterior (sem os indicadores novos): nada de zero inventado
+    await S._alterar((E) => { E.dias_encerrados.push({ id: "antigo", data_operacional: "2026-10-01", polo: "Polo Velho", operador: "OPV",
+      metricas_finais: { chamadas_processadas: 5, callbacks_realizados: 2, pendencias_contabilizadas: 3, sem_telefone: 0, contatos_invalidos: 0, tentativas: 2 } }); });
+    const velho = S.painel().por_polo.find((g) => g.chave === "Polo Velho"), t = S.painel().turnos.find((x) => x.id === "antigo");
+    igual([velho.incompleto, t.servicos_executados, t.ocorrencias_resolvidas, t.callbacks_realizados], [true, null, null, 2]);
+    await reiniciar(S);
+  });
+
+  await teste("1.1.0 Desfazer resolução/serviço: só se registrado; mantém callback e o outro registro; sem dupla contagem", async () => {
+    await abrirDia(S);
+    const [a] = await importar(S, loteCSV(1));
+    await falhaCom(() => S.desfazerResultado(a.id, "resolvida"), "não está registrado");
+    await S.registrar(a.id, "callback_realizado", "whatsapp");
+    await S.registrarResultado(a.id, "resolvida"); await S.registrarResultado(a.id, "servico_executado");
+    await falhaCom(() => S.registrarResultado(a.id, "resolvida"), "já foi registrado");
+    igual(S.estado().metricas_tempo_real.ocorrencias_resolvidas, 1, "registro duplicado não pode contar duas vezes");
+    const r = await S.desfazerResultado(a.id, "resolvida");
+    igual([r.estado, r.resolvida_em, !!r.servico_executado_em, r.tentativas.length], ["callback_realizado", null, true, 1]);
+    let t = S.estado().metricas_tempo_real; igual([t.callbacks_realizados, t.ocorrencias_resolvidas, t.servicos_executados], [1, 0, 1]);
+    await falhaCom(() => S.desfazerResultado(a.id, "resolvida"), "não está registrado");
+    await falhaCom(() => S.desfazerResultado(a.id, "outra"), "desconhecido");
+    await S.registrarResultado(a.id, "resolvida"); // pode registrar de novo depois de desfazer
+    t = (await S.encerrarLote()).metricas_dia; igual([t.ocorrencias_resolvidas, t.servicos_executados], [1, 1]);
+  });
+  await teste("1.1.0 Cópia de contingência não conta como salvo no destino", async () => {
+    await abrirDia(S);
+    const e = await S.exportar();
+    await S.marcarContingencia(e.id);
+    const x = S.exportacao(e.id); igual([x.salvo, !!x.contingencia], [null, true]);
   });
 
   S.arm.fechar();

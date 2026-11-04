@@ -1,0 +1,25 @@
+# Central de Callback COI 1.1.0-web-dev - manifesto SHA-256 - gerado em 04/11/2026 15:42 - conferir: sha256sum -c MANIFESTO_SHA256.txt
+94d846e952938e8ed4ecab244eb8dcee6c850a653cfe3f943295cd1ac2d7e64f *./css/estilo.css
+dfaa1afa7c5c049c4af358714eb69686faecf26da3aa2daf1adafa4a9fe61b09 *./docs/ALTERACOES-1.0.2.txt
+b0aa661dcb9f73c457b542a265dea1285c761b68f32bc4633848c926e64db7cb *./docs/ALTERACOES-1.1.0.txt
+4aa47f7f515c92746f1a4a012a3c0c39d5a44d3f0e82fd4fc409e17709227433 *./docs/historico-mensagens/MENSAGENS-ANTES-E-DEPOIS.txt
+ba3f88eccc0d362c39b4bf045645a77b01ec4efb968a5a15bce7eae620d1bc9e *./docs/historico-mensagens/modelos-mensagem-1.0.1-ORIGINAL.json
+89b35c001212ceb72c5994e3eaa9816c804e2a70d5188f59497b41226e6a4375 *./docs/INTEGRACAO-SHAREPOINT-FUTURA.txt
+8733dd2cea47ed8ce47bbc9edb6bb9a8537fab8eb2aeecf4d0d1cc63bd1e1ec9 *./docs/LIMITACOES-E-PENDENCIAS.txt
+d497bbf2b4af373163035cd2db5c436e80db7deda48a1d854445467e4801babc *./docs/RECONHECIMENTO-MENSAGENS.txt
+8f1bbf49ae9be2e048ffcb1748b4982e7c08730dc03e94f7ca1682245b916b5d *./docs/RELATORIO-TESTES-1.1.0.txt
+60e72ec3efc44865e1eb0eee419c4931d012c85c8f97b44f30e7d1f4a035bfff *./exemplos/navegador-chamadas-ADMS2026-FICTICIO.csv
+ab5daf7e6251b5f4a4c721961f307d95624211486e13e4865636731a194d9862 *./exemplos/navegador-chamadas-CONTINGENCIA-FICTICIO.csv
+20ce5097e8ebc29de870de225446b7d8f0cb31044f0ff13be801c7efd94232d6 *./exemplos/navegador-chamadas-FICTICIO.csv
+f7e4d09354387192f613c5fb2a600d5589e7dbec87722743f9c8ab2d2f64fd53 *./index.html
+ca1f2f564a093a9fbed624be823d68b6e431afa64150fe355d627a0f34cc1e85 *./js/app.js
+e034933503da1523ed873276b333c19f7c2270850d803faa33ec505aff215265 *./js/armazenamento.js
+0a3d7752321e33144be4e7cff49ce29bfa690ef27e980f630e2103cc09adb080 *./js/modelos.js
+dbc8770ed3bf582103448fe76ab27da8174cb94a765021031930f5efe7d503d2 *./js/nucleo.js
+de9e3fd09a79c570b4ccacc5e4ef5e8e1e4b51639f99b08da69210508ce0b4f6 *./js/servico.js
+d4d7f9266c04172a02b81cf7e0ec112517b52a3b1d64ef52fcdf09a93a8cc07d *./LEIA-ME.txt
+ab899577cbb1c0e964271bff74a908fdf553ded7f3e5845bcb627392fbf7a4bb *./testes/ponta-a-ponta/cdp.mjs
+09c178afda93737a7707e23f1ab6c3b919e5b14447516265bddbcc73d7d9750c *./testes/ponta-a-ponta/e2e.mjs
+80a0325cb517da553f2a111293633c1c89d9e0d0c0c09163961b6a12f9b03e24 *./testes/ponta-a-ponta/rodar-testes-unitarios.mjs
+9c235faea92335adfce7af83810447c226de58d9df3f05d7d98b9ec4627211cd *./testes/testes.html
+5bc9620d4be374cf88313ba63b35cc96c04f114efd9b0a871b4a279728fb74ab *./testes/testes.js
