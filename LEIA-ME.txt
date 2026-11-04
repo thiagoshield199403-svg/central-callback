@@ -1,0 +1,44 @@
+CENTRAL DE CALLBACK COI - versao 1.0.2-web-dev (COPIA DE DESENVOLVIMENTO - aplicacao web local)
+=================================================================================================
+ATENCAO: esta copia NAO e a versao de uso. Ela usa um armazenamento separado (central-callback-coi-dev) e mostra
+uma faixa "COPIA DE DESENVOLVIMENTO" no topo. Nao use na operacao sem autorizacao. Novidades: docs\ALTERACOES-1.0.2.txt
+Exemplo de contingencia (ficticio): exemplos\navegador-chamadas-CONTINGENCIA-FICTICIO.csv
+
+COMO INICIAR
+1. Copie a pasta CENTRAL_CALLBACK_WEB inteira para uma pasta sua (ex.: Documentos).
+2. Clique duas vezes em index.html. Ele abre no navegador.
+   - Use o Microsoft Edge ou o Google Chrome (testados: versao 156).
+   - Se abrir em outro navegador, clique com o botao direito em index.html > Abrir com > Microsoft Edge.
+   - Nao use janela anonima/InPrivate: ao fechar, ela apaga os dados do dia.
+3. Dica: depois de aberto, salve nos Favoritos (Ctrl+D) para abrir rapido nos proximos dias.
+
+Nao ha instalacao, executavel, .bat, servidor, Python ou Node.js. Nada roda em segundo plano:
+fechar a aba encerra a Central. Ao abrir de novo, o dia e o lote continuam de onde pararam.
+
+USO DIARIO
+1. Abra o dia (polo e operador).
+2. Importar CSV do ADMS: escolha o arquivo exportado do Navegador de Chamadas, confira a previa e importe.
+   O CSV atual do ADMS (com a linha "Filtrar: [...]" antes do cabecalho) e aceito.
+3. Trabalhe as chamadas: Abrir WhatsApp Web (abre com o texto pronto; QUEM ENVIA E O OPERADOR),
+   depois registre: Callback realizado / Tentativa sem sucesso / Contato invalido (com o meio: WhatsApp, ligacao, outro).
+4. "Encerrar e limpar o lote": as metricas ficam; os dados dos clientes sao apagados.
+5. Repita 2 a 4 para o proximo CSV.
+6. "Encerrar o dia": gera o arquivo DEFINITIVO de indicadores.
+   EXPORTAR INDICADORES DO DIA pode ser usado a qualquer momento (gera nova versao).
+
+ONDE FICAM OS ARQUIVOS DE INDICADORES
+- Padrao: pasta de Downloads do navegador.
+- Opcional (Edge/Chrome): Configuracao > "Escolher pasta" (ex.: pasta do SharePoint sincronizada pelo OneDrive).
+  O navegador pode pedir permissao de novo a cada dia; se negar, o arquivo e baixado para Downloads.
+- Leve os arquivos para a biblioteca SharePoint CENTRAL_CALLBACK/INDICADORES.
+
+ONDE FICAM OS DADOS
+- No armazenamento local do navegador (IndexedDB), so neste computador e neste perfil do Windows/navegador.
+- "Limpar dados de navegacao" (cookies e dados de sites) APAGA o dia em andamento. Exporte ao fim de cada dia.
+
+TESTE RAPIDO (sem dados reais)
+- exemplos\navegador-chamadas-ADMS2026-FICTICIO.csv (formato atual do ADMS) e
+  exemplos\navegador-chamadas-FICTICIO.csv (formato antigo): dados 100% ficticios.
+- testes\testes.html: abre e roda os testes automaticos (usa um banco de teste separado; nao mexe nos seus dados).
+
+Limitacoes e pendencias: docs\LIMITACOES-E-PENDENCIAS.txt
