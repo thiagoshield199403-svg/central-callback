@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Testes da Central de Callback</title>
+  <style>
+    body { font: 14px/1.5 "Segoe UI", system-ui, sans-serif; margin: 20px; background: #f4f6f8; color: #1d2733; }
+    #placar { font-size: 18px; font-weight: 700; } .ok { color: #1b7a3d; } .falha { color: #b42318; }
+    ul { list-style: none; padding: 0; } li { padding: 3px 0; border-bottom: 1px solid #e3e8ee; }
+  </style>
+</head>
+<body>
+  <h1>Testes automatizados — Central de Callback (versão web)</h1>
+  <p>Usa somente dados fictícios e um banco de testes separado, apagado no fim. Não altera os dados da Central.</p>
+  <p id="placar">Executando…</p>
+  <ul id="resultado"></ul>
+  <script src="../js/modelos.js"></script>
+  <script src="../js/nucleo.js"></script>
+  <script src="../js/armazenamento.js"></script>
+  <script src="../js/servico.js"></script>
+  <script src="testes.js"></script>
+</body>
+</html>
