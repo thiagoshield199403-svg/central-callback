@@ -425,7 +425,7 @@
   /* ==================================================== serviço + armazenamento (banco de TESTES) */
   await Armazenamento.apagarBanco(BANCO);
   async function novoServico() { return new Servico(await new Armazenamento(BANCO).iniciar()).carregar(); }
-  async function abrirDia(s, polo = "Polo Fictício", operador = "Operador Teste") { if (s.sessao()) await reiniciar(s); await s.abrirSessao(polo, operador); }
+  async function abrirDia(s, polo = "Polo Fictício", operador = "Operador Teste") { if (s.sessao()) await reiniciar(s); await s._alterar((E) => { E.historico_atendimento = []; E.callbacks_manuais = []; E.fechamentos = []; }); await s.abrirSessao(polo, operador); } // cada teste começa sem histórico permanente
   async function reiniciar(s) { if (s.loteAberto()) await s.encerrarLote(); if (s.sessao()) await s.encerrarDia(); }
   async function importar(s, bytes, nome = "lote.csv") { const p = s.previa(bytes); await s.importar(nome, bytes, p.resumo.sha256); return s.chamadas(); }
   async function processarLote(s, bytes, callbacks, extra = 0) {
@@ -839,6 +839,383 @@
     const e = await S.exportar();
     await S.marcarContingencia(e.id);
     const x = S.exportacao(e.id); igual([x.salvo, !!x.contingencia], [null, true]);
+  });
+
+  /* ---------------------------------------------------- Central de Disparos (conector falso: nada sai do navegador) */
+  const PRONTO = { pronto: true, modo: "producao" };
+  const semEspera = { intervalo: 0, esperar: async () => {} };
+  function conectorFalso(regra) {
+    const c = { envios: [], chaves: new Set(), enviar: async (e) => { c.envios.push(e);
+      const r = regra ? regra(e, c.envios.length) : null; if (r) return r;
+      c.chaves.add(e.chave); return { resultado: "enviado", wamid: "wamid." + c.envios.length }; } };
+    return c;
+  }
+  const linhasDisparo = () => [
+    linha("CALL 0000201", "INC 0000300", "MOBILE: 79991000201", "Fio partido na rua", { submotivos: "RV" }),
+    linha("CALL 0000202", "INC 0000301", "MOBILE: 79991000202"),
+    linha("CALL 0000203", "INC 0000302", "MOBILE: 79991000203", "", { submotivos: "NT" }),
+    linha("CALL 0000204", "INC 0000303", "", "Cliente pede retorno no tel 79 99100-0204"),
+    linha("CALL 0000205", "INC 0000304", "MOBILE: 79 3200-0205"),
+  ];
+  async function loteDisparo() {
+    await abrirDia(S);
+    const b = gerarCSV(linhasDisparo()); await S.importar("d.csv", b, S.previa(b).resumo.sha256);
+    return S.incidentesParaDisparo();
+  }
+  const chavesDe = (l, ...incs) => l.filter((x) => incs.includes(x.incidente)).map((x) => x.chave);
+  const statusDe = (f, inc) => f.itens.find((i) => i.incidente === inc).status;
+  const fechar = async () => { if (S.loteAberto()) { for (const f of S.E.disparos) if (["autorizada", "pausada"].includes(f.situacao)) { f.executor = null; await S.cancelarRestante(f.id); } await S.encerrarLote(); } };
+  const modelosAntes = JSON.stringify(window.MODELOS_MENSAGEM);
+
+  await teste("Disparos: prepara só os selecionados, cada um com a mensagem das regras existentes", async () => {
+    const l = await loteDisparo();
+    const f = await S.prepararDisparo(chavesDe(l, "INC 0000300", "INC 0000301"), "selecao");
+    igual(f.itens.length, 2);
+    for (const i of f.itens) {
+      const c = S.obterChamada(i.chamada_id), sug = N.sugerirMensagem(c);
+      igual(i.modelo, sug.codigo); igual(i.texto, S._textoMensagem(c, sug.codigo), "texto da regra existente"); igual(i.status, "preparado");
+    }
+    await S.descartarFila(f.id); await fechar();
+  });
+  await teste("Disparos: nada é enviado sem autorização explícita", async () => {
+    const l = await loteDisparo(), f = await S.prepararDisparo(chavesDe(l, "INC 0000301"), "selecao"), c = conectorFalso();
+    await falhaCom(() => S.processarFila(f.id, c, semEspera), "não está em condição");
+    igual(c.envios.length, 0);
+    await falhaCom(() => S.autorizarDisparo(f.id, { pronto: false, modo: "indisponivel" }), "não está disponível");
+    igual(S.fila(f.id).situacao, "revisao");
+    await S.descartarFila(f.id); await fechar();
+  });
+  await teste("Disparos: revisão identifica telefone inválido, confirmação e duplicada; só o enviável é autorizado", async () => {
+    const l = await loteDisparo();
+    let f = await S.prepararDisparo(l.map((x) => x.chave), "lote");
+    igual(statusDe(f, "INC 0000304"), "aguardando", "fixo não pode ser enviado");
+    igual(statusDe(f, "INC 0000303"), "aguardando", "telefone do comentário pede confirmação");
+    const a = f.itens.find((i) => i.incidente === "INC 0000300"), b = f.itens.find((i) => i.incidente === "INC 0000301");
+    await S.corrigirTelefoneItem(f.id, b.id, a.telefone);
+    await S.editarMensagemItem(f.id, b.id, a.texto); f = S.fila(f.id);
+    verdade(f.itens.find((i) => i.id === b.id).pendencias.some((p) => p.codigo === "duplicada"), "duplicada");
+    igual(S.resumoRevisao(f).duplicadas, 1);
+    await falhaCom(() => S.corrigirTelefoneItem(f.id, b.id, "7932000205"), "FIXO");
+    const c = conectorFalso();
+    f = await S.autorizarDisparo(f.id, PRONTO); await S.processarFila(f.id, c, semEspera); f = S.fila(f.id);
+    igual(c.envios.length, 2, "só INC 300 e INC 302");
+    igual([statusDe(f, "INC 0000300"), statusDe(f, "INC 0000301"), statusDe(f, "INC 0000304")], ["enviado", "cancelado", "cancelado"]);
+    await fechar();
+  });
+  await teste("Disparos: editar o texto não altera o modelo original; restaurar volta ao texto do modelo", async () => {
+    const l = await loteDisparo(); let f = await S.prepararDisparo(chavesDe(l, "INC 0000301"), "selecao"); const i = f.itens[0], orig = i.texto;
+    await S.editarMensagemItem(f.id, i.id, "Texto alterado pelo operador."); f = S.fila(f.id);
+    verdade(f.itens[0].editada && f.itens[0].texto.startsWith(N.SAUDACAO), "saudação garantida pela regra existente");
+    igual(JSON.stringify(window.MODELOS_MENSAGEM), modelosAntes, "modelos intactos");
+    await S.restaurarMensagemItem(f.id, i.id); igual([S.fila(f.id).itens[0].texto, S.fila(f.id).itens[0].editada], [orig, false]);
+    await falhaCom(() => S.editarMensagemItem(f.id, i.id, "x".repeat(1600)), "passa de");
+    await S.descartarFila(f.id); await fechar();
+  });
+  await teste("Disparos: após autorizar a fila não aceita edição e cada envio guarda o vínculo incidente/telefone/mensagem", async () => {
+    const l = await loteDisparo(); let f = await S.prepararDisparo(chavesDe(l, "INC 0000300", "INC 0000301"), "selecao"); const c = conectorFalso();
+    f = await S.autorizarDisparo(f.id, PRONTO);
+    await falhaCom(() => S.editarMensagemItem(f.id, f.itens[0].id, "outro"), "já foi autorizada");
+    await S.processarFila(f.id, c, semEspera); f = S.fila(f.id);
+    for (const i of f.itens) { const e = c.envios.find((x) => x.chave === i.chave); igual([e.telefone, e.texto, e.incidente], [i.telefone, i.texto, i.incidente]);
+      igual([i.tentativas.length, i.tentativas[0].resultado, !!i.tentativas[0].inicio, !!i.tentativas[0].fim], [1, "enviado", true, true]); }
+    igual(S.painelDisparo(f).percentual, 100); igual(f.situacao, "concluida");
+    await fechar();
+  });
+  await teste("Disparos: incidente já enviado não pode ser preparado de novo no lote", async () => {
+    const l = await loteDisparo(); let f = await S.prepararDisparo(chavesDe(l, "INC 0000301"), "selecao");
+    await S.autorizarDisparo(f.id, PRONTO); await S.processarFila(f.id, conectorFalso(), semEspera);
+    igual(S.incidentesParaDisparo().find((x) => x.incidente === "INC 0000301").elegivel, false);
+    await falhaCom(() => S.prepararDisparo(chavesDe(l, "INC 0000301"), "selecao"), "Nenhum incidente");
+    await fechar();
+  });
+  const enviarUm = async (l, inc, conector) => { let f = await S.prepararDisparo(chavesDe(l, inc), "selecao"); f = await S.autorizarDisparo(f.id, PRONTO); await S.processarFila(f.id, conector || conectorFalso(), semEspera); return S.fila(f.id); };
+  await teste("Callback: mensagem enviada registra callback do operador, com data e hora, e soma no total dele", async () => {
+    const l = await loteDisparo(), antes = S.painel().turnos[0].callbacks_realizados;
+    const f = await enviarUm(l, "INC 0000301"), i = f.itens[0], c = S.obterChamada(i.chamada_id);
+    igual([c.estado, c.meio_callback, c.callback_origem, c.callback_operador, c.tentativas.length], ["callback_realizado", "whatsapp", "disparo", "Operador Teste", 1]);
+    verdade(!isNaN(new Date(c.callback_em)) && c.callback_em === c.tentativas[0].momento, "data e hora");
+    igual([i.status, i.callback.situacao, i.callback.operador], ["enviado", "registrado", "Operador Teste"], "envio e resultado separados");
+    const t = S.painel().turnos[0]; igual([t.operador, t.callbacks_realizados], ["Operador Teste", antes + 1]);
+    const dia = (await S.encerrarLote()).metricas_dia; igual(dia.callbacks_realizados, 1, "entra no dia uma vez");
+  });
+  await teste("Callback: não conta preparada, pendente, falha, limite, sem conexão, incerta ou simulada", async () => {
+    const l = await loteDisparo(), id = S.incidentesParaDisparo().find((x) => x.incidente === "INC 0000301").id;
+    const pendente = () => igual([S.obterChamada(id).estado, S.obterChamada(id).tentativas.length, S.obterChamada(id).callback_operador || null], ["pendente", 0, null]);
+    let f = await S.prepararDisparo(chavesDe(l, "INC 0000301"), "selecao"); pendente();
+    f = await S.autorizarDisparo(f.id, PRONTO); pendente();
+    for (const r of [{ resultado: "limite" }, { resultado: "sem_conexao" }]) { await S.processarFila(f.id, { enviar: async () => r }, semEspera); pendente(); }
+    await S.processarFila(f.id, { enviar: async () => ({ resultado: "falha", codigo: 1 }) }, semEspera); pendente();
+    await S.reprocessarFalhas(f.id); await S.processarFila(f.id, { enviar: async () => ({ resultado: "incerto" }) }, semEspera); pendente();
+    await fechar();
+    const l2 = await loteDisparo(); f = await S.prepararDisparo(chavesDe(l2, "INC 0000301"), "selecao");
+    await S.autorizarDisparo(f.id, { pronto: true, modo: "simulacao" }); await S.processarFila(f.id, { enviar: async () => ({ resultado: "enviado", wamid: "sim", simulado: true }) }, semEspera);
+    igual(S.obterChamada(S.fila(f.id).itens[0].chamada_id).estado, "pendente", "simulação");
+    await fechar();
+  });
+  await teste("Callback: registrado manualmente depois da autorização não envia nem conta de novo", async () => {
+    const l = await loteDisparo(); let f = await S.prepararDisparo(chavesDe(l, "INC 0000301"), "selecao"); f = await S.autorizarDisparo(f.id, PRONTO);
+    const id = f.itens[0].chamada_id; await S.registrar(id, "callback_realizado", "ligacao");
+    const c = conectorFalso(); await S.processarFila(f.id, c, semEspera); f = S.fila(f.id);
+    igual([c.envios.length, f.itens[0].status, f.itens[0].callback.situacao, f.situacao], [0, "cancelado", "ja_registrado", "concluida"]);
+    const ch = S.obterChamada(id); igual([ch.tentativas.length, ch.meio_callback, ch.callback_origem || null], [1, "ligacao", null], "registro manual preservado");
+    igual(S.metricasTempoReal().callbacks_realizados, 1);
+    await fechar();
+  });
+  await teste("Callback: registrado manualmente com a mensagem em trânsito não soma de novo", async () => {
+    const l = await loteDisparo(); let f = await S.prepararDisparo(chavesDe(l, "INC 0000301"), "selecao"); f = await S.autorizarDisparo(f.id, PRONTO); const id = f.itens[0].chamada_id;
+    await S.processarFila(f.id, { enviar: async () => { await S.registrar(id, "callback_realizado", "ligacao"); return { resultado: "enviado", wamid: "w1" }; } }, semEspera); f = S.fila(f.id);
+    igual([f.itens[0].status, f.itens[0].callback.situacao], ["enviado", "ja_registrado"]);
+    igual([S.obterChamada(id).tentativas.length, S.obterChamada(id).meio_callback], [1, "ligacao"]); igual(S.metricasTempoReal().callbacks_realizados, 1);
+    await fechar();
+  });
+  await teste("Callback: depois do disparo o registro manual é recusado e 'Reabrir' corrige sem mudar o status de envio", async () => {
+    const l = await loteDisparo(), f = await enviarUm(l, "INC 0000301"), id = f.itens[0].chamada_id;
+    await falhaCom(() => S.registrar(id, "callback_realizado", "ligacao"), "já registrado");
+    igual(S.obterChamada(id).tentativas.length, 1);
+    await S.registrar(id, "reabrir", null, "correção de teste"); const c = S.obterChamada(id);
+    igual([c.estado, c.callback_operador, c.callback_em, c.callback_origem, S.fila(f.id).itens[0].status], ["pendente", null, null, null, "enviado"]);
+    igual(S.incidentesParaDisparo().find((x) => x.id === id).elegivel, false, "continua sem poder reenviar a mesma mensagem");
+    await fechar();
+  });
+  await teste("Callback: reconsulta depois de queda da aba conta uma única vez", async () => {
+    const l = await loteDisparo(); let f = await S.prepararDisparo(chavesDe(l, "INC 0000301"), "selecao"); f = await S.autorizarDisparo(f.id, PRONTO); const id = f.itens[0].chamada_id;
+    await S._alterar((E) => { const x = E.disparos.find((d) => d.id === f.id); x.itens[0].status = "enviando"; x.itens[0].tentativas.push({ n: 1, inicio: new Date().toISOString(), fim: null }); x.executor = { id: "morta", expira: new Date(Date.now() - 1000).toISOString() }; });
+    await S.processarFila(f.id, { enviar: async () => ({ resultado: "enviado", wamid: "w", reaproveitado: true }) }, semEspera);
+    igual([S.obterChamada(id).estado, S.obterChamada(id).tentativas.length, S.metricasTempoReal().callbacks_realizados], ["callback_realizado", 1, 1]);
+    await fechar();
+  });
+  await teste("Contatos: selecionar o incidente envia só ao contato principal; os demais ficam pendentes e livres no painel", async () => {
+    await abrirDia(S);
+    const b = gerarCSV([linha("CALL 0000301", "INC 0000400", "MOBILE: 79991000301", "", { horario: "10/03/2026 09:00:00" }), linha("CALL 0000302", "INC 0000400", "MOBILE: 79991000302", "", { horario: "10/03/2026 08:00:00" })]);
+    await S.importar("c.csv", b, S.previa(b).resumo.sha256);
+    const l = S.incidentesParaDisparo(); igual(l.length, 1); const c = conectorFalso();
+    const f = await enviarUm(l, "INC 0000400", c); igual([f.itens.length, c.envios.length, c.envios[0].telefone], [1, 1, "79991000301"]);
+    const principal = S.obterChamada(f.itens[0].chamada_id), outra = S.chamadas().find((x) => x.id !== principal.id);
+    igual([principal.estado, outra.estado, outra.tentativas.length], ["callback_realizado", "pendente", 0]);
+    const r = await S.abrirWhatsapp(outra.id, "79991000302", null, false, null); verdade(r.url.includes("phone=5579991000302"), "envio individual ao outro contato");
+    igual(S.obterChamada(outra.id).estado, "pendente", "abrir o WhatsApp continua sem contar callback"); igual(c.envios.length, 1);
+    await fechar();
+  });
+  await teste("Contatos: após o disparo, outro número do mesmo contato segue disponível; callback manual continua bloqueando", async () => {
+    await abrirDia(S);
+    const b = gerarCSV([linha("CALL 0000311", "INC 0000410", "MOBILE: 79991000311; TELEPHONE: 79991000312")]);
+    await S.importar("c.csv", b, S.previa(b).resumo.sha256);
+    const l = S.incidentesParaDisparo(), id = (await enviarUm(l, "INC 0000410")).itens[0].chamada_id;
+    verdade((await S.abrirWhatsapp(id, "79991000312", null, false, null)).url.includes("5579991000312"), "outro número");
+    verdade((await S.abrirWhatsappManual(id, "79991000399", null, null)).url.includes("5579991000399"), "envio manual a outro número");
+    await falhaCom(() => S.abrirWhatsapp(id, "79991000311", null, false, null), "Callback já registrado");
+    await falhaCom(() => S.abrirWhatsappManual(id, "(79) 99100-0311", null, null), "Callback já registrado");
+    igual(S.metricasTempoReal().callbacks_realizados, 1);
+    await S.registrar(id, "reabrir", null, "teste"); await S.registrar(id, "callback_realizado", "ligacao");
+    await falhaCom(() => S.abrirWhatsapp(id, "79991000312", null, false, null), "Callback já registrado");
+    await fechar();
+  });
+  await teste("Disparos: falha definitiva segue a fila; reprocessar usa a mesma chave", async () => {
+    const l = await loteDisparo(); let f = await S.prepararDisparo(chavesDe(l, "INC 0000300", "INC 0000301"), "selecao");
+    let n = 0; const c = conectorFalso(() => (++n === 1 ? { resultado: "falha", codigo: 131026, detalhe: "recusado" } : null));
+    f = await S.autorizarDisparo(f.id, PRONTO); await S.processarFila(f.id, c, semEspera); f = S.fila(f.id);
+    igual([f.situacao, S.painelDisparo(f).total_falha, S.painelDisparo(f).total_enviado], ["concluida", 1, 1]);
+    const chave = f.itens.find((i) => i.status === "falha").chave;
+    await S.reprocessarFalhas(f.id); await S.processarFila(f.id, c, semEspera); f = S.fila(f.id);
+    igual(c.envios.filter((e) => e.chave === chave).length, 2, "mesma chave");
+    igual(S.painelDisparo(f).total_enviado, 2); verdade(f.eventos.some((e) => e.tipo === "reprocessamento_autorizado"));
+    await fechar();
+  });
+  await teste("Disparos: sem conexão a fila pausa, nada se perde, e ao retomar o item segue com a mesma chave", async () => {
+    const l = await loteDisparo(); let f = await S.prepararDisparo(chavesDe(l, "INC 0000300", "INC 0000301"), "selecao");
+    const fora = { enviar: async () => { throw new TypeError("Failed to fetch"); } };
+    f = await S.autorizarDisparo(f.id, PRONTO); await S.processarFila(f.id, fora, semEspera); f = S.fila(f.id);
+    igual([f.situacao, f.itens.map((i) => i.status).sort().join()], ["pausada", "preparado,preparado"]);
+    igual(f.executor, null, "libera a posse");
+    const chaves = f.itens.map((i) => i.chave), c = conectorFalso();
+    await S.processarFila(f.id, c, semEspera); f = S.fila(f.id);
+    igual([f.situacao, c.envios.length], ["concluida", 2]); igual(c.envios.map((e) => e.chave).sort(), chaves.slice().sort());
+    igual(f.itens.map((i) => i.tentativas.length).sort(), [1, 2], "a fila pausou na 1ª falha: cada tentativa fica registrada");
+    await fechar();
+  });
+  await teste("Disparos: limite da API pausa a fila; pausar e cancelar param o que falta", async () => {
+    const l = await loteDisparo(); let f = await S.prepararDisparo(chavesDe(l, "INC 0000300", "INC 0000301", "INC 0000302"), "selecao");
+    const lim = conectorFalso((e, n) => (n === 2 ? { resultado: "limite", codigo: 130429, detalhe: "limite" } : null));
+    f = await S.autorizarDisparo(f.id, PRONTO); await S.processarFila(f.id, lim, semEspera); f = S.fila(f.id);
+    igual([f.situacao, S.painelDisparo(f).total_enviado, S.painelDisparo(f).total_pendente], ["pausada", 1, 2]);
+    await S.processarFila(f.id, conectorFalso(async () => null) && { enviar: async () => { await S.pausarFila(f.id); return { resultado: "enviado", wamid: "w" }; } }, semEspera); f = S.fila(f.id);
+    igual([f.situacao, S.painelDisparo(f).total_enviado], ["pausada", 2], "pausa após a mensagem em trânsito");
+    const antes = S.painelDisparo(f).total_enviado;
+    await S.cancelarRestante(f.id); f = S.fila(f.id);
+    igual([f.situacao, S.painelDisparo(f).total_enviado, S.painelDisparo(f).total_cancelado], ["cancelada", antes, 1]);
+    await fechar();
+  });
+  await teste("Disparos: queda da aba durante o envio não reenvia por conta própria e retoma com a mesma chave", async () => {
+    const l = await loteDisparo(); let f = await S.prepararDisparo(chavesDe(l, "INC 0000301"), "selecao");
+    f = await S.autorizarDisparo(f.id, PRONTO);
+    const chave = f.itens[0].chave;
+    await S._alterar((E) => { const x = E.disparos.find((d) => d.id === f.id); x.itens[0].status = "enviando"; x.itens[0].tentativas.push({ n: 1, inicio: new Date().toISOString(), fim: null }); x.executor = { id: "aba-morta", expira: new Date(Date.now() + 60000).toISOString() }; });
+    await falhaCom(() => S.processarFila(f.id, conectorFalso(), semEspera), "envio em curso");
+    await S._alterar((E) => { E.disparos.find((d) => d.id === f.id).executor.expira = new Date(Date.now() - 1000).toISOString(); });
+    const c = conectorFalso(); await S.processarFila(f.id, c, semEspera); f = S.fila(f.id);
+    igual([c.envios.length, c.envios[0].chave, f.itens[0].status], [1, chave, "enviado"]); verdade(f.eventos.some((e) => e.tipo === "recuperado"));
+    await fechar();
+  });
+  await teste("Disparos: resultado incerto bloqueia reenvio até o operador liberar (com chave nova)", async () => {
+    const l = await loteDisparo(); let f = await S.prepararDisparo(chavesDe(l, "INC 0000301"), "selecao");
+    let n = 0; const c = conectorFalso(() => (++n === 1 ? { resultado: "incerto", codigo: "x", detalhe: "?" } : null));
+    f = await S.autorizarDisparo(f.id, PRONTO); await S.processarFila(f.id, c, semEspera); f = S.fila(f.id);
+    igual([f.itens[0].status, f.itens[0].incerto], ["falha", true]); const chave = f.itens[0].chave;
+    await falhaCom(() => S.reprocessarFalhas(f.id), "Não há falhas");
+    await S.liberarIncerto(f.id, f.itens[0].id); await S.reprocessarFalhas(f.id); await S.processarFila(f.id, c, semEspera); f = S.fila(f.id);
+    verdade(f.itens[0].status === "enviado" && f.itens[0].chave !== chave, "liberado com chave nova");
+    await fechar();
+  });
+  await teste("Disparos: item alterado depois da autorização é bloqueado (vínculo preservado)", async () => {
+    const l = await loteDisparo(); let f = await S.prepararDisparo(chavesDe(l, "INC 0000301"), "selecao");
+    f = await S.autorizarDisparo(f.id, PRONTO);
+    await S._alterar((E) => { E.disparos.find((d) => d.id === f.id).itens[0].telefone = "79991009999"; });
+    const c = conectorFalso(); await S.processarFila(f.id, c, semEspera);
+    igual([c.envios.length, S.fila(f.id).itens[0].status], [0, "falha"]);
+    await fechar();
+  });
+  await teste("Disparos: gravações simultâneas não se sobrescrevem (resultado do envio não se perde)", async () => {
+    const l = await loteDisparo(), a = S.obterChamada(l[0].id), b = S.obterChamada(l[1].id);
+    await Promise.all([S.registrar(a.id, "sem_sucesso", "ligacao"), S.registrar(b.id, "sem_sucesso", "ligacao"), S.registrar(a.id, "sem_sucesso", "ligacao")]);
+    igual([S.obterChamada(a.id).tentativas.length, S.obterChamada(b.id).tentativas.length], [2, 1]);
+    await fechar();
+  });
+  await teste("Disparos: lote não encerra com fila ativa; ao encerrar apaga telefone, nome e texto e mantém a auditoria", async () => {
+    const l = await loteDisparo(); let f = await S.prepararDisparo(chavesDe(l, "INC 0000301"), "selecao");
+    f = await S.autorizarDisparo(f.id, PRONTO);
+    await falhaCom(() => S.encerrarLote(), "fila de envio em andamento");
+    await S.processarFila(f.id, conectorFalso(), semEspera); await S.encerrarLote(); f = S.fila(f.id);
+    const i = f.itens[0], bruto = JSON.stringify(S.E.disparos);
+    igual([i.telefone, i.destinatario, i.texto, i.texto_modelo, f.dados_apagados], [null, null, null, null, true]);
+    verdade(i.telefone_mascara.endsWith("0202") && !bruto.includes("79991000202") && !bruto.includes("Cliente Fictício"), "dados pessoais");
+    igual([i.status, i.tentativas.length], ["enviado", 1]); verdade(/^[0-9a-f]{64}$/.test(i.hash_texto), "hash");
+    const csv = S.csvAuditoriaDisparos(); verdade(csv.includes("INC 0000301") && csv.includes("enviado") && !csv.includes("79991000202"), "auditoria sem telefone");
+  });
+  await teste("Disparos: simulação não bloqueia o envio real posterior", async () => {
+    const l = await loteDisparo(); let f = await S.prepararDisparo(chavesDe(l, "INC 0000301"), "selecao");
+    await S.autorizarDisparo(f.id, { pronto: true, modo: "simulacao" }); await S.processarFila(f.id, conectorFalso(() => ({ resultado: "enviado", wamid: "sim.1", simulado: true })), semEspera);
+    igual(S.incidentesParaDisparo().find((x) => x.incidente === "INC 0000301").elegivel, true);
+    await fechar();
+  });
+  await teste("Disparos: filas antigas são lidas; estado sem o campo 'disparos' continua abrindo", async () => {
+    await S._alterar((E) => { delete E.disparos; }); await S.carregar(); igual(S.E.disparos, []);
+  });
+
+  /* ---------------------------------------------------- histórico permanente, callback manual e fechamento */
+  const importarLinhas = async (ls) => { const b = gerarCSV(ls); await S.importar("h.csv", b, S.previa(b).resumo.sha256); return S.incidentesParaDisparo(); };
+  const novoTurno = async (op = "OP2") => { if (S.loteAberto()) await S.encerrarLote(); if (S.sessao()) await S.encerrarDia(); await S.abrirSessao("Polo Fictício", op); };
+  const umaLinha = (call, inc) => linha(call, inc, "MOBILE: 79991000501");
+  await teste("Histórico: incidente atendido é reconhecido em lote e turno posteriores, sem contar callback de novo", async () => {
+    await abrirDia(S); let l = await importarLinhas([umaLinha("CALL 0000501", "INC 0000500")]);
+    await S.registrar(l[0].id, "callback_realizado", "ligacao");
+    await novoTurno(); l = await importarLinhas([umaLinha("CALL 0000502", "INC 0000500")]);
+    const a = S.atendimentoDoIncidente("INC:INC 0000500"); igual([a.operador, a.meio, a.status], ["Operador Teste", "ligacao", "realizado"]);
+    igual([l[0].elegivel, l[0].atendido, S.obterChamada(l[0].id).estado], [false, true, "pendente"]);
+    igual(S.metricasTempoReal().callbacks_realizados, 0, "reconhecer não é callback");
+    await falhaCom(() => S.prepararDisparo([l[0].chave], "selecao"), "Nenhum incidente");
+    igual(S.historicoDoIncidente("INC:INC 0000500").length, 1);
+    await S.encerrarLote();
+  });
+  await teste("Histórico: preparada, falha, incerta, cancelada e simulada não geram registro; reabrir mantém o registro como reaberto", async () => {
+    await abrirDia(S); let l = await importarLinhas([umaLinha("CALL 0000511", "INC 0000510"), linha("CALL 0000512", "INC 0000511", "MOBILE: 79991000512"), linha("CALL 0000513", "INC 0000512", "MOBILE: 79991000513")]);
+    let f = await S.prepararDisparo(l.map((x) => x.chave), "selecao"); f = await S.autorizarDisparo(f.id, PRONTO);
+    await S.processarFila(f.id, { enviar: async (e) => (e.incidente === "INC 0000510" ? { resultado: "falha" } : e.incidente === "INC 0000511" ? { resultado: "incerto" } : { resultado: "limite" }) }, semEspera);
+    igual(S.E.historico_atendimento.filter((r) => r.tipo === "callback").length, 0);
+    await S.cancelarRestante(f.id);
+    igual(S.E.historico_atendimento.map((r) => r.tipo), ["cancelado"]);
+    const c = l[0].id; await S.encerrarLote(); await abrirDia(S); l = await importarLinhas([umaLinha("CALL 0000514", "INC 0000513")]);
+    await S.registrar(l[0].id, "callback_realizado", "whatsapp"); await S.registrar(l[0].id, "reabrir", null, "correção");
+    igual([S.E.historico_atendimento.length, S.E.historico_atendimento[0].status, S.atendimentoDoIncidente("INC:INC 0000513")], [1, "reaberto", null]); verdade(c);
+    await S.encerrarLote();
+  });
+  await teste("Limpeza do lote preserva histórico de callbacks, disparos e lotes finalizados", async () => {
+    await abrirDia(S); const l = await importarLinhas([umaLinha("CALL 0000521", "INC 0000520")]); const f = await enviarUm(l, "INC 0000520");
+    await S.encerrarLote();
+    igual([S.chamadas().length, S.E.historico_atendimento.length, S.fila(f.id).itens[0].status, S.E.lotes.length, S.E.lotes[0].situacao], [0, 1, "enviado", 1, "encerrado"]);
+    await S.encerrarDia(); igual([S.E.historico_atendimento.length, !!S.fila(f.id), S.E.dias_encerrados[0].lotes.length], [1, true, 1]);
+  });
+  await teste("Manual: operador vem do turno; só conta depois de confirmar o envio; falha não conta", async () => {
+    await S._alterar((E) => { E.sessao = null; }); await falhaCom(() => S.abrirCallbackManual({ incidente: "1", telefone: "79991000601", modo: "padronizada", modelo: "manual_falta_energia" }), "Abra o turno");
+    await abrirDia(S, "Polo Fictício", "TSA4");
+    await falhaCom(() => S.abrirCallbackManual({ incidente: "", telefone: "79991000601", modo: "padronizada", modelo: "manual_falta_energia" }), "incidente");
+    await falhaCom(() => S.abrirCallbackManual({ incidente: "600", telefone: "7932001234", modo: "padronizada", modelo: "manual_falta_energia" }), "FIXO");
+    const r = await S.abrirCallbackManual({ incidente: "600", telefone: "(79) 99100-0601", modo: "padronizada", modelo: "manual_falta_energia", operador: "INVENTADO" });
+    igual([r.item.operador, r.item.incidente, r.item.status_envio], ["TSA4", "INC 600", "pendente"]); verdade(r.url.includes("web.whatsapp.com") && decodeURIComponent(r.url).includes("INC 600"), "link");
+    igual(S.metricasTempoReal().callbacks_realizados, 0, "pendente não conta");
+    await S.confirmarEnvioManual(r.item.id, "enviado"); igual(S.metricasTempoReal().callbacks_realizados, 1);
+    await falhaCom(() => S.confirmarEnvioManual(r.item.id, "enviado"), "já foi confirmado");
+    const f = await S.abrirCallbackManual({ incidente: "601", telefone: "79991000602", modo: "personalizada", texto: "Texto livre" });
+    verdade(decodeURIComponent(f.url).includes("Olá, aqui é a Energisa. Texto livre"), "saudação da regra existente");
+    await S.confirmarEnvioManual(f.item.id, "falha"); igual(S.metricasTempoReal().callbacks_realizados, 1, "falha não conta");
+  });
+  await teste("Manual: segundo telefone do mesmo incidente não conta de novo; resolver não gera callback; histórico persiste e filtra", async () => {
+    await abrirDia(S, "Polo Fictício", "TSA4");
+    const a = await S.abrirCallbackManual({ incidente: "INC 610", telefone: "79991000611", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(a.item.id, "enviado");
+    const b = await S.abrirCallbackManual({ incidente: "610", telefone: "79991000612", modo: "padronizada", modelo: "manual_falta_energia" }); const cb = await S.confirmarEnvioManual(b.item.id, "enviado");
+    igual([cb.status_envio, cb.callback, S.metricasTempoReal().callbacks_realizados], ["enviado", "ja_registrado", 1]);
+    const antes = S.E.historico_atendimento.length;
+    const res = await S.marcarResolucaoManual(a.item.id, true); igual([res.status_resolucao, res.status_envio, S.E.historico_atendimento.length, S.metricasTempoReal().callbacks_realizados, S.metricasTempoReal().ocorrencias_resolvidas], ["resolvido", "enviado", antes, 1, 1]);
+    await S.carregar(); igual(S.historicoManual({}).length, 2, "persiste");
+    igual(S.indicadoresManuais(S.historicoManual({})), { enviadas: 2, resolvidos: 1, pendentes_resolucao: 1, falhas: 0 });
+    igual(S.historicoManual({ status: "resolvido" }).length, 1); igual(S.historicoManual({ incidente: "999" }).length, 0); igual(S.historicoManual({ operador: "OUTRO" }).length, 0); igual(S.historicoManual({ de: "2999-01-01" }).length, 0);
+  });
+  await teste("Manual: incidente do lote aberto marca o principal uma única vez e não duplica com o disparo", async () => {
+    await abrirDia(S, "Polo Fictício", "TSA4"); const l = await importarLinhas([umaLinha("CALL 0000621", "INC 0000620")]);
+    const a = await S.abrirCallbackManual({ incidente: "INC 0000620", telefone: "79991000621", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(a.item.id, "enviado");
+    const c = S.obterChamada(l[0].id); igual([c.estado, c.callback_origem, S.metricasTempoReal().callbacks_realizados, S.E.historico_atendimento.length], ["callback_realizado", "callback_manual", 1, 1]);
+    await falhaCom(() => S.prepararDisparo([l[0].chave], "selecao"), "Nenhum incidente"); await falhaCom(() => S.registrar(l[0].id, "callback_realizado", "ligacao"), "já registrado");
+    await S.encerrarLote();
+  });
+  await teste("Manual antes de o incidente entrar no lote: o registro individual no mesmo turno não conta de novo e mantém a resolução", async () => {
+    await abrirDia(S, "Polo Fictício", "TSA4");
+    const a = await S.abrirCallbackManual({ incidente: "INC 0000630", telefone: "79991000631", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(a.item.id, "enviado"); await S.marcarResolucaoManual(a.item.id, true);
+    igual([S.metricasTempoReal().callbacks_realizados, S.metricasTempoReal().ocorrencias_resolvidas], [1, 1]);
+    const l = await importarLinhas([umaLinha("CALL 0000631", "INC 0000630")]); await S.registrar(l[0].id, "callback_realizado", "whatsapp");
+    const data = S.sessao().data_operacional, cons = S.consolidadoDia(data)[0];
+    igual([S.metricasTempoReal().callbacks_realizados, S.metricasTempoReal().ocorrencias_resolvidas, S.E.historico_atendimento.length, cons.callbacks, cons.resolvidos], [1, 1, 1, 1, 1]);
+    await S.registrar(l[0].id, "reabrir", null, "correção de teste"); igual([S.metricasTempoReal().callbacks_realizados, S.consolidadoDia(data).length ? S.consolidadoDia(data)[0].callbacks : 0], [0, 0], "reabrir zera a única atuação");
+    await S.encerrarLote();
+  });
+  await teste("Manual em incidente já contado: marcar resolvido atualiza o indicador sem gerar callback; desfazer volta", async () => {
+    await abrirDia(S, "Polo Fictício", "TSA4"); const l = await importarLinhas([umaLinha("CALL 0000641", "INC 0000640")]); await S.registrar(l[0].id, "callback_realizado", "ligacao");
+    const a = await S.abrirCallbackManual({ incidente: "INC 0000640", telefone: "79991000641", modo: "padronizada", modelo: "manual_falta_energia" }), c = await S.confirmarEnvioManual(a.item.id, "enviado"); igual(c.callback, "ja_registrado");
+    await S.marcarResolucaoManual(a.item.id, true); const data = S.sessao().data_operacional;
+    igual([S.metricasTempoReal().callbacks_realizados, S.metricasTempoReal().ocorrencias_resolvidas, S.consolidadoDia(data)[0].callbacks, S.consolidadoDia(data)[0].resolvidos], [1, 1, 1, 1]);
+    await S.marcarResolucaoManual(a.item.id, false); igual([S.metricasTempoReal().ocorrencias_resolvidas, S.consolidadoDia(data)[0].resolvidos], [0, 0]);
+    await S.encerrarLote();
+  });
+  await teste("Excluir histórico manual: exige a palavra, mantém pendentes, não mexe em indicadores nem fechamento e fica auditado", async () => {
+    await abrirDia(S, "Polo Fictício", "TSA4"); const novo = async (n) => (await S.abrirCallbackManual({ incidente: "INC " + n, telefone: "79991000651", modo: "padronizada", modelo: "manual_falta_energia" })).item.id;
+    const a = await novo("650"), b = await novo("651"), c = await novo("652"); await S.confirmarEnvioManual(a, "enviado"); await S.confirmarEnvioManual(b, "falha");
+    const data = S.sessao().data_operacional, antes = JSON.stringify([S.metricasTempoReal(), S.consolidadoDia(data), S.E.historico_atendimento]), ind = S.indicadoresManuais(S.historicoManual({}));
+    await falhaCom(() => S.ocultarHistoricoManual([a, b, c], "excluir"), "EXCLUIR"); igual(S.historicoManual({}).length, 3, "sem a palavra nada muda");
+    const r = await S.ocultarHistoricoManual([a, b, c], "EXCLUIR"); igual(r.quantidade, 2, "pendente não sai");
+    igual(S.historicoManual({}).map((i) => i.id), [c]); igual(JSON.stringify([S.metricasTempoReal(), S.consolidadoDia(data), S.E.historico_atendimento]), antes, "contagem intacta");
+    igual(S.indicadoresManuais(S.historicoManual({}, { incluirOcultos: true })), ind); igual(S.E.callbacks_manuais.length, 3, "nada apagado");
+    await S.carregar(); const ult = S.E.auditoria_manual[S.E.auditoria_manual.length - 1]; igual([ult.operador, ult.quantidade, ult.registros.length], ["TSA4", 2, 2]); igual(S.historicoManual({}).length, 1, "persiste");
+  });
+  await teste("Fechamento: só agregados por operador, com total; sem nenhum dado de cliente", async () => {
+    await abrirDia(S, "Polo Fictício", "TSA4"); const l = await importarLinhas([umaLinha("CALL 0000701", "INC 0000700"), linha("CALL 0000702", "INC 0000701", "MOBILE: 79991000702")]);
+    const f = await enviarUm(l, "INC 0000700"); await S.registrarResultado(f.itens[0].chamada_id, "resolvida");
+    const m = await S.abrirCallbackManual({ incidente: "INC 0000799", telefone: "79991000799", modo: "personalizada", texto: "Mensagem secreta do cliente" }); await S.confirmarEnvioManual(m.item.id, "enviado");
+    const hoje = S.sessao().data_operacional; await falhaCom(() => S.gerarFechamento(hoje), "Encerre o dia");
+    await S.encerrarLote(); await S.encerrarDia();
+    const x = await S.gerarFechamento(hoje), ls = x.conteudo.replace("﻿", "").trim().split("\r\n");
+    igual(ls[0], "data;polo;operador;callbacks_realizados;incidentes_resolvidos;incidentes_cancelados;versao");
+    igual(ls.slice(1), [`${hoje};Polo Fictício;TSA4;2;1;0;1`, `${hoje};TOTAL;TOTAL;2;1;0;1`]);
+    for (const p of ["INC", "CALL", "79991", "Cliente", "Rua", "secreta", "FIC_UC"]) verdade(!x.conteudo.includes(p), "vazou " + p);
+    await falhaCom(() => S.gerarFechamento(hoje), "já foi concluído");
+    igual(S.diasSemFechamento(), []);
+  });
+  await teste("Fechamento: dados novos exigem motivo e geram nova versão, sem substituir a anterior; envio idempotente", async () => {
+    await abrirDia(S, "Polo Fictício", "TSA4"); const a = await S.abrirCallbackManual({ incidente: "710", telefone: "79991000711", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(a.item.id, "enviado");
+    const hoje = S.sessao().data_operacional; await S.encerrarDia(); const v1 = await S.gerarFechamento(hoje);
+    await S.abrirSessao("Polo Fictício", "TSA5"); const b = await S.abrirCallbackManual({ incidente: "711", telefone: "79991000712", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(b.item.id, "enviado"); await S.encerrarDia();
+    verdade(S.fechamentoDesatualizado(hoje), "detecta dados novos"); await falhaCom(() => S.gerarFechamento(hoje), "motivo");
+    const v2 = await S.gerarFechamento(hoje, { motivo: "Novo turno" }); igual([v2.versao, v2.substitui, v2.nome.endsWith("_v2.csv"), S.E.fechamentos.length], [2, v1.nome, true, 2]);
+    const chamadas = []; const c = { enviarFechamento: async (d) => { chamadas.push(d.nome); return { resultado: "enviado", arquivo_id: "x" }; } };
+    igual((await S.enviarFechamentosPendentes(c)).enviados, 2); igual((await S.enviarFechamentosPendentes(c)).enviados, 0); igual(chamadas.length, 2);
+    await S.enviarFechamentosPendentes({ enviarFechamento: async () => { throw new Error("não deveria"); } });
   });
 
   S.arm.fechar();

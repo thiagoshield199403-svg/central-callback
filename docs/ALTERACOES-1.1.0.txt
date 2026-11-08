@@ -3,14 +3,14 @@ CENTRAL DE CALLBACK COI - 1.1.0-web-dev - EVOLUCAO A PARTIR DA REFERENCIA CENTRA
 Data: 04/11/2026. NAO publicado. Nenhum commit, upload ou alteracao no GitHub. Aguarda aprovacao.
 
 0. ORIGEM, DESTINO E BACKUP
-- Referencia estudada (somente leitura): C:\Users\ShielD\Desktop\CENTRAL_CALLBACK (servidor Python local + interface
+- Referencia estudada (somente leitura): <copia local de referencia> (servidor Python local + interface
   web em central\app\callback\web). Nenhum arquivo dela foi alterado (conferido: 0 arquivos modificados) e ela NAO foi
   executada (executar o servidor gravaria no banco e nos logs dela).
-- Central Web atualizada: neste computador ela esta em C:\Users\ShielD\Desktop\callback-github (versao 1.0.2-web-dev,
-  a mesma copia de desenvolvimento). O caminho C:\Users\tsa4\Downloads\CENTRAL_CALLBACK_RECUPERACAO_20261103\... e do
+- Central Web atualizada: neste computador ela esta em <pasta local de desenvolvimento> (versao 1.0.2-web-dev,
+  a mesma copia de desenvolvimento). O caminho <pasta de recuperacao em outro computador> e do
   computador corporativo e nao existe aqui; 05_ENTREGA e os backups antigos tambem nao estao aqui (nada foi tocado).
 - Backup integral antes de qualquer alteracao:
-  C:\Users\ShielD\Desktop\CENTRAL_CALLBACK_WEB_BACKUP_1.0.2_antes_evolucao_04-11-2026 (19 arquivos + MANIFESTO_SHA256.txt;
+  <pasta local de backup> (19 arquivos + MANIFESTO_SHA256.txt;
   conferido intacto ao final).
 
 1. TECNOLOGIA
@@ -29,8 +29,8 @@ Visual (cores, Segoe UI 14px, espacamentos) | mesma base, mas fontes 11-12px e  
                                             | padding 4px (apertado)                  | rolagem horizontal mantida                               |
 Abertura do turno so com o operador         | pedia Polo + Operador                   | so a SIGLA; polo vem da Configuracao e e pedido so na    | U,E
  (polo da Configuracao)                     |                                         | 1a vez (fica salvo)                                      |
-Creditos no rodape                          | "Criado por Thiago Araujo" + comentario | "Criador: Thiago dos Santos Araujo" / "Filtros ADMS:     | E
-                                            | "aguardando confirmacao"                | Any Carolinne dos Santos Muniz" (texto exato da refer.)  |
+Creditos no rodape                          | "Criado por <autor>" + comentario | "Criador: <autor>" / "Filtros ADMS:     | E
+                                            | "aguardando confirmacao"                | <autora dos filtros>" (texto exato da refer.)  |
 Sem faixa de desenvolvimento                | faixa "COPIA DE DESENVOLVIMENTO"        | retirada; textos do rodape movidos para Configuracao     | E
 Cliente confirmou normalizacao              | nao existia                             | "Ocorrencia resolvida com sucesso" (mesma regra)          | U,E
 "Servico executado"                         | nao existia                             | NOVO (nao existe na referencia; ver secao 3)             | U,E
@@ -63,7 +63,7 @@ Pedidos novos (nao vinham da referencia):
 Envio manual de WhatsApp na linha de "Copiar texto" (botao + campo de telefone)           | U,E
 Validacao do telefone (DDD, +55, 0, fixo recusado, sequencias de teste recusadas)         | U,E
 Indicador "tentativas sem sucesso"                                                        | U,E
-Nome automatico CALLBACK_<POLO>_<dd-mm-aaaa>.csv e pasta sugerida W:\...                  | U,E
+Nome automatico CALLBACK_<POLO>_<dd-mm-aaaa>.csv e pasta sugerida <pasta de rede>                  | U,E
 
 3. DIVERGENCIAS ENTRE OS SISTEMAS (nada foi descartado em silencio)
 a) "Servico executado": NAO existe na referencia (nem na Central de Callback nem no restante do codigo). Foi criado como
@@ -98,12 +98,12 @@ g) Na referencia o lote aberto tambem fica fora da exportacao; mantido. Novidade
 - Regra do Power BI (sem dupla contagem): por id_turno, usar so a linha de MAIOR versao.
 - Salvamento: abre a janela "Salvar como" do Windows com o nome preenchido; o operador so confirma em Salvar.
   O arquivo so e marcado como salvo depois que a gravacao termina; cancelar = "NAO foi salvo" (avisado).
-- Pasta W:\DTEC\DEOP\DECO\CO\USUARIOS\TSA4\CENTRAL DE CALLBACK - LIMITACAO DO NAVEGADOR: o Edge/Chrome NAO aceita um
-  caminho escrito (W:\...) como pasta inicial da janela; aceita apenas uma pasta ja escolhida pelo usuario.
-  MELHOR ALTERNATIVA IMPLEMENTADA: (1) Configuracao > "Escolher pasta inicial..." uma vez (navegar ate W:\...\CENTRAL DE
+- Pasta <pasta de rede do COI>\CENTRAL DE CALLBACK - LIMITACAO DO NAVEGADOR: o Edge/Chrome NAO aceita um
+  caminho escrito (<pasta de rede>) como pasta inicial da janela; aceita apenas uma pasta ja escolhida pelo usuario.
+  MELHOR ALTERNATIVA IMPLEMENTADA: (1) Configuracao > "Escolher pasta inicial..." uma vez (navegar ate <pasta de rede do COI>\CENTRAL DE
   CALLBACK); (2) o navegador tambem lembra a ultima pasta usada no salvamento. Depois disso a janela abre direto la.
   O caminho recomendado aparece na Configuracao e no historico para orientar.
-- W: indisponivel (desconectada): a janela abre na pasta padrao e a Central avisa que a pasta inicial nao estava
+- Unidade de rede indisponivel (desconectada): a janela abre na pasta padrao e a Central avisa que a pasta inicial nao estava
   disponivel. Falha ao gravar: mensagem com o motivo e o arquivo vai para Downloads (avisado; nunca "salvo" falso).
 - Navegador sem a janela "Salvar como" (ex.: Firefox): download para a pasta Downloads, com aviso para mover o arquivo.
 
@@ -119,18 +119,18 @@ g) Na referencia o lote aberto tambem fica fora da exportacao; mantido. Novidade
 6. TESTES EXECUTADOS (04/11/2026, dados 100% ficticios)
 - Unitarios: 84/84 aprovados no Chrome 156 e 84/84 no Edge 156 (74 anteriores, dos quais 2 reescritos para o novo
   formato de exportacao, + 10 novos).
-- Ponta a ponta pela interface: 22/22 aprovados no Chrome e 22/22 no Edge, com a unidade W: simulada por "subst"
-  (gravacao real conferida em W:\DTEC\DEOP\DECO\CO\USUARIOS\TSA4\CENTRAL DE CALLBACK\CALLBACK_ARACAJU_04-11-2026.csv),
-  e sem W: (cenario de pasta indisponivel). O mapeamento temporario foi removido ao final.
+- Ponta a ponta pela interface: 22/22 aprovados no Chrome e 22/22 no Edge, com a unidade de rede simulada por "subst"
+  (gravacao real conferida em <pasta de rede do COI>\CENTRAL DE CALLBACK\CALLBACK_ARACAJU_04-11-2026.csv),
+  e sem unidade de rede (cenario de pasta indisponivel). O mapeamento temporario foi removido ao final.
 - Resolucoes: 1920x1080, 1600x900, 1366x768, 1280x720, 1024x768 e 390x844 (celular): sem rolagem horizontal da pagina;
   envio manual na mesma linha (ate 560px de largura; no celular o campo desce para a linha de baixo).
 - Console: nenhum erro (o teste encontrou e foi corrigida uma violacao da politica de seguranca por estilo embutido).
 - Abertura por file:// confirmada sem servidor; janela "Salvar como" disponivel por file:// no Chrome e no Edge.
 - O que NAO da para automatizar e fica para o teste manual no computador do COI:
   * a janela nativa "Salvar como" foi SIMULADA nos testes (registra nome, pasta inicial e conteudo); conferir a janela
-    real escolhendo a pasta W:\... em Configuracao e clicando em EXPORTAR DO DIA;
+    real escolhendo a pasta <pasta de rede> em Configuracao e clicando em EXPORTAR DO DIA;
   * abertura real do WhatsApp Web (os testes interceptam o link; nada foi enviado a ninguem);
-  * politicas do navegador corporativo (pop-ups, permissao de pasta, unidade W: real).
+  * politicas do navegador corporativo (pop-ups, permissao de pasta, unidade de rede real).
 
 7. PARA PUBLICAR (somente depois da aprovacao)
 - js\app.js: trocar BANCO_BASE de "central-callback-coi-dev" para "central-callback-coi" (dados da versao em uso).
@@ -146,9 +146,9 @@ Dados antigos: o esquema do armazenamento continua 1; turnos/lotes gravados pela
   antigos aparecem no Painel com "—" nos indicadores que ainda nao existiam (nada de zero inventado).
 
 9. AJUSTES FINAIS ANTES DA PUBLICACAO (04/11/2026)
-9.1 Exportacao - destino obrigatorio W:\DTEC\DEOP\DECO\CO\USUARIOS\TSA4\CENTRAL DE CALLBACK
+9.1 Exportacao - destino obrigatorio <pasta de rede do COI>\CENTRAL DE CALLBACK
 - LIMITE TECNICO (Edge/Chrome, sem servidor nem executavel): uma pagina NAO consegue abrir a janela "Salvar como" num
-  caminho escrito (W:\...). O navegador so aceita, como pasta inicial, uma pasta que o usuario ja selecionou nele.
+  caminho escrito (<pasta de rede>). O navegador so aceita, como pasta inicial, uma pasta que o usuario ja selecionou nele.
   Nao existe outro recurso do navegador para isso; politicas da TI (ex.: DownloadDirectory do Edge) valem so para
   downloads, nao para a janela "Salvar como".
 - O que foi feito para o destino ser OBRIGATORIO e nao sugestao:
@@ -159,19 +159,19 @@ Dados antigos: o esquema do armazenamento continua 1; turnos/lotes gravados pela
   c) depois do clique em Salvar, a Central confere se o arquivo ficou DENTRO da pasta de destino; se o operador
      navegar para outra pasta, a gravacao e RECUSADA (nada e gravado e nada e dado como salvo);
   d) Configuracao mostra o destino obrigatorio e permite apenas "Selecionar de novo" a mesma pasta.
-- Falhas (W: desconectada, Citrix/VPN sem a unidade, sem permissao, gravacao interrompida): janela "Arquivo NAO salvo no
+- Falhas (Unidade de rede desconectada, acesso remoto sem a unidade, sem permissao, gravacao interrompida): janela "Arquivo NAO salvo no
   destino" com o motivo. Nada e simulado; o arquivo continua guardado na Central (Lotes do dia e exportacoes > salvar);
   opcoes: "Tentar de novo", "Baixar copia de contingencia" (vai para Downloads, fica registrada como contingencia e
   NAO como salva no destino) e "Fechar".
 - Comportamentos do navegador para observar no teste corporativo:
   * a Central confere o NOME da pasta (CENTRAL DE CALLBACK); o navegador nao informa a letra da unidade. Selecione a
-    pasta que esta na W:;
-  * se a W: estiver desconectada e o navegador ainda nao tiver permissao naquela sessao, a janela pode abrir em outra
+    pasta que esta na unidade de rede;
+  * se a unidade de rede estiver desconectada e o navegador ainda nao tiver permissao naquela sessao, a janela pode abrir em outra
     pasta: a Central recusa salvar fora do destino e explica;
   * o Edge/Chrome pode criar um arquivo VAZIO no local escolhido mesmo quando a Central recusa gravar fora do destino
     (comportamento da janela do navegador). Apague-o se aparecer;
   * a permissao de gravacao na pasta pode ser pedida de novo depois de fechar o navegador (politica do navegador);
-  * em Citrix, a W: precisa estar visivel no "Explorador de Arquivos" da sessao em que o navegador roda.
+  * em acesso remoto, a unidade de rede precisa estar visivel no "Explorador de Arquivos" da sessao em que o navegador roda.
 9.2 Bolinha de resolucao na lista
 - Na coluna Acoes, antes de "Abrir" (coluna passou de 66 para 90 px; a altura da linha nao mudou).
 - Estados (forma + simbolo + cor, nao so cor): circulo TRACEJADO cinza = indisponivel (sem callback);
@@ -183,7 +183,7 @@ Dados antigos: o esquema do armazenamento continua 1; turnos/lotes gravados pela
 - Nos detalhes: registro mantido e acrescentado "desfazer" ao lado de "Servico executado" e de "Ocorrencia resolvida".
   "Reabrir (corrigir)" continua apagando os dois junto com o callback, como antes.
 9.3 Creditos
-- Texto identico ("Criador: Thiago dos Santos Araujo" / "Filtros ADMS: Any Carolinne dos Santos Muniz"); fonte de 11 para
+- Texto identico ("Criador: <autor>" / "Filtros ADMS: <autora dos filtros>"); fonte de 11 para
   14 px, nomes em negrito e cor escura, linha divisoria discreta; rodape continua com uma linha (~40 px).
 9.4 Nao alterado: 27 mensagens (modelos.js identico ao backup), regras de classificacao (nucleo.js), demais telas.
 Arquivos alterados nesta rodada: js\app.js, js\servico.js, css\estilo.css, index.html (negrito nos nomes),

@@ -16,10 +16,10 @@ o turno e o lote continuam de onde pararam.
 PRIMEIRA VEZ NO COMPUTADOR
 - Configuracao > Polo padrao (ex.: Aracaju).
 - No primeiro EXPORTAR DO DIA a Central pede, uma unica vez, a pasta de destino OBRIGATORIA:
-  W:\DTEC\DEOP\DECO\CO\USUARIOS\TSA4\CENTRAL DE CALLBACK (so a pasta CENTRAL DE CALLBACK e aceita).
+  <pasta de rede do COI>\CENTRAL DE CALLBACK (so a pasta CENTRAL DE CALLBACK e aceita).
 
 USO DIARIO
-1. Abrir o turno: so a sua SIGLA (ex.: TSA4).
+1. Abrir o turno: so a sua SIGLA (ex.: ABC1).
 2. Importar CSV do ADMS: escolha o arquivo exportado do Navegador de Chamadas, confira a previa e importe.
 3. Clique na ocorrencia. Confira a mensagem sugerida (pode trocar e editar o texto).
    - Telefone do ADMS: "Abrir WhatsApp Web".
@@ -33,7 +33,7 @@ USO DIARIO
    Errou? "Reabrir (corrigir)" com uma observacao (apaga tambem servico/resolucao daquela chamada).
 5. "Encerrar e limpar o lote": os indicadores ficam; os dados dos clientes sao apagados.
 6. EXPORTAR DO DIA: gera CALLBACK_<POLO>_<data>.csv e abre a janela Salvar do Windows NA PASTA DE DESTINO, com o nome
-   pronto; confirme em Salvar. Salvar fora do destino e recusado. W: indisponivel: "Arquivo NAO salvo no destino"
+   pronto; confirme em Salvar. Salvar fora do destino e recusado. Unidade de rede indisponivel: "Arquivo NAO salvo no destino"
    (o arquivo continua guardado na Central; ha copia de contingencia opcional para Downloads). "Encerrar o dia" gera a versao definitiva. O arquivo nao tem dados de clientes.
 7. Botao PAINEL: indicadores de hoje e por dia, operador e polo (turnos feitos neste navegador).
 
@@ -48,6 +48,15 @@ TESTE RAPIDO (sem dados reais)
 - Desenvolvimento (opcional, exige Node.js): node testes\ponta-a-ponta\rodar-testes-unitarios.mjs  e
   node testes\ponta-a-ponta\e2e.mjs  (testes pela interface, sem janela).
 
+CENTRAL DE DISPAROS (opcional; exige o gateway com Node.js e, para envio real, a API oficial do WhatsApp)
+- Tres opcoes na tela do lote: envio individual (como acima), envio em lote e callback manual (abre a tela Callback WhatsApp).
+- Treino sem entregar nada: node gateway\servidor.mjs  e abra http://127.0.0.1:8787/ (os dados desse endereco sao separados dos do index.html).
+- Como funciona, protecoes e configuracao externa: docs\CENTRAL-DE-DISPAROS.txt
+
+HISTORICO, CALLBACK WHATSAPP, FECHAMENTO E BI
+- Incidente ja atendido aparece com a linha verde-claro, mesmo em CSV novo.
+- Botao Callback WhatsApp: envio manual com historico proprio. Botao Fechamento: arquivos diarios agregados. Botao BI: indicadores.
+- Detalhes e configuracao do Google Drive: docs\DRIVE-BI-E-POLOS.txt
+
 Limitacoes e pendencias: docs\LIMITACOES-E-PENDENCIAS.txt
 
-Criador: Thiago dos Santos Araujo · Filtros ADMS: Any Carolinne dos Santos Muniz

@@ -1,0 +1,18 @@
+# Credenciais
+.env
+.env.*
+!.env.exemplo
+*.pem
+*.key
+*.p12
+client_secret*.json
+google-oauth.json
+gateway/modelos-aprovados.json
+
+# Dados operacionais (fechamentos, registro de envios, tokens do Google)
+gateway/dados/
+
+# Dados reais: somente os exemplos ficticios entram no repositorio
+*.csv
+!exemplos/*-FICTICIO.csv
+*.xlsx

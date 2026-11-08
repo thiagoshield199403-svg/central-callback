@@ -57,8 +57,8 @@ C. PENDENCIAS (nao resolvidas nesta versao - nada foi inventado)
 
 D. ATUALIZACAO 1.1.0-web-dev (04/11/2026)
 1. Item B.6 (exportacao) substituido: EXPORTAR DO DIA abre a janela "Salvar como" do Windows (Edge/Chrome) com o nome
-   CALLBACK_<POLO>_<dd-mm-aaaa>.csv. O navegador NAO aceita um caminho escrito (W:\...) como pasta inicial: a pasta e
-   escolhida uma vez (Configuracao > Escolher pasta inicial) e lembrada. W: desconectada: a janela abre na pasta
+   CALLBACK_<POLO>_<dd-mm-aaaa>.csv. O navegador NAO aceita um caminho escrito (<pasta de rede>) como pasta inicial: a pasta e
+   escolhida uma vez (Configuracao > Escolher pasta inicial) e lembrada. Unidade de rede desconectada: a janela abre na pasta
    padrao, com aviso. Sem a janela (outros navegadores): download para Downloads, com aviso.
 2. Pendencia C.1 parcialmente resolvida com a referencia CENTRAL_CALLBACK (Desktop): normalizacao apos callback e taxa de
    resolucao (agora "Ocorrencia resolvida com sucesso"), creditos, abertura do turno so com o operador, texto editavel.
@@ -67,5 +67,9 @@ D. ATUALIZACAO 1.1.0-web-dev (04/11/2026)
 3. "Servico executado" nao existe na referencia: criado com a mesma regra da normalizacao (so apos callback, uma vez).
 4. Painel: mostra apenas os turnos registrados neste navegador (ate 60 dias encerrados). O consolidado de todos os
    operadores e no Power BI, com os arquivos exportados.
-5. Testes manuais ainda necessarios no computador do COI: janela Salvar real com a unidade W: corporativa, abertura real
+5. Testes manuais ainda necessarios no computador do COI: janela Salvar real com a unidade de rede corporativa, abertura real
    do WhatsApp Web e politicas do navegador corporativo (pop-ups, permissao de pasta).
+
+E. CENTRAL DE DISPAROS (08/11/2026)
+A premissa "so navegador" continua valendo para o envio individual. O disparo em fila depende do gateway (Node.js) e da API oficial.
+Pendencias externas, limites e o que nao foi testado: docs\CENTRAL-DE-DISPAROS.txt, secoes 4, 6 e 7.

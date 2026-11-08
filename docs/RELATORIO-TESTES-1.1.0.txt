@@ -23,8 +23,8 @@ Novos nesta rodada (*) e anteriores:
  *  Exportacoes seguintes: abrem direto no destino, sem perguntar a pasta de novo
  *  Sem gesto recente do usuario: pede um clique e entao abre a janela Salvar no destino
  *  Local fora do destino e recusado: nada e gravado e nada e dado como salvo
- *  Unidade W: inacessivel: avisa, nao simula, nao descarta; copia de contingencia so se pedida
- *  Unidade W: de volta: "salvar" no historico grava no destino
+ *  Unidade de rede inacessivel: avisa, nao simula, nao descarta; copia de contingencia so se pedida
+ *  Unidade de rede de volta: "salvar" no historico grava no destino
  *  Configuracao mostra o destino obrigatorio (sem opcao de outra pasta)
     Cancelar a janela Salvar: nada e dado como salvo (adaptado)
     Encerrar o dia: arquivo definitivo NO DESTINO; proxima abertura pede so a sigla (adaptado)
@@ -33,7 +33,7 @@ Novos nesta rodada (*) e anteriores:
     assunto e texto editavel · envio manual na mesma linha · validacao de telefone · WhatsApp nao conta tentativa/
     callback · callback + servico + resolucao · filtros · sem sucesso/contato invalido · encerrar lote · painel ·
     resolucoes 1920x1080 a 390x844 · console sem erros.
-Retirado: "Gravacao REAL na unidade W: por download" (a exportacao nao baixa mais para outra pasta como caminho normal;
+Retirado: "Gravacao REAL na unidade de rede por download" (a exportacao nao baixa mais para outra pasta como caminho normal;
   o download agora e so a copia de contingencia, testada para a pasta de downloads de teste).
 
 3. COMO A EXPORTACAO FOI TESTADA (e o que NAO da para automatizar)
@@ -41,23 +41,23 @@ Retirado: "Gravacao REAL na unidade W: por download" (a exportacao nao baixa mai
   sao substituidas por equivalentes que devolvem PASTAS E ARQUIVOS REAIS da area privada do navegador; a pasta
   "W/CENTRAL DE CALLBACK" faz o papel do destino. A Central grava de verdade, confere se o arquivo ficou dentro do
   destino, e o teste le o arquivo gravado (nome, cabecalho, valores, ausencia de dados pessoais, versao, definitiva).
-- "W: inacessivel": a pasta de destino e removida depois de selecionada; o navegador responde NotFoundError, o mesmo
+- "Unidade de rede inacessivel": a pasta de destino e removida depois de selecionada; o navegador responde NotFoundError, o mesmo
   tipo de erro de uma unidade desconectada.
 - PARA O SEU TESTE NO COMPUTADOR CORPORATIVO (ver docs\ALTERACOES-1.1.0.txt, secao 9):
   a) 1o EXPORTAR DO DIA: aparece "Destino da exportacao (configuracao unica)" > Selecionar a pasta > navegar ate
-     W:\DTEC\DEOP\DECO\CO\USUARIOS\TSA4\CENTRAL DE CALLBACK > Selecionar pasta. Se o navegador perguntar, permitir
+     <pasta de rede do COI>\CENTRAL DE CALLBACK > Selecionar pasta. Se o navegador perguntar, permitir
      "editar arquivos".
   b) A janela "Salvar como" deve abrir NESSA pasta com CALLBACK_<POLO>_<dd-mm-aaaa>.csv preenchido > Salvar.
   c) Conferir o arquivo na pasta. Repetir EXPORTAR DO DIA: deve abrir direto na pasta, sem nova selecao.
   d) Tentar salvar em outra pasta: a Central deve recusar ("nao e a pasta de destino").
-  e) Com a W: desconectada (ou fora do Citrix/VPN): deve aparecer "Arquivo NAO salvo no destino".
+  e) Com a unidade de rede desconectada (ou fora do acesso remoto): deve aparecer "Arquivo NAO salvo no destino".
   f) Fechar e reabrir o navegador e exportar: se pedir permissao de novo, aceitar (comportamento do navegador).
 
 4. CONFERENCIAS DE PRESERVACAO
 - js\modelos.js (as 27 mensagens) identico ao backup (comparacao byte a byte).
 - js\nucleo.js (regras de classificacao) nao alterado nesta rodada.
-- Referencia C:\Users\ShielD\Desktop\CENTRAL_CALLBACK: 0 arquivos alterados.
-- Backup C:\Users\ShielD\Desktop\CENTRAL_CALLBACK_WEB_BACKUP_1.0.2_antes_evolucao_04-11-2026: manifesto conferido, integro.
+- Referencia <copia local de referencia>: 0 arquivos alterados.
+- Backup <pasta local de backup>: manifesto conferido, integro.
 - Nenhum commit, upload ou publicacao.
 
 5. COMO REPETIR (opcional; exige Node.js e Chrome/Edge)

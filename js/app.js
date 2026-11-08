@@ -1,7 +1,7 @@
 /* Central de Callback COI — interface (aplicação web local, aberta direto pelo index.html; sem servidor).
    Todo texto vindo do CSV é inserido como TEXTO (esc), nunca como HTML. O estado fica no armazenamento local do navegador
-   (IndexedDB) e sobrevive ao fechamento do navegador. A Central NUNCA envia mensagens: abre o WhatsApp Web com o texto e o
-   operador confere, envia e registra o resultado.
+   (IndexedDB) e sobrevive ao fechamento do navegador. No envio individual a Central NÃO envia mensagens: abre o WhatsApp Web
+   com o texto e o operador confere, envia e registra o resultado. O disparo autorizado em fila fica em js/disparos.js e usa o gateway.
    1.1.0: visual e funções recuperados da referência CENTRAL_CALLBACK (texto editável, prévia com amostra, localização resumida,
    filtros, créditos), envio manual de WhatsApp, serviço executado / ocorrência resolvida, painel e exportação diária. */
 "use strict";
@@ -30,7 +30,9 @@
     const t = $("#toast"); t.textContent = msg; t.className = "toast" + (erro ? " erro" : "");
     clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add("oculto"), erro ? 7000 : 4000);
   }
-  window.CentralUI = { toast: (m) => toast(m) }; // usado só pela página de testes
+  window.CentralUI = { toast: (m) => toast(m), // toast: usado pela página de testes
+    esc, confirmar, toastErro: toast, avisar: () => avisarOutrasAbas(), recarregar: () => carregar(), atualizarDuranteFila: () => atualizarDuranteFila() };
+  window.CentralUI.operadorAtual = () => (estado && estado.sessao ? estado.sessao.operador : null); // restante: Central de Disparos
 
   function confirmar(titulo, html, rotulo = "Confirmar", classe = "acao") {
     return new Promise((ok) => {
@@ -70,9 +72,13 @@
     $("#historico").classList.toggle("oculto", !s && !estado.exportacoes.length);
     metricas(); historico();
     if (estado.lote_aberto) carregarChamadas(); else { chamadas = []; fecharPainel(); }
+    window.CentralDisparos.atualizar(); window.CentralManual.atualizar();
   }
   function avisarOutrasAbas() { if (canal) canal.postMessage("mudou"); }
-  function atualizarTudo() { avisarOutrasAbas(); estado = srv.estado(); metricas(); historico(); if (estado.lote_aberto) carregarChamadas(); }
+  function atualizarTudo() { avisarOutrasAbas(); estado = srv.estado(); metricas(); historico(); if (estado.lote_aberto) carregarChamadas(); window.CentralDisparos.atualizar(); }
+
+  /* Durante o disparo: atualiza totais e lista, sem redesenhar o painel aberto (não apaga o que o operador está digitando). */
+  function atualizarDuranteFila() { estado = srv.estado(); metricas(); if (estado.lote_aberto) { chamadas = srv.chamadas(); grupos = srv.grupos(); desenharTabela(); } }
 
   /* ------------------------------------------------------------ indicadores (faixa do dia) */
   /* Tempo real = lotes encerrados + lote em andamento, pela regra do encerramento (CALL única no dia, melhor resultado).
@@ -262,9 +268,11 @@
     const m = estado.metricas_dia;
     if (!await confirmar("Encerrar o dia", `<p>Será gerado o arquivo <b>definitivo</b> do dia (${esc(estado.nome_arquivo_dia)}) com ${m.chamadas_processadas} chamadas e ${m.callbacks_realizados} callbacks.
         Depois disso o turno não recebe mais lotes.</p>`, "Encerrar e exportar")) return;
+    const operadorDia = estado.sessao.operador, dataDia = estado.sessao.data_operacional;
     const r = await executar(() => srv.encerrarDia());
     if (!r) return;
     avisarOutrasAbas(); carregar();
+    window.CentralFechamento.aposEncerrarDia(dataDia, operadorDia);
     await salvarArquivo(srv.exportacao(r.exportacao.id));
   };
 
@@ -367,8 +375,8 @@
     const idsSel = selecionada ? (grupos.find((g) => g.membros.some((m) => m.id === selecionada)) || { membros: [] }).membros.map((m) => m.id) : [];
     $("#linhas").innerHTML = lista.map((g) => {
       const c = g.principal, tel = c.telefones.find((t) => t.numero);
-      const feitos = g.membros.filter((m) => m.estado === "callback_realizado").length;
-      return `<tr data-id="${c.id}" data-call="${esc(c.call_id)}" data-grupo="${esc(g.chave)}" class="${idsSel.includes(c.id) ? "selecionada" : ""}${g.risco >= 1 ? " linha-risco" : ""}">
+      const feitos = g.membros.filter((m) => m.estado === "callback_realizado").length, at = srv.atendimentoDoIncidente(g.chave);
+      return `<tr data-id="${c.id}" data-call="${esc(c.call_id)}" data-grupo="${esc(g.chave)}" class="${idsSel.includes(c.id) ? "selecionada" : ""}${at || c.estado === "callback_realizado" ? " linha-callback" : ""}${g.risco >= 1 ? " linha-risco" : ""}">
         <td class="c-inc">${celulaIncidente(g, c)}${c.ja_vista_no_dia ? ' <span class="mini" title="Apareceu em lote anterior do dia">↺</span>' : ""}</td>
         <td class="data-hora">${esc(N.formatarDataHora(c.horario_call))}</td>
         <td class="c-motivo" title="${esc(c.motivo || "")}">${esc(c.motivo || "—")}${etiquetaSugestao(c)}</td>
@@ -376,7 +384,7 @@
         <td class="c-tel">${tel ? esc(N.formatarTelefone(tel.numero)) + (tel.requer_confirmacao ? ' <span class="mini" title="Telefone achado no comentário: confirmar antes de usar">*</span>' : "") : "—"}</td>
         <td class="c-local" title="${esc(c.localizacao || "")}">${esc(N.resumirLocalizacao(c.localizacao) || "—")}</td>
         <td class="c-num">${g.qtd > 1 ? g.membros.reduce((s, x) => s + x.tentativas.length, 0) : c.tentativas.length}</td>
-        <td class="c-sit">${situacao(c)}${c.whatsapp_aberto_em && c.estado === "pendente" ? ` <span class="mini" title="WhatsApp aberto${c.whatsapp_manual ? " (envio manual)" : ""}">WA</span>` : ""}${g.qtd > 1 ? ` <span class="mini" title="comunicações deste incidente com callback">${feitos}/${g.qtd}</span>` : ""}</td>
+        <td class="c-sit">${at && c.estado !== "callback_realizado" ? `<span class="etq e-callback_realizado" title="Callback realizado por ${esc(at.operador)} em ${esc(horaBR(at.em))}">Já atendido · ${esc(at.operador)}</span>` : situacao(c)}${c.whatsapp_aberto_em && c.estado === "pendente" ? ` <span class="mini" title="WhatsApp aberto${c.whatsapp_manual ? " (envio manual)" : ""}">WA</span>` : ""}${g.qtd > 1 ? ` <span class="mini" title="comunicações deste incidente com callback">${feitos}/${g.qtd}</span>` : ""}</td>
         <td class="c-acoes">${bolinha(c, g)}<button class="mini-botao" data-abrir-linha="${c.id}">Abrir</button></td></tr>`;
     }).join("") || `<tr><td colspan="9" class="mini">Nenhuma ocorrência neste filtro.</td></tr>`;
   }
@@ -409,7 +417,8 @@
     try { d = srv.detalhe(id, modelo); } catch (e) { toast(e.message, true); fecharPainel(); return; }
     desenharTabela();
     const p = $("#painel"); p.classList.remove("oculto");
-    const feito = d.estado === "callback_realizado", sub = (N.SUBTIPOS[d.subtipo || ""] || {}).rotulo;
+    const feito = d.estado === "callback_realizado", atHist = srv.historicoDoIncidente(N.chaveIncidente(d)), sub = (N.SUBTIPOS[d.subtipo || ""] || {}).rotulo;
+    const viaDisparo = feito && !!d.callback_telefone, podeWa = (n) => !feito || (viaDisparo && n !== d.callback_telefone); // envio a OUTRO contato após o disparo
     const mesmo = painelEstado.id === d.id && painelEstado.modelo === d.modelo && painelEstado.texto != null;
     const texto = mesmo ? painelEstado.texto : d.mensagem;
     const botaoRes = (tipo, rotulo, quando) => quando
@@ -435,10 +444,12 @@
           <td><span class="etq e-${m.estado}">${ESTADOS[m.estado]}</span></td>
           <td>${m.id === d.id ? '<span class="mini">aberta</span>' : `<button class="mini-botao" data-abrir="${m.id}">Abrir</button>`}</td></tr>`).join("")}
         </tbody></table></div>` : ""}
+      ${atHist.length ? `<h3>Histórico do incidente</h3><ul class="lista mini">${atHist.map((r) => `<li><b>${esc(r.operador)}</b> · ${horaBR(r.em)} · ${r.tipo === "cancelado" ? "envio cancelado" : `callback ${esc(r.status)} (${esc(MEIOS[r.meio] || r.meio)})${r.resolvido_em ? " · resolvido" : ""}`}</li>`).join("")}</ul>` : ""}
       <h3>Telefones</h3>
       ${d.telefones.length ? d.telefones.map((t) => `<div class="telefone"><div><b>${esc(N.formatarTelefone(t.numero))}</b> <span class="mini">${esc(t.tipo)}${t.requer_confirmacao ? " · achado no comentário: confirme" : ""}</span></div>
-        <div>${t.tipo === "celular" && t.numero && !feito ? `<button class="acao" data-wa="${esc(t.numero)}" data-conf="${t.requer_confirmacao ? 1 : 0}">Abrir WhatsApp Web</button>` : ""}</div></div>`).join("")
+        <div>${t.tipo === "celular" && t.numero && podeWa(t.numero) ? `<button class="acao" data-wa="${esc(t.numero)}" data-conf="${t.requer_confirmacao ? 1 : 0}">Abrir WhatsApp Web</button>` : ""}</div></div>`).join("")
         : '<p class="mini">O ADMS não trouxe telefone. Procure o cadastro do cliente no incidente e use o <b>Envio manual</b> abaixo.</p>'}
+      ${viaDisparo ? `<p class="mini">Mensagem confirmada para ${esc(N.formatarTelefone(d.callback_telefone))} por ${esc(d.callback_operador)} em ${esc(horaBR(d.callback_em))}. Para falar com outro contato, use os botões de envio.</p>` : ""}
       <h3>Mensagem</h3>
       <select id="p-modelo" aria-label="Mensagem">${d.modelos_agrupados.map((g) => `<optgroup label="${esc(g.grupo.toUpperCase())}">${g.modelos.map((m) =>
         `<option value="${esc(m.codigo)}" ${m.codigo === d.modelo ? "selected" : ""}>${esc(m.nome)}${m.prioridade ? "  ⚠ PRIORIDADE" : ""}</option>`).join("")}</optgroup>`).join("")}</select>
@@ -447,8 +458,8 @@
       <textarea id="p-texto" maxlength="${N.TEXTO_MAX}" aria-label="Texto da mensagem">${esc(texto)}</textarea>
       <div class="linha-envio">
         <button class="contorno" id="p-copiar">Copiar texto</button>
-        <button class="acao" id="p-manual" title="Abre o WhatsApp Web com esta mensagem para o telefone digitado ao lado" ${feito ? "disabled" : ""}>Envio manual</button>
-        <input id="p-tel-manual" inputmode="tel" maxlength="20" placeholder="(DDD) 9xxxx-xxxx" aria-label="Telefone para envio manual" value="${esc(telefoneManual[d.id] || "")}" ${feito ? "disabled" : ""}>
+        <button class="acao" id="p-manual" title="Abre o WhatsApp Web com esta mensagem para o telefone digitado ao lado" ${feito && !viaDisparo ? "disabled" : ""}>Envio manual</button>
+        <input id="p-tel-manual" inputmode="tel" maxlength="20" placeholder="(DDD) 9xxxx-xxxx" aria-label="Telefone para envio manual" value="${esc(telefoneManual[d.id] || "")}" ${feito && !viaDisparo ? "disabled" : ""}>
       </div>
       <p class="mini dica-envio" id="p-dica-envio">Abrir o WhatsApp não envia nada e não conta como callback nem tentativa: confira, envie e registre abaixo.</p>
       <h3>Registrar resultado</h3>
@@ -464,7 +475,7 @@
         ${botaoRes("servico_executado", "Serviço executado", d.servico_executado_em)}
         ${botaoRes("resolvida", "Ocorrência resolvida com sucesso", d.resolvida_em)}</div>`
         : '<p class="mini">Serviço executado e ocorrência resolvida ficam disponíveis depois do callback realizado.</p>'}
-      ${d.tentativas.length ? `<h3>Tentativas</h3><ul class="lista">${d.tentativas.map((h) => `<li>${horaBR(h.momento)} · ${esc(MEIOS[h.meio] || h.meio)} · ${esc(ESTADOS[h.resultado] || (h.resultado === "sem_sucesso" ? "sem sucesso" : h.resultado))}</li>`).join("")}</ul>` : ""}`;
+      ${d.tentativas.length ? `<h3>Tentativas</h3><ul class="lista">${d.tentativas.map((h) => `<li>${horaBR(h.momento)} · ${esc(MEIOS[h.meio] || h.meio)} · ${esc(ESTADOS[h.resultado] || (h.resultado === "sem_sucesso" ? "sem sucesso" : h.resultado))}${h.origem === "disparo" ? ` · Central de Disparos · ${esc(h.operador)}` : ""}</li>`).join("")}</ul>` : ""}`;
     painelEstado = { id: d.id, modelo: d.modelo, texto: mesmo ? painelEstado.texto : null };
     $("#p-fechar").onclick = fecharPainel;
     p.querySelectorAll("[data-abrir]").forEach((b) => b.onclick = () => abrirChamada(Number(b.dataset.abrir)));
@@ -574,7 +585,7 @@
     $("#modal-caixa").innerHTML = `<button class="fechar" id="pi-fechar">Fechar</button><h2>Painel de indicadores</h2>
       <div class="abas">${Object.entries(abas).map(([k, r]) => `<button data-aba="${k}" class="${k === aba ? "ativa" : ""}">${r}</button>`).join("")}</div>
       ${corpo}
-      <p class="mini">Fonte: turnos registrados <b>neste navegador</b> (turno aberto em tempo real + até 60 dias encerrados). Cada chamada conta uma vez por turno.
+      <p class="mini">Fonte: turnos registrados <b>neste navegador</b> (turno aberto em tempo real + dias encerrados). Cada chamada conta uma vez por turno.
         O consolidado de todos os operadores é feito no Power BI com os arquivos do EXPORTAR DO DIA.${incompleto ? " * Turnos anteriores à versão 1.1.0 não tinham este indicador: o total mostrado soma só os turnos que têm." : ""}</p>`;
     $("#modal").classList.remove("oculto");
     $("#pi-fechar").onclick = fecharModal;
@@ -626,7 +637,10 @@
     document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !$("#modal").classList.contains("oculto") && $("#modal-caixa").dataset.livre) fecharModal(); });
     window.CentralUI.servico = srv;
     carregar();
+    window.CentralDisparos.verificarConector();
+    window.CentralFechamento.automatico();
     document.body.dataset.pronto = "1";
   }
-  iniciar();
+  // Espera todos os scripts: servida por HTTP, o armazenamento pode responder antes de os módulos seguintes carregarem.
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar); else iniciar();
 })();

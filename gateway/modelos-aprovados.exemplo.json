@@ -1,0 +1,3 @@
+{
+  "manual_falta_energia": { "template": "nome_do_modelo_aprovado_na_meta", "idioma": "pt_BR", "parametros": ["incidente"] }
+}

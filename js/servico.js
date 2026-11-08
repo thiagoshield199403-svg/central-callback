@@ -3,7 +3,8 @@
    - a CALL repetida no arquivo conta uma vez; repetida em outro lote do MESMO dia também (pseudônimo HMAC com chave do dia,
      apagada ao encerrar o dia), valendo o MELHOR estado alcançado;
    - encerrar o lote é atômico: congela as métricas, acumula no dia e só então apaga os dados pessoais;
-   - callback só com registro explícito do operador; abrir o WhatsApp não é tentativa nem callback;
+   - callback só com registro explícito do operador, ou mensagem efetivamente enviada pela Central de Disparos (js/disparos.js);
+     abrir o WhatsApp não é tentativa nem callback;
    - a exportação diária é versionada (sem dados pessoais) e nunca sobrescreve uma anterior;
    1.1.0 (recuperado da referência CENTRAL_CALLBACK v1.1.0 + pedido do COI):
    - "Ocorrência resolvida com sucesso" = regra "cliente confirmou normalização" da referência: só depois do callback
@@ -29,6 +30,8 @@
   const RESULTADOS = { servico_executado: { campo: "servico_executado_em", rotulo: "Serviço executado" },
     resolvida: { campo: "resolvida_em", rotulo: "Ocorrência resolvida com sucesso" } };
   const comCallback = (c) => c.estado === "callback_realizado";
+  /* Callback registrado bloqueia o envio individual. Exceção: callback vindo da Central de Disparos não impede enviar a OUTRO número do contato. */
+  const bloqueiaIndividual = (c, numero) => comCallback(c) && !(c.callback_telefone && c.callback_telefone !== numero);
   const semSucesso = (c) => c.tentativas.filter((t) => t.resultado === "sem_sucesso").length;
   /* Junta uma CALL do lote à marca do dia (mesma regra no encerramento e no tempo real): melhor estado, tentativas somadas,
      serviço/resolução em OU (só contam se o estado final do dia for callback realizado). */
@@ -44,25 +47,31 @@
 
   function estadoVazio() {
     return { config: { ...CONFIG_PADRAO, instalacao_id: N.novoId() }, sessao: null, lotes: [], chamadas: [], marcas: {},
-      exportacoes: [], dias_encerrados: [], proximo_id: 1 };
+      exportacoes: [], dias_encerrados: [], proximo_id: 1, disparos: [], historico_atendimento: [], callbacks_manuais: [], fechamentos: [], auditoria_manual: [] };
   }
 
   class Servico {
-    constructor(armazenamento, aoMudar) { this.arm = armazenamento; this.E = null; this.aoMudar = aoMudar || (() => {}); }
+    constructor(armazenamento, aoMudar) { this.arm = armazenamento; this.E = null; this.aoMudar = aoMudar || (() => {}); this._cadeia = Promise.resolve(); }
 
-    async carregar() {
+    /* Central de Disparos: a fila grava enquanto o operador usa a tela. Leituras e gravações passam por UMA cadeia, para que
+       uma gravação nunca parta de uma cópia antiga e apague o resultado da anterior (ex.: o status "enviado" de uma mensagem). */
+    _emOrdem(f) { const r = this._cadeia.then(f); this._cadeia = r.catch(() => {}); return r; }
+    carregar() { return this._emOrdem(() => this._carregarAgora()); }
+    async _carregarAgora() {
       const lido = await this.arm.ler();
       this.E = lido || estadoVazio();
+      for (const k of ["disparos", "historico_atendimento", "callbacks_manuais", "fechamentos", "auditoria_manual"]) this.E[k] = this.E[k] || []; // estados gravados por versões anteriores
       if (!lido) await this._salvar(this.E);
       return this;
     }
 
     /* Toda alteração: copia, aplica, grava de uma vez. Falhou: nada muda (nem em memória). */
-    async _alterar(f) {
+    _alterar(f) { return this._emOrdem(() => this._alterarAgora(f)); }
+    async _alterarAgora(f) {
       const novo = clonar(this.E);
       const r = f(novo);
       try { this.E = await this.arm.gravar(novo); }
-      catch (e) { if (e instanceof raiz.Armazenamento.ErroConcorrencia) await this.carregar(); throw e; }
+      catch (e) { if (e instanceof raiz.Armazenamento.ErroConcorrencia) await this._carregarAgora(); throw e; }
       this.aoMudar();
       return r;
     }
@@ -166,10 +175,12 @@
           if (ch.estado === "pendente") throw new ErroCallback("A chamada já está pendente.");
           if (!observacao) throw new ErroCallback("Explique por que está reabrindo (correção de registro).", 422);
           ch.estado = "pendente"; ch.meio_callback = null; ch.servico_executado_em = null; ch.resolvida_em = null;
+          ch.callback_origem = null; ch.callback_operador = null; ch.callback_em = null; ch.callback_telefone = null;
+          this._reabrirNoHistorico(E, ch);
         } else {
           if (ch.estado === "callback_realizado") throw new ErroCallback("Callback já registrado para esta chamada. Use 'Reabrir' se o registro estiver errado.");
           ch.tentativas.push({ meio, resultado: acao, momento: agoraIso() });
-          if (acao === "callback_realizado") { ch.estado = "callback_realizado"; ch.meio_callback = meio; }
+          if (acao === "callback_realizado") { ch.estado = "callback_realizado"; ch.meio_callback = meio; this._anotarCallback(E, ch, { origem: "registro_manual", meio }); }
           else if (acao === "contato_invalido") ch.estado = "contato_invalido";
         }
         if (observacao) ch.observacao = observacao;
@@ -187,6 +198,7 @@
         if (!comCallback(ch)) throw new ErroCallback(`Registre o callback realizado antes de marcar "${r.rotulo}".`);
         if (ch[r.campo]) throw new ErroCallback(`"${r.rotulo}" já foi registrado para esta chamada. Use 'Reabrir' se o registro estiver errado.`);
         ch[r.campo] = agoraIso(); ch.atualizado_em = agoraIso();
+        if (tipo === "resolvida") this._resolverNoHistorico(E, ch, true);
         return ch;
       });
     }
@@ -200,6 +212,7 @@
         const ch = E.chamadas.find((x) => x.id === id);
         if (!ch[r.campo]) throw new ErroCallback(`"${r.rotulo}" não está registrado para esta chamada.`);
         ch[r.campo] = null; ch.atualizado_em = agoraIso();
+        if (tipo === "resolvida") this._resolverNoHistorico(E, ch, false);
         return ch;
       });
     }
@@ -215,7 +228,7 @@
       if (!tel) throw new ErroCallback("Telefone não pertence a esta chamada.", 404);
       if (tel.tipo !== "celular") throw new ErroCallback("WhatsApp só para celular. Para este número, use a ligação.", 422);
       if (tel.requer_confirmacao && !confirmoTelefone) throw new ErroCallback("Telefone encontrado no comentário: confirme que é do cliente antes de abrir o WhatsApp.", 422);
-      if (c.estado === "callback_realizado") throw new ErroCallback("Callback já registrado para esta chamada.");
+      if (bloqueiaIndividual(c, numero)) throw new ErroCallback("Callback já registrado para esta chamada.");
       const texto = this._textoMensagem(c, modelo, textoEditado);
       return this._alterar((E) => { E.chamadas.find((x) => x.id === id).whatsapp_aberto_em = agoraIso(); return { url: N.linkWhatsappWeb(numero, texto), texto }; });
     }
@@ -224,7 +237,7 @@
     abrirWhatsappManual(id, telefoneDigitado, modelo, textoEditado) {
       const c = this.obterChamada(id), v = N.validarTelefoneManual(telefoneDigitado);
       if (!v.ok) throw new ErroCallback(v.erro, 422);
-      if (c.estado === "callback_realizado") throw new ErroCallback("Callback já registrado para esta chamada.");
+      if (bloqueiaIndividual(c, v.numero)) throw new ErroCallback("Callback já registrado para esta chamada.");
       const texto = this._textoMensagem(c, modelo, textoEditado);
       return this._alterar((E) => { const ch = E.chamadas.find((x) => x.id === id); ch.whatsapp_aberto_em = agoraIso(); ch.whatsapp_manual = true;
         return { url: N.linkWhatsappWeb(v.numero, texto), texto, numero: v.numero, exibir: v.exibir }; });
@@ -257,6 +270,7 @@
       return this._alterar((E) => {
         const lote = E.lotes.find((l) => l.situacao === "aberto");
         if (!lote) throw new ErroCallback("Não há lote aberto.");
+        if (this._encerrarFilasDoLote) this._encerrarFilasDoLote(E, lote.id); // Central de Disparos: recusa fila ativa; apaga dados pessoais das filas
         const lista = E.chamadas.filter((c) => c.lote_id === lote.id), metr = this.metricasLote(lista);
         for (const c of lista) acumular(E.marcas, c, this.marcaIncidente(E.sessao, c.incidente));
         lote.metricas = metr; lote.situacao = "encerrado"; lote.encerrado_em = agoraIso();
@@ -322,7 +336,6 @@
       Object.assign(exp, { nome: N.nomeArquivoDia(s, turno), linhas: 1, conteudo, formato: "diario-1.1.0",
         sha256: N.sha256Hex(new TextEncoder().encode(conteudo)), data_operacional: s.data_operacional, polo: s.polo, salvo: null });
       E.exportacoes.unshift(exp);
-      E.exportacoes = E.exportacoes.slice(0, 200);
       return exp;
     }
     exportar() {
@@ -342,7 +355,6 @@
         E.dias_encerrados.unshift({ id: s.id, data_operacional: s.data_operacional, polo: s.polo, operador: s.operador,
           metricas_finais: s.metricas_finais, lotes: E.lotes.map((l) => ({ numero: l.numero, arquivo_nome: l.arquivo_nome, metricas: l.metricas })),
           encerrada_em: agoraIso() });
-        E.dias_encerrados = E.dias_encerrados.slice(0, 60);
         E.marcas = {}; E.lotes = []; E.chamadas = []; E.sessao = null; // sem a chave do dia, não há como voltar às CALLs
         return { exportacao: exp, metricas: s.metricas_finais };
       });

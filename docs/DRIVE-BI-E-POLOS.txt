@@ -1,0 +1,62 @@
+CENTRAL DE CALLBACK COI - HISTORICO PERMANENTE, CALLBACK WHATSAPP, FECHAMENTO, GOOGLE DRIVE, BI E POLOS
+========================================================================================================
+Data: 08/11/2026.
+
+1. HISTORICO PERMANENTE
+- Cada callback fica registrado por incidente: operador do turno, data e hora, meio, origem, resultado do envio, polo e numero de WhatsApp.
+- Um CSV novo com incidente ja atendido mostra a linha inteira verde-claro, o operador e o link "historico". A linha nao pode ser selecionada.
+  Reconhecer nao conta callback de novo nem muda a chamada: o operador ainda pode atende-la pelo painel individual.
+- Geram registro: callback manual do painel, envio confirmado pela fila, "Enviei" na aba Callback WhatsApp.
+  Nao geram: preparada, aguardando, falha, cancelada, simulada, resultado incerto.
+- Reabrir nao apaga: o registro fica como "reaberto" e o incidente deixa de aparecer como atendido.
+- "Encerrar e limpar o lote" remove so a fila de trabalho. Foram retirados os limites que descartavam filas (100), dias (60) e exportacoes (200).
+- Tudo fica no armazenamento do navegador, neste computador. A Central NAO tem login: quem acessa o perfil do Windows ve o historico.
+  Controle de acesso depende de politica da conta do Windows ou de uma futura autenticacao.
+- O historico cresce sem limite dentro de um unico registro; volumes de anos podem deixar as gravacoes mais lentas. Acompanhar.
+
+2. CALLBACK WHATSAPP (botao no topo)
+- A tela existia em outro sistema (COI-DADOS). Foi criada aqui com os modelos da Central; o outro sistema nao foi alterado.
+- O operador vem do turno aberto. Ele preenche so incidente e telefone e escolhe a mensagem.
+- Enviar abre o WhatsApp Web (mecanismo individual existente). O navegador nao tem como saber se a mensagem saiu, por isso o status fica Pendente
+  ate o operador clicar em "Enviei" ou "Falhou". So "Enviei" conta como callback.
+- Segundo telefone do mesmo incidente: fica Enviado e nao conta de novo. Marcar resolvido nunca gera callback.
+- O telefone fica gravado neste historico (pedido da etapa 4.5). Avaliar retencao com a LGPD.
+- EXCLUIR HISTORICO e uma exclusao VISUAL: pede a palavra EXCLUIR, tira da lista e registra quem, quando e quantos (E.auditoria_manual). Nao apaga nada: callbacks contados, indicadores, fechamentos e BI nao mudam,
+  e o telefone continua guardado. Envio ainda pendente nao sai da lista. Exclusao definitiva nao existe: exigiria autenticacao, que a Central nao tem.
+
+3. FECHAMENTO DIARIO
+- Gerado ao encerrar o dia e, ao abrir a Central, para dias anteriores que ainda nao tenham fechamento. Botao "Fechamento" no topo.
+- Arquivo: fechamento_callbacks_AAAA-MM-DD_POLO.csv; novas versoes: _v2, _v3. O polo entra no nome porque cada polo gera o seu arquivo no mesmo dia.
+- Colunas: data; polo; operador; callbacks_realizados; incidentes_resolvidos; incidentes_cancelados; versao. Ultima linha: TOTAL.
+- "Incidentes cancelados" = itens cancelados DEPOIS da autorizacao do disparo. A Central nao tinha esse conceito; confirme se e o desejado
+  (regra em js\historico-atendimento.js, _anotarCancelado).
+- Novo turno no mesmo dia gera nova versao com motivo registrado. Reprocessamento manual exige motivo. Nada e substituido.
+- O gateway recusa qualquer arquivo fora do formato agregado exato (gateway\fechamento-csv.mjs).
+
+4. GOOGLE DRIVE - O QUE VOCE PRECISA FAZER (uma vez)
+Estrutura ja criada em Meu Drive: CENTRAL CALLBACK COI > BI > 2026 > 11-NOVEMBRO e 12-DEZEMBRO; BI > HISTORICO (reservada, ainda sem uso).
+1) console.cloud.google.com, na conta do Drive: criar um projeto e ativar a Google Drive API.
+2) Tela de consentimento: tipo Externo, incluir a propria conta como usuario de teste. Em modo "teste" o Google expira a autorizacao em 7 dias: publique o app
+   (sem verificacao, uso proprio) para que ela nao expire.
+3) Credenciais > Criar ID do cliente OAuth > App para computador > baixar o JSON.
+4) node gateway\importar-credencial-google.mjs "caminho\client_secret_....json"  (grava em gateway\.env sem exibir o segredo; apague o JSON depois).
+5) node --env-file=gateway\.env gateway\autorizar-drive.mjs  e autorize no navegador, com a conta do Drive.
+6) Inicie o gateway com: node --env-file=gateway\.env gateway\servidor.mjs  Os fechamentos pendentes vao na proxima abertura ou em Fechamento > Enviar pendentes.
+ESCOPO: o padrao e drive.file, o mais restrito disponivel: o app so enxerga o que ele mesmo criou. O Google nao oferece escopo limitado a uma pasta escolhida. Por isso o app cria a
+propria arvore CENTRAL CALLBACK COI > BI > ano > mes, separada das pastas criadas pelo navegador. Para usar pastas existentes seria preciso GOOGLE_ESCOPO=.../auth/drive (Drive inteiro) e GOOGLE_DRIVE_RAIZ_ID.
+Sem essa configuracao os fechamentos ficam em gateway\dados\fechamentos e o BI le de la, avisando que o Drive nao esta configurado.
+
+5. BI (http://127.0.0.1:8787/bi.html)
+Central > fechamento > Drive > sincronizacao (a cada 5 min, BI_INTERVALO_MS) > base agregada (gateway\dados\bi-base.json) > BI (recarrega a cada 1 min).
+Tela unica no visual do Painel de Callbacks ADMS, com todas as visoes (mensal, operador, diaria, acumulado). Canal e motivo de cancelamento nao existem nos fechamentos e por isso nao aparecem.
+Por dia e polo vale so a maior versao. Drive fora do ar: mostra os ultimos dados e informa "pendente". Um BI unico para todos os polos precisa rodar num
+gateway que leia a mesma pasta do Drive; os gateways dos polos podem publicar nela com a mesma credencial.
+
+6. POLOS E WHATSAPP (arquitetura)
+Cada polo roda o proprio gateway no proprio computador, com o seu gateway\.env: WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_TOKEN, GATEWAY_POLO e WHATSAPP_NUMERO_ROTULO.
+Os dados locais ficam em cada computador; a unificacao acontece no Drive/BI. Operador cobrindo outro polo abre o turno no computador daquele polo: fica registrado com a sua sigla,
+o polo do turno e o numero usado. Nenhum numero foi configurado nem contratado. O historico de incidentes NAO e compartilhado entre polos (e local por privacidade): um incidente atendido em outro
+computador nao aparece verde aqui. Compartilhar exigiria um servidor central com autenticacao.
+
+7. O QUE NAO FOI TESTADO
+Chamadas reais ao Google e a Meta (nao ha credenciais) e o fluxo de autorizar-drive.mjs. Os testes usam APIs simuladas em 127.0.0.1.
