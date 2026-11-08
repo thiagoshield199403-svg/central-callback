@@ -1,5 +1,4 @@
-/* BI: identidade do Painel de Callbacks ADMS. Folha autônoma (não usa estilo.css).
-   Verde x vermelho se confundem em daltonismo: nas linhas, "cancelados" é tracejado; nas barras, o azul fica entre os dois e há tabela. */
+/* BI: identidade do Painel de Callbacks ADMS. Folha autônoma (não usa estilo.css). */
 :root { color-scheme: dark; --bg: #08111f; --panel: #101d2e; --line: #26384f; --muted: #91a3b9; --text: #edf4fb; --green: #31d49a; --blue: #55a9ff; --orange: #f3b45c; --red: #ff737d; }
 * { box-sizing: border-box; }
 body { margin: 0; background: radial-gradient(ellipse at 15% 0%, #132844 0, transparent 42%), var(--bg); color: var(--text); font: 14px/1.5 Inter, "Segoe UI", Arial, sans-serif; }
@@ -29,7 +28,7 @@ body { margin: 0; background: radial-gradient(ellipse at 15% 0%, #132844 0, tran
 .field input, .field select { width: 100%; background: #0b1727; color: var(--text); border: 1px solid #2b4058; border-radius: 9px; padding: 10px 11px; outline: none; font: inherit; }
 .field input:focus, .field select:focus { border-color: var(--green); }
 
-.cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
 .card, .panel { background: linear-gradient(145deg, #122238, #0f1b2b); border: 1px solid var(--line); border-radius: 15px; }
 .card { padding: 17px 18px; min-height: 112px; }
 .card .label { color: var(--muted); font-size: 12px; font-weight: 650; }
@@ -48,7 +47,6 @@ body { margin: 0; background: radial-gradient(ellipse at 15% 0%, #132844 0, tran
 .bi-svg text { font-size: 10px; fill: #8295ab; }
 .bi-svg .grade { stroke: #26384d; stroke-width: 1; }
 .bi-svg .linha { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.bi-svg .linha.s3 { stroke-dasharray: 5 4; }
 .bi-svg .rotulo-fim { fill: var(--text); font-weight: 650; font-size: 11px; }
 .bi-svg .mira { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
 .bi-svg .alvo { fill: transparent; cursor: crosshair; }
@@ -58,16 +56,15 @@ body { margin: 0; background: radial-gradient(ellipse at 15% 0%, #132844 0, tran
 .bi-svg .arco.blue { stroke: var(--blue); } .bi-svg .arco.orange { stroke: var(--orange); }
 .bi-svg .centro { fill: var(--text); font-size: 22px; font-weight: 800; }
 .bi-svg .nome { fill: var(--text); font-size: 12px; font-weight: 650; }
-.s1 { stroke: var(--green); fill: var(--green); } .s2 { stroke: var(--blue); fill: var(--blue); } .s3 { stroke: var(--red); fill: var(--red); }
-path.s1, path.s2, path.s3 { stroke: none; }
+.s1 { stroke: var(--green); fill: var(--green); } .s2 { stroke: var(--blue); fill: var(--blue); }
+path.s1, path.s2 { stroke: none; }
 .bi-vazio { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--muted); font-size: 12px; text-align: center; }
 
 .legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 11px; margin-top: 8px; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
 .traco { display: inline-block; width: 16px; margin-right: 5px; vertical-align: 3px; border-top: 2px solid; }
-.traco.tracejado { border-top-style: dashed; }
-.c1.dot { background: var(--green); } .c2.dot { background: var(--blue); } .c3.dot { background: var(--red); }
-.c1.traco { color: var(--green); } .c2.traco { color: var(--blue); } .c3.traco { color: var(--red); }
+.c1.dot { background: var(--green); } .c2.dot { background: var(--blue); }
+.c1.traco { color: var(--green); } .c2.traco { color: var(--blue); }
 
 .tablewrap { overflow: auto; max-height: 390px; border: 1px solid #24374d; border-radius: 10px; }
 .tablewrap.curta { max-height: 240px; }
@@ -96,7 +93,7 @@ details.ver-tabela summary { cursor: pointer; color: var(--blue); font-size: 11p
 
 .bi-dica { position: fixed; z-index: 30; background: #0b1727; color: var(--text); border: 1px solid #344b65; padding: 7px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; pointer-events: none; white-space: nowrap; }
 
-@media (max-width: 1100px) { .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } .filters { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .filters { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 950px) { .grid { grid-template-columns: minmax(0, 1fr); } .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .auditgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) {
   .wrap { padding: 18px 13px 32px; } .top { display: block; } .status { display: inline-block; margin-top: 12px; white-space: normal; }

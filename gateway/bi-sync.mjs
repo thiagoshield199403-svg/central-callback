@@ -28,7 +28,7 @@ export function criarSync({ drive, dados, intervalo = 300000 }) {
     if (rodando) return st;
     rodando = true; st.ultima_tentativa = new Date().toISOString();
     try {
-      if (drive.configurado) { const lista = await drive.listarFechamentos(); await incorporar(lista, (a) => drive.baixar(a.id)); st.situacao = "ok"; st.detalhe = null; st.fonte = "drive"; }
+      if (drive.configurado) { await drive.garantirEstrutura(); const lista = await drive.listarFechamentos(); await incorporar(lista, (a) => drive.baixar(a.id)); st.situacao = "ok"; st.detalhe = null; st.fonte = "drive"; }
       else { await incorporar(fonteLocal(), (a) => a.ler()); st.situacao = "nao_configurado"; st.detalhe = "Google Drive ainda não configurado: mostrando os fechamentos guardados neste computador."; st.fonte = "local"; }
       st.ultima_sincronizacao = base.ultima_sincronizacao = new Date().toISOString();
       salvar();

@@ -128,7 +128,7 @@
   }
 
   /* ------------------------------------------------------------ salvar a exportação: DESTINO OBRIGATÓRIO */
-  /* Destino: W:\DTEC\DEOP\DECO\CO\USUÁRIOS\TSA4\CENTRAL DE CALLBACK.
+  /* Destino: N.PASTA_EXPORTACAO_SUGERIDA.
      LIMITE DO NAVEGADOR (Edge/Chrome, File System Access): a janela "Salvar como" não aceita um caminho escrito como pasta
      inicial; aceita só uma pasta que o usuário já selecionou. Por isso:
      1) na 1ª vez neste navegador, o operador seleciona a pasta CENTRAL DE CALLBACK (só é aceita pasta com esse nome);
@@ -403,7 +403,8 @@
         <p><b>${a.chamadas}</b> chamadas · <b>${a.callback_realizado}</b> callbacks · ${a.servico_executado} serviços executados · ${a.resolvida} resolvidas ·
         <b>${a.pendente}</b> pendências · ${a.sem_telefone} sem telefone · ${a.contato_invalido} contatos inválidos · ${a.tentativas} tentativas</p>
         <p><b>Os dados das chamadas (nomes, telefones, endereços, comentários) serão apagados</b> e não poderão ser recuperados.
-        Pendências deste lote ficam contabilizadas como pendências do dia.</p>`, "Encerrar e limpar", "perigo")) return;
+        Pendências deste lote ficam contabilizadas como pendências do dia.</p>
+        ${srv.pendentesConfirmacao().length ? `<p><b>${srv.pendentesConfirmacao().length} envio(s) não confirmado(s)</b> ficarão sem contar como callback.</p>` : ""}`, "Encerrar e limpar", "perigo")) return;
     const numero = estado.lote_aberto.numero;
     const r = await executar(() => srv.encerrarLote(), (x) => `✓ Lote ${numero} encerrado: ${x.metricas_lote.chamadas} chamadas, ${x.metricas_lote.callback_realizado} callbacks. Métricas preservadas; dados das chamadas apagados.`);
     if (r) { selecionada = null; for (const k of Object.keys(telefoneManual)) delete telefoneManual[k]; destaqueEncerramento = Date.now(); avisarOutrasAbas(); carregar(); }
@@ -637,7 +638,6 @@
     document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !$("#modal").classList.contains("oculto") && $("#modal-caixa").dataset.livre) fecharModal(); });
     window.CentralUI.servico = srv;
     carregar();
-    window.CentralDisparos.verificarConector();
     window.CentralFechamento.automatico();
     document.body.dataset.pronto = "1";
   }

@@ -95,10 +95,10 @@ await teste("Créditos mais visíveis: nomes maiores e em destaque, rodapé baix
 await teste("Tela inicial enxuta: 1ª vez pede sigla + polo; abre o turno", async () => {
   verdade(await visivel("#abrir-dia") && await visivel("#campo-polo"), "polo deveria aparecer na 1ª vez");
   await foto("01-abertura-1a-vez-1366");
-  await js(`(() => { const f = document.querySelector("#form-dia"); f.operador.value = "tsa4"; f.polo.value = "Aracaju"; f.requestSubmit(); return true; })()`);
+  await js(`(() => { const f = document.querySelector("#form-dia"); f.operador.value = "opt4"; f.polo.value = "Aracaju"; f.requestSubmit(); return true; })()`);
   await pg.aguardar("!document.querySelector('#abrir-dia').offsetParent && !!document.querySelector('#importar').offsetParent");
   const info = await texto("#dia-info");
-  verdade(info.includes("TSA4") && info.includes("Polo Aracaju"), info);
+  verdade(info.includes("OPT4") && info.includes("Polo Aracaju"), info);
 });
 await teste("Importar CSV fictício do ADMS (prévia com amostra, confirmação)", async () => {
   const doc = await pg.cmd("DOM.getDocument", {});
@@ -286,7 +286,7 @@ await teste("Painel de indicadores: hoje, por dia, por operador, por polo", asyn
     await clicar(`[data-aba="${aba}"]`); await espera(120);
     const linhas = await js(`[...document.querySelectorAll(".tabela-painel tbody tr")].map((t) => t.innerText.replace(/\\t/g, " | "))`);
     verdade(linhas.length >= 1, aba);
-    if (aba === "operador") verdade(linhas[0].startsWith("TSA4"), linhas[0]);
+    if (aba === "operador") verdade(linhas[0].startsWith("OPT4"), linhas[0]);
     if (aba === "polo") verdade(linhas[0].startsWith("Aracaju"), linhas[0]);
   }
   await foto("07-painel-por-operador-1366");
@@ -301,12 +301,12 @@ const conferirConteudo = (t, esperado) => {
   for (const p of ["CALL ", "INC ", "FIC", "Rua", "Fictício", "Ficticio"]) verdade(!t.includes(p), "dado proibido: " + p);
   return r;
 };
-const ESPERADO = ["Aracaju", "TSA4", "2", "1", "2", "1"];
+const ESPERADO = ["Aracaju", "OPT4", "2", "1", "2", "1"];
 await teste("Destino obrigatório (1ª vez): pede a pasta CENTRAL DE CALLBACK e recusa outra pasta (nada é salvo)", async () => {
   nomeEsperado = `CALLBACK_ARACAJU_${await hojeBR()}.csv`;
   await limparModal(); await clicar("#btn-exportar");
   await pg.aguardar(`document.querySelector("#modal-caixa").textContent.includes("Destino da exportação")`);
-  verdade((await texto("#modal-caixa")).includes("W:\\DTEC\\DEOP\\DECO\\CO\\USUÁRIOS\\TSA4\\CENTRAL DE CALLBACK"), "caminho do destino na mensagem");
+  verdade((await texto("#modal-caixa")).includes(await js("window.Nucleo.PASTA_EXPORTACAO_SUGERIDA")), "caminho do destino na mensagem");
   await js("(window.__modoPasta = 'errada', true)");
   await clicarEscolha("Selecionar a pasta"); await espera(400);
   verdade((await texto("#toast")).includes("Pasta recusada"), await texto("#toast"));
@@ -385,7 +385,7 @@ await teste("Unidade W: de volta: “salvar” no histórico grava no destino", 
 await teste("Configuração mostra o destino obrigatório (sem opção de outra pasta)", async () => {
   await clicar("#btn-config"); await pg.aguardar("!!document.querySelector('#form-cfg')");
   const t = await texto("#modal-caixa");
-  verdade(t.includes("Destino obrigatório") && t.includes("W:\\DTEC\\DEOP\\DECO\\CO\\USUÁRIOS\\TSA4\\CENTRAL DE CALLBACK") && t.includes("✓ Pasta CENTRAL DE CALLBACK"), t);
+  verdade(t.includes("Destino obrigatório") && t.includes(await js("window.Nucleo.PASTA_EXPORTACAO_SUGERIDA")) && t.includes("✓ Pasta CENTRAL DE CALLBACK"), t);
   verdade(!t.includes("Não usar pasta") && !t.includes("última pasta usada"), "não pode oferecer outra pasta");
   await foto("13-configuracao-destino-1366");
   await clicar("#cfg-cancelar");
@@ -399,7 +399,7 @@ await teste("Encerrar o dia: arquivo definitivo no destino; próxima abertura pe
   await foto("08-abertura-so-sigla-1366");
 });
 await teste("Diferentes resoluções: sem rolagem horizontal da página; painel e envio manual cabem", async () => {
-  await js(`(() => { const f = document.querySelector("#form-dia"); f.operador.value = "TSA4"; f.requestSubmit(); return true; })()`);
+  await js(`(() => { const f = document.querySelector("#form-dia"); f.operador.value = "OPT4"; f.requestSubmit(); return true; })()`);
   await pg.aguardar("!!document.querySelector('#importar').offsetParent");
   const doc = await pg.cmd("DOM.getDocument", {});
   const { nodeId } = await pg.cmd("DOM.querySelector", { nodeId: doc.root.nodeId, selector: "#arquivo" });

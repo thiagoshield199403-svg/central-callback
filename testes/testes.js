@@ -726,12 +726,12 @@
     await reiniciar(S);
     const poloAntes = S.configuracao().polo;
     await S.salvarConfiguracao({ polo: "" });
-    await falhaCom(() => S.abrirSessao("", "TSA4"), "polo");
+    await falhaCom(() => S.abrirSessao("", "OPT4"), "polo");
     await falhaCom(() => S.abrirSessao("Aracaju", "  "), "sigla");
-    await S.abrirSessao("Aracaju", "TSA4");
-    igual([S.sessao().polo, S.sessao().operador, S.configuracao().polo], ["Aracaju", "TSA4", "Aracaju"]);
+    await S.abrirSessao("Aracaju", "OPT4");
+    igual([S.sessao().polo, S.sessao().operador, S.configuracao().polo], ["Aracaju", "OPT4", "Aracaju"]);
     await reiniciar(S);
-    await S.abrirSessao("", "TSA5");
+    await S.abrirSessao("", "OPT5");
     igual([S.sessao().polo, S.estado().nome_arquivo_dia.startsWith("CALLBACK_ARACAJU_") && /_T\d+\.csv$/.test(S.estado().nome_arquivo_dia)], ["Aracaju", true]);
     await reiniciar(S); await S.salvarConfiguracao({ polo: poloAntes });
   });
@@ -801,14 +801,14 @@
   });
   await teste("1.1.0 Painel: por dia, operador e polo; cada turno uma vez; turno antigo sem o indicador = null", async () => {
     await reiniciar(S);
-    await S.abrirSessao("Aracaju", "TSA4"); await processarLote(S, loteCSV(4), 2, 1); await S.encerrarDia();
+    await S.abrirSessao("Aracaju", "OPT4"); await processarLote(S, loteCSV(4), 2, 1); await S.encerrarDia();
     await S.abrirSessao("Aracaju", "TSB1"); await processarLote(S, loteCSV(3, 50), 1);
     const P = S.painel();
     const hoje = P.por_dia.find((g) => g.chave === S.sessao().data_operacional);
     verdade(hoje.turnos >= 2 && hoje.chamadas_processadas >= 7);
     const ops = Object.fromEntries(P.por_operador.map((g) => [g.chave, g]));
     igual([ops.TSB1.turnos, ops.TSB1.chamadas_processadas, ops.TSB1.callbacks_realizados, ops.TSB1.tentativas_sem_sucesso], [1, 3, 1, 0]);
-    verdade(ops.TSA4.callbacks_realizados >= 2 && ops.TSA4.tentativas_sem_sucesso >= 1);
+    verdade(ops.OPT4.callbacks_realizados >= 2 && ops.OPT4.tentativas_sem_sucesso >= 1);
     verdade(P.por_polo.some((g) => g.chave === "Aracaju" && g.turnos >= 2));
     // turno gravado pela versão anterior (sem os indicadores novos): nada de zero inventado
     await S._alterar((E) => { E.dias_encerrados.push({ id: "antigo", data_operacional: "2026-10-01", polo: "Polo Velho", operador: "OPV",
@@ -1136,11 +1136,11 @@
   });
   await teste("Manual: operador vem do turno; só conta depois de confirmar o envio; falha não conta", async () => {
     await S._alterar((E) => { E.sessao = null; }); await falhaCom(() => S.abrirCallbackManual({ incidente: "1", telefone: "79991000601", modo: "padronizada", modelo: "manual_falta_energia" }), "Abra o turno");
-    await abrirDia(S, "Polo Fictício", "TSA4");
+    await abrirDia(S, "Polo Fictício", "OPT4");
     await falhaCom(() => S.abrirCallbackManual({ incidente: "", telefone: "79991000601", modo: "padronizada", modelo: "manual_falta_energia" }), "incidente");
     await falhaCom(() => S.abrirCallbackManual({ incidente: "600", telefone: "7932001234", modo: "padronizada", modelo: "manual_falta_energia" }), "FIXO");
     const r = await S.abrirCallbackManual({ incidente: "600", telefone: "(79) 99100-0601", modo: "padronizada", modelo: "manual_falta_energia", operador: "INVENTADO" });
-    igual([r.item.operador, r.item.incidente, r.item.status_envio], ["TSA4", "INC 600", "pendente"]); verdade(r.url.includes("web.whatsapp.com") && decodeURIComponent(r.url).includes("INC 600"), "link");
+    igual([r.item.operador, r.item.incidente, r.item.status_envio], ["OPT4", "INC 600", "pendente"]); verdade(r.url.includes("web.whatsapp.com") && decodeURIComponent(r.url).includes("INC 600"), "link");
     igual(S.metricasTempoReal().callbacks_realizados, 0, "pendente não conta");
     await S.confirmarEnvioManual(r.item.id, "enviado"); igual(S.metricasTempoReal().callbacks_realizados, 1);
     await falhaCom(() => S.confirmarEnvioManual(r.item.id, "enviado"), "já foi confirmado");
@@ -1149,7 +1149,7 @@
     await S.confirmarEnvioManual(f.item.id, "falha"); igual(S.metricasTempoReal().callbacks_realizados, 1, "falha não conta");
   });
   await teste("Manual: segundo telefone do mesmo incidente não conta de novo; resolver não gera callback; histórico persiste e filtra", async () => {
-    await abrirDia(S, "Polo Fictício", "TSA4");
+    await abrirDia(S, "Polo Fictício", "OPT4");
     const a = await S.abrirCallbackManual({ incidente: "INC 610", telefone: "79991000611", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(a.item.id, "enviado");
     const b = await S.abrirCallbackManual({ incidente: "610", telefone: "79991000612", modo: "padronizada", modelo: "manual_falta_energia" }); const cb = await S.confirmarEnvioManual(b.item.id, "enviado");
     igual([cb.status_envio, cb.callback, S.metricasTempoReal().callbacks_realizados], ["enviado", "ja_registrado", 1]);
@@ -1160,14 +1160,14 @@
     igual(S.historicoManual({ status: "resolvido" }).length, 1); igual(S.historicoManual({ incidente: "999" }).length, 0); igual(S.historicoManual({ operador: "OUTRO" }).length, 0); igual(S.historicoManual({ de: "2999-01-01" }).length, 0);
   });
   await teste("Manual: incidente do lote aberto marca o principal uma única vez e não duplica com o disparo", async () => {
-    await abrirDia(S, "Polo Fictício", "TSA4"); const l = await importarLinhas([umaLinha("CALL 0000621", "INC 0000620")]);
+    await abrirDia(S, "Polo Fictício", "OPT4"); const l = await importarLinhas([umaLinha("CALL 0000621", "INC 0000620")]);
     const a = await S.abrirCallbackManual({ incidente: "INC 0000620", telefone: "79991000621", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(a.item.id, "enviado");
     const c = S.obterChamada(l[0].id); igual([c.estado, c.callback_origem, S.metricasTempoReal().callbacks_realizados, S.E.historico_atendimento.length], ["callback_realizado", "callback_manual", 1, 1]);
     await falhaCom(() => S.prepararDisparo([l[0].chave], "selecao"), "Nenhum incidente"); await falhaCom(() => S.registrar(l[0].id, "callback_realizado", "ligacao"), "já registrado");
     await S.encerrarLote();
   });
   await teste("Manual antes de o incidente entrar no lote: o registro individual no mesmo turno não conta de novo e mantém a resolução", async () => {
-    await abrirDia(S, "Polo Fictício", "TSA4");
+    await abrirDia(S, "Polo Fictício", "OPT4");
     const a = await S.abrirCallbackManual({ incidente: "INC 0000630", telefone: "79991000631", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(a.item.id, "enviado"); await S.marcarResolucaoManual(a.item.id, true);
     igual([S.metricasTempoReal().callbacks_realizados, S.metricasTempoReal().ocorrencias_resolvidas], [1, 1]);
     const l = await importarLinhas([umaLinha("CALL 0000631", "INC 0000630")]); await S.registrar(l[0].id, "callback_realizado", "whatsapp");
@@ -1177,7 +1177,7 @@
     await S.encerrarLote();
   });
   await teste("Manual em incidente já contado: marcar resolvido atualiza o indicador sem gerar callback; desfazer volta", async () => {
-    await abrirDia(S, "Polo Fictício", "TSA4"); const l = await importarLinhas([umaLinha("CALL 0000641", "INC 0000640")]); await S.registrar(l[0].id, "callback_realizado", "ligacao");
+    await abrirDia(S, "Polo Fictício", "OPT4"); const l = await importarLinhas([umaLinha("CALL 0000641", "INC 0000640")]); await S.registrar(l[0].id, "callback_realizado", "ligacao");
     const a = await S.abrirCallbackManual({ incidente: "INC 0000640", telefone: "79991000641", modo: "padronizada", modelo: "manual_falta_energia" }), c = await S.confirmarEnvioManual(a.item.id, "enviado"); igual(c.callback, "ja_registrado");
     await S.marcarResolucaoManual(a.item.id, true); const data = S.sessao().data_operacional;
     igual([S.metricasTempoReal().callbacks_realizados, S.metricasTempoReal().ocorrencias_resolvidas, S.consolidadoDia(data)[0].callbacks, S.consolidadoDia(data)[0].resolvidos], [1, 1, 1, 1]);
@@ -1185,32 +1185,66 @@
     await S.encerrarLote();
   });
   await teste("Excluir histórico manual: exige a palavra, mantém pendentes, não mexe em indicadores nem fechamento e fica auditado", async () => {
-    await abrirDia(S, "Polo Fictício", "TSA4"); const novo = async (n) => (await S.abrirCallbackManual({ incidente: "INC " + n, telefone: "79991000651", modo: "padronizada", modelo: "manual_falta_energia" })).item.id;
+    await abrirDia(S, "Polo Fictício", "OPT4"); const novo = async (n) => (await S.abrirCallbackManual({ incidente: "INC " + n, telefone: "79991000651", modo: "padronizada", modelo: "manual_falta_energia" })).item.id;
     const a = await novo("650"), b = await novo("651"), c = await novo("652"); await S.confirmarEnvioManual(a, "enviado"); await S.confirmarEnvioManual(b, "falha");
     const data = S.sessao().data_operacional, antes = JSON.stringify([S.metricasTempoReal(), S.consolidadoDia(data), S.E.historico_atendimento]), ind = S.indicadoresManuais(S.historicoManual({}));
     await falhaCom(() => S.ocultarHistoricoManual([a, b, c], "excluir"), "EXCLUIR"); igual(S.historicoManual({}).length, 3, "sem a palavra nada muda");
     const r = await S.ocultarHistoricoManual([a, b, c], "EXCLUIR"); igual(r.quantidade, 2, "pendente não sai");
     igual(S.historicoManual({}).map((i) => i.id), [c]); igual(JSON.stringify([S.metricasTempoReal(), S.consolidadoDia(data), S.E.historico_atendimento]), antes, "contagem intacta");
     igual(S.indicadoresManuais(S.historicoManual({}, { incluirOcultos: true })), ind); igual(S.E.callbacks_manuais.length, 3, "nada apagado");
-    await S.carregar(); const ult = S.E.auditoria_manual[S.E.auditoria_manual.length - 1]; igual([ult.operador, ult.quantidade, ult.registros.length], ["TSA4", 2, 2]); igual(S.historicoManual({}).length, 1, "persiste");
+    await S.carregar(); const ult = S.E.auditoria_manual[S.E.auditoria_manual.length - 1]; igual([ult.operador, ult.quantidade, ult.registros.length], ["OPT4", 2, 2]); igual(S.historicoManual({}).length, 1, "persiste");
+  });
+  const tresIncidentes = async () => { await abrirDia(S, "Polo Fictício", "OPT4"); return importarLinhas([umaLinha("CALL 0000661", "INC 0000660"), umaLinha("CALL 0000663", "INC 0000662"), umaLinha("CALL 0000665", "INC 0000664")]); };
+  const atualDe = (id) => S.itemAtual(S.fila(id));
+  await teste("Lote guiado: não usa outra fila; abrir e voltar não contam; retorno repetido não avança duas vezes; só Enviei conta, uma vez", async () => {
+    const l = await tresIncidentes(), filas = S.E.disparos.length, f = await S.iniciarAtendimento(l.map((x) => x.chave));
+    igual([S.E.disparos.length, f.situacao, f.assistido, f.autorizacao.conector_modo], [filas + 1, "atendimento", true, "whatsapp_web"]);
+    const i1 = atualDe(f.id), i2 = f.itens[1]; igual(i1.incidente, "INC 0000660");
+    await falhaCom(() => S.abrirAtendimento(f.id, i2.id), "não é o atual");
+    const r = await S.abrirAtendimento(f.id, i1.id); verdade(r.url.startsWith("https://web.whatsapp.com/send?phone=55"), "mesmo link do envio individual"); igual([atualDe(f.id).status, S.metricasTempoReal().callbacks_realizados], ["aberto", 0], "abrir não conta");
+    await S.registrarRetornoAtendimento(f.id, i1.id); await S.registrarRetornoAtendimento(f.id, i1.id);
+    igual([S.fila(f.id).itens[0].status, atualDe(f.id).incidente, S.metricasTempoReal().callbacks_realizados, S.fila(f.id).eventos.filter((e) => e.tipo === "retorno").length], ["nao_confirmado", "INC 0000662", 0, 1], "retorno não conta nem avança duas vezes");
+    igual(S.incidentesParaDisparo().find((x) => x.incidente === "INC 0000660").elegivel, false); await S.pularAtendimento(f.id, i2.id); await S.pularAtendimento(f.id, atualDe(f.id).id); igual(S.fila(f.id).situacao, "concluida");
+    await falhaCom(() => S.prepararDisparo([l[0].chave], "lote"), "Nenhum incidente");
+    await S.confirmarEnvioAtendimento(f.id, i1.id, "enviado"); const data = S.sessao().data_operacional;
+    igual([S.metricasTempoReal().callbacks_realizados, S.E.historico_atendimento.length, S.consolidadoDia(data)[0].callbacks, S.obterChamada(l[0].id).estado], [1, 1, 1, "callback_realizado"]);
+    await falhaCom(() => S.confirmarEnvioAtendimento(f.id, i1.id, "enviado"), "não está aguardando"); igual(S.metricasTempoReal().callbacks_realizados, 1, "sem duplicar");
+    await S.encerrarLote();
+  });
+  await teste("Lote guiado: pular, pausar, retomar, cancelar e persistência; Não enviei libera o incidente; encerrar é recusado em andamento", async () => {
+    const l = await tresIncidentes(), f = await S.iniciarAtendimento(l.map((x) => x.chave));
+    await S.pularAtendimento(f.id, atualDe(f.id).id); await S.pausarAtendimento(f.id); const i = atualDe(f.id); igual(i.incidente, "INC 0000662");
+    await falhaCom(() => S.abrirAtendimento(f.id, i.id), "Retome"); await falhaCom(() => S.encerrarLote(), "em andamento");
+    await S.carregar(); igual([S.fila(f.id).situacao, atualDe(f.id).incidente, S.painelAtendimento(S.fila(f.id)).pulados], ["pausada", "INC 0000662", 1], "persistiu");
+    await S.retomarAtendimento(f.id); await S.abrirAtendimento(f.id, i.id); await S.cancelarAtendimento(f.id);
+    igual(S.fila(f.id).itens.map((x) => x.status), ["pulado", "nao_confirmado", "cancelado"]); igual(S.pendentesConfirmacao().length, 1);
+    await S.confirmarEnvioAtendimento(f.id, i.id, "falha"); igual([S.metricasTempoReal().callbacks_realizados, S.incidentesParaDisparo().every((x) => x.elegivel)], [0, true], "não enviei não conta e libera");
+    await S.encerrarLote();
+  });
+  await teste("Lote guiado: telefone com pendência bloqueia a abertura até corrigir; callback por outra via pula sem contar de novo", async () => {
+    await abrirDia(S, "Polo Fictício", "OPT4"); const l = await importarLinhas([linha("CALL 0000671", "INC 0000670", ""), umaLinha("CALL 0000673", "INC 0000672")]), f = await S.iniciarAtendimento(l.map((x) => x.chave));
+    const i = atualDe(f.id); await falhaCom(() => S.abrirAtendimento(f.id, i.id), "celular"); await S.corrigirTelefoneItem(f.id, i.id, "79991000671"); await S.abrirAtendimento(f.id, i.id); await S.registrarRetornoAtendimento(f.id, i.id);
+    await S.registrar(l[1].id, "callback_realizado", "ligacao"); const r = await S.abrirAtendimento(f.id, atualDe(f.id).id);
+    igual([r.pulado, S.fila(f.id).situacao, S.metricasTempoReal().callbacks_realizados], [true, "concluida", 1]);
+    await S.encerrarLote();
   });
   await teste("Fechamento: só agregados por operador, com total; sem nenhum dado de cliente", async () => {
-    await abrirDia(S, "Polo Fictício", "TSA4"); const l = await importarLinhas([umaLinha("CALL 0000701", "INC 0000700"), linha("CALL 0000702", "INC 0000701", "MOBILE: 79991000702")]);
+    await abrirDia(S, "Polo Fictício", "OPT4"); const l = await importarLinhas([umaLinha("CALL 0000701", "INC 0000700"), linha("CALL 0000702", "INC 0000701", "MOBILE: 79991000702")]);
     const f = await enviarUm(l, "INC 0000700"); await S.registrarResultado(f.itens[0].chamada_id, "resolvida");
     const m = await S.abrirCallbackManual({ incidente: "INC 0000799", telefone: "79991000799", modo: "personalizada", texto: "Mensagem secreta do cliente" }); await S.confirmarEnvioManual(m.item.id, "enviado");
     const hoje = S.sessao().data_operacional; await falhaCom(() => S.gerarFechamento(hoje), "Encerre o dia");
     await S.encerrarLote(); await S.encerrarDia();
     const x = await S.gerarFechamento(hoje), ls = x.conteudo.replace("﻿", "").trim().split("\r\n");
     igual(ls[0], "data;polo;operador;callbacks_realizados;incidentes_resolvidos;incidentes_cancelados;versao");
-    igual(ls.slice(1), [`${hoje};Polo Fictício;TSA4;2;1;0;1`, `${hoje};TOTAL;TOTAL;2;1;0;1`]);
+    igual(ls.slice(1), [`${hoje};Polo Fictício;OPT4;2;1;0;1`, `${hoje};TOTAL;TOTAL;2;1;0;1`]);
     for (const p of ["INC", "CALL", "79991", "Cliente", "Rua", "secreta", "FIC_UC"]) verdade(!x.conteudo.includes(p), "vazou " + p);
     await falhaCom(() => S.gerarFechamento(hoje), "já foi concluído");
     igual(S.diasSemFechamento(), []);
   });
   await teste("Fechamento: dados novos exigem motivo e geram nova versão, sem substituir a anterior; envio idempotente", async () => {
-    await abrirDia(S, "Polo Fictício", "TSA4"); const a = await S.abrirCallbackManual({ incidente: "710", telefone: "79991000711", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(a.item.id, "enviado");
+    await abrirDia(S, "Polo Fictício", "OPT4"); const a = await S.abrirCallbackManual({ incidente: "710", telefone: "79991000711", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(a.item.id, "enviado");
     const hoje = S.sessao().data_operacional; await S.encerrarDia(); const v1 = await S.gerarFechamento(hoje);
-    await S.abrirSessao("Polo Fictício", "TSA5"); const b = await S.abrirCallbackManual({ incidente: "711", telefone: "79991000712", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(b.item.id, "enviado"); await S.encerrarDia();
+    await S.abrirSessao("Polo Fictício", "OPT5"); const b = await S.abrirCallbackManual({ incidente: "711", telefone: "79991000712", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(b.item.id, "enviado"); await S.encerrarDia();
     verdade(S.fechamentoDesatualizado(hoje), "detecta dados novos"); await falhaCom(() => S.gerarFechamento(hoje), "motivo");
     const v2 = await S.gerarFechamento(hoje, { motivo: "Novo turno" }); igual([v2.versao, v2.substitui, v2.nome.endsWith("_v2.csv"), S.E.fechamentos.length], [2, v1.nome, true, 2]);
     const chamadas = []; const c = { enviarFechamento: async (d) => { chamadas.push(d.nome); return { resultado: "enviado", arquivo_id: "x" }; } };

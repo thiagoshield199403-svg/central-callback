@@ -34,7 +34,7 @@ Data: 08/11/2026.
 - O gateway recusa qualquer arquivo fora do formato agregado exato (gateway\fechamento-csv.mjs).
 
 4. GOOGLE DRIVE - O QUE VOCE PRECISA FAZER (uma vez)
-Estrutura ja criada em Meu Drive: CENTRAL CALLBACK COI > BI > 2026 > 11-NOVEMBRO e 12-DEZEMBRO; BI > HISTORICO (reservada, ainda sem uso).
+O app cria sozinho: CENTRAL CALLBACK COI > FECHAMENTOS > ano > mes (arquivos diarios), BI e HISTORICO (reservadas). As pastas criadas antes pelo navegador nao sao vistas pelo app.
 1) console.cloud.google.com, na conta do Drive: criar um projeto e ativar a Google Drive API.
 2) Tela de consentimento: tipo Externo, incluir a propria conta como usuario de teste. Em modo "teste" o Google expira a autorizacao em 7 dias: publique o app
    (sem verificacao, uso proprio) para que ela nao expire.
@@ -43,12 +43,13 @@ Estrutura ja criada em Meu Drive: CENTRAL CALLBACK COI > BI > 2026 > 11-NOVEMBRO
 5) node --env-file=gateway\.env gateway\autorizar-drive.mjs  e autorize no navegador, com a conta do Drive.
 6) Inicie o gateway com: node --env-file=gateway\.env gateway\servidor.mjs  Os fechamentos pendentes vao na proxima abertura ou em Fechamento > Enviar pendentes.
 ESCOPO: o padrao e drive.file, o mais restrito disponivel: o app so enxerga o que ele mesmo criou. O Google nao oferece escopo limitado a uma pasta escolhida. Por isso o app cria a
-propria arvore CENTRAL CALLBACK COI > BI > ano > mes, separada das pastas criadas pelo navegador. Para usar pastas existentes seria preciso GOOGLE_ESCOPO=.../auth/drive (Drive inteiro) e GOOGLE_DRIVE_RAIZ_ID.
+propria arvore CENTRAL CALLBACK COI, separada das pastas criadas pelo navegador. Para usar pastas existentes seria preciso GOOGLE_ESCOPO=.../auth/drive (Drive inteiro) e GOOGLE_DRIVE_RAIZ_ID.
 Sem essa configuracao os fechamentos ficam em gateway\dados\fechamentos e o BI le de la, avisando que o Drive nao esta configurado.
 
 5. BI (http://127.0.0.1:8787/bi.html)
 Central > fechamento > Drive > sincronizacao (a cada 5 min, BI_INTERVALO_MS) > base agregada (gateway\dados\bi-base.json) > BI (recarrega a cada 1 min).
-Tela unica no visual do Painel de Callbacks ADMS, com todas as visoes (mensal, operador, diaria, acumulado). Canal e motivo de cancelamento nao existem nos fechamentos e por isso nao aparecem.
+Tela unica no visual do Painel de Callbacks ADMS, com todas as visoes (mensal, operador, diaria, acumulado). Metricas principais: CALLBACKS EXECUTADOS e CALLBACKS RESOLVIDOS; taxa = resolvidos / executados x 100.
+A coluna incidentes_cancelados continua no arquivo de fechamento, mas nao aparece no BI.
 Por dia e polo vale so a maior versao. Drive fora do ar: mostra os ultimos dados e informa "pendente". Um BI unico para todos os polos precisa rodar num
 gateway que leia a mesma pasta do Drive; os gateways dos polos podem publicar nela com a mesma credencial.
 
@@ -58,5 +59,5 @@ Os dados locais ficam em cada computador; a unificacao acontece no Drive/BI. Ope
 o polo do turno e o numero usado. Nenhum numero foi configurado nem contratado. O historico de incidentes NAO e compartilhado entre polos (e local por privacidade): um incidente atendido em outro
 computador nao aparece verde aqui. Compartilhar exigiria um servidor central com autenticacao.
 
-7. O QUE NAO FOI TESTADO
-Chamadas reais ao Google e a Meta (nao ha credenciais) e o fluxo de autorizar-drive.mjs. Os testes usam APIs simuladas em 127.0.0.1.
+7. TESTE REAL DO DRIVE
+node --env-file=gateway\.env gateway\testar-drive.mjs  envia um fechamento ficticio, le de volta, confere o BI e manda para a lixeira. Os testes automaticos usam APIs simuladas em 127.0.0.1.

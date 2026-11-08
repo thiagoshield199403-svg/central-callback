@@ -3,7 +3,7 @@
 (function () {
   const $ = (s) => document.querySelector(s);
   const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-  const SERIES = [["callbacks", "Callbacks realizados", 1], ["resolvidos", "Incidentes resolvidos", 2], ["cancelados", "Incidentes cancelados", 3]];
+  const SERIES = [["callbacks", "Callbacks executados", 1], ["resolvidos", "Callbacks resolvidos", 2]];
   const FILTROS = ["#f-ano", "#f-mes", "#f-de", "#f-ate", "#f-operador"];
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const num = (v) => Number(v).toLocaleString("pt-BR");
@@ -17,7 +17,7 @@
     const a = $("#f-ano").value, m = $("#f-mes").value, de = $("#f-de").value, ate = $("#f-ate").value, o = $("#f-operador").value;
     return dados.linhas.filter((l) => (!a || l.data.startsWith(a)) && (!m || l.data.slice(5, 7) === m) && (!de || l.data >= de) && (!ate || l.data <= ate) && (!o || l.operador === o));
   }
-  const vazio = () => ({ callbacks: 0, resolvidos: 0, cancelados: 0 });
+  const vazio = () => ({ callbacks: 0, resolvidos: 0 });
   function agrupar(ls, f) { const m = new Map(); for (const l of ls) { const k = f(l); if (!m.has(k)) m.set(k, vazio()); const g = m.get(k); for (const [c] of SERIES) g[c] += l[c]; } return m; }
   function total(ls) { const t = vazio(); for (const l of ls) for (const [c] of SERIES) t[c] += l[c]; return t; }
   const ordenado = (m) => [...m].sort((a, b) => a[0].localeCompare(b[0]));
@@ -60,10 +60,10 @@
   function graficoBarras(sel, itens, rotulo) {
     const { el, L, A } = area(sel), M = { e: 44, d: 12, t: 12, b: 26 }, n = itens.length;
     if (!n) return semDados(el);
-    const { passo, topo } = escala(maximo(itens)), e = eixo(L, A, M, topo, passo), fx = (L - M.e - M.d) / n, lb = Math.max(2, Math.min(26, (fx * 0.72 - 4) / 3));
+    const { passo, topo } = escala(maximo(itens)), e = eixo(L, A, M, topo, passo), fx = (L - M.e - M.d) / n, q_s = SERIES.length, lb = Math.max(2, Math.min(26, (fx * 0.72 - 2 * (q_s - 1)) / q_s));
     const salto = Math.max(1, Math.ceil(46 / fx)); let h = e.h;
     itens.forEach(([r, v], i) => {
-      const x0 = M.e + fx * i + (fx - 3 * lb - 4) / 2;
+      const x0 = M.e + fx * i + (fx - q_s * lb - 2 * (q_s - 1)) / 2;
       SERIES.forEach(([c, , s], k) => {
         const y = e.y(v[c]), a = A - M.b - y, x1 = x0 + k * (lb + 2), q = Math.min(4, a, lb / 2);
         if (a > 0) h += `<path class="s${s}" d="M${x1},${A - M.b}V${y + q}q0,-${q} ${q},-${q}H${x1 + lb - q}q${q},0 ${q},${q}V${A - M.b}Z"/>`;
@@ -78,44 +78,32 @@
     });
   }
 
-  /* Dois anéis, cada um com o seu denominador: são as mesmas contas dos cartões de percentual. */
-  function graficoTaxas(sel, t) {
-    const { el, L, A } = area(sel), base2 = t.callbacks + t.cancelados;
-    if (!t.callbacks && !t.resolvidos && !t.cancelados) return semDados(el);
-    const r = Math.min(L * 0.15, A * 0.3), esp = r * 0.38, cy = A / 2 - 14, circ = 2 * Math.PI * r;
-    const aneis = [
-      { cx: L * 0.27, cor: "blue", a: t.resolvidos, b: t.callbacks, nome: "Resolução", conta: "resolvidos ÷ callbacks", det: `${num(t.resolvidos)} resolvidos de ${num(t.callbacks)} callbacks` },
-      { cx: L * 0.73, cor: "orange", a: t.cancelados, b: base2, nome: "Cancelamento", conta: "cancelados ÷ total", det: `${num(t.cancelados)} cancelados de ${num(base2)} (callbacks + cancelados)` },
-    ];
-    let h = "";
-    aneis.forEach((d, i) => {
-      const f = d.b ? Math.min(1, d.a / d.b) : 0;
-      h += `<circle class="trilha" cx="${d.cx}" cy="${cy}" r="${r}" stroke-width="${esp}"/>`;
-      if (f > 0) h += `<circle class="arco ${d.cor}" cx="${d.cx}" cy="${cy}" r="${r}" stroke-width="${esp}" stroke-dasharray="${circ * f} ${circ}" transform="rotate(-90 ${d.cx} ${cy})"/>`;
-      h += `<text class="centro" x="${d.cx}" y="${cy + 8}" text-anchor="middle">${pct(d.a, d.b)}</text><text class="nome" x="${d.cx}" y="${cy + r + esp / 2 + 24}" text-anchor="middle">${d.nome}</text><text x="${d.cx}" y="${cy + r + esp / 2 + 39}" text-anchor="middle">${d.conta}</text>`;
-      h += `<circle class="alvo" data-i="${i}" cx="${d.cx}" cy="${cy}" r="${r + esp / 2}"/>`;
-    });
-    el.innerHTML = svg(L, A, "Percentuais de resolução e de cancelamento", h);
-    el.querySelectorAll(".alvo").forEach((a) => {
-      a.addEventListener("mousemove", (ev) => { const d = aneis[Number(a.dataset.i)]; dica(ev, `<b>${d.nome}: ${pct(d.a, d.b)}</b><br>${esc(d.det)}`); });
-      a.addEventListener("mouseleave", escondeDica);
-    });
+  function graficoTaxa(sel, t) {
+    const { el, L, A } = area(sel);
+    if (!t.callbacks && !t.resolvidos) return semDados(el);
+    const r = Math.min(L * 0.24, A * 0.31), esp = r * 0.38, cx = L / 2, cy = A / 2 - 14, circ = 2 * Math.PI * r, f = t.callbacks ? Math.min(1, t.resolvidos / t.callbacks) : 0;
+    let h = `<circle class="trilha" cx="${cx}" cy="${cy}" r="${r}" stroke-width="${esp}"/>`;
+    if (f > 0) h += `<circle class="arco blue" cx="${cx}" cy="${cy}" r="${r}" stroke-width="${esp}" stroke-dasharray="${circ * f} ${circ}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    h += `<text class="centro" x="${cx}" y="${cy + 8}" text-anchor="middle">${pct(t.resolvidos, t.callbacks)}</text><text class="nome" x="${cx}" y="${cy + r + esp / 2 + 24}" text-anchor="middle">Resolvidos ÷ executados</text>`;
+    h += `<circle class="alvo" cx="${cx}" cy="${cy}" r="${r + esp / 2}"/>`;
+    el.innerHTML = svg(L, A, "Taxa de resolução", h);
+    const a = el.querySelector(".alvo");
+    a.addEventListener("mousemove", (ev) => dica(ev, `<b>Taxa de resolução: ${pct(t.resolvidos, t.callbacks)}</b><br>${num(t.resolvidos)} resolvidos de ${num(t.callbacks)} executados`));
+    a.addEventListener("mouseleave", escondeDica);
   }
 
   function tabela(sel, itens, classe = "") {
     $(sel).innerHTML = itens.length
-      ? itens.map(([r, v]) => `<tr><td${classe ? ` class="${classe}"` : ""}>${esc(r)}</td>${SERIES.map(([c]) => `<td class="num">${num(v[c])}</td>`).join("")}</tr>`).join("")
+      ? itens.map(([r, v]) => `<tr><td${classe ? ` class="${classe}"` : ""}>${esc(r)}</td>${SERIES.map(([c]) => `<td class="num">${num(v[c])}</td>`).join("")}<td class="num">${pct(v.resolvidos, v.callbacks)}</td></tr>`).join("")
       : `<tr><td colspan="4" class="empty">${esc(msgVazia)}</td></tr>`;
   }
 
   function desenhar() {
     msgVazia = dados.linhas.length ? "Nenhum dado neste filtro." : "Ainda não há fechamentos sincronizados.";
-    const ls = aplicar(), t = total(ls), base = total(dados.linhas);
-    texto("#k-callbacks", num(t.callbacks)); texto("#k-resolvidos", num(t.resolvidos)); texto("#k-cancelados", num(t.cancelados));
-    texto("#k-resolucao", pct(t.resolvidos, t.callbacks)); texto("#k-cancelamento", pct(t.cancelados, t.callbacks + t.cancelados));
-    texto("#m-callbacks", num(t.callbacks)); texto("#m-resolvidos", num(t.resolvidos)); texto("#m-cancelados", num(t.cancelados));
+    const ls = aplicar(), t = total(ls);
+    texto("#k-callbacks", num(t.callbacks)); texto("#k-resolvidos", num(t.resolvidos)); texto("#k-taxa", pct(t.resolvidos, t.callbacks)); texto("#k-operadores", num(new Set(ls.map((l) => l.operador)).size));
+    texto("#m-callbacks", num(t.callbacks)); texto("#m-resolvidos", num(t.resolvidos)); texto("#m-taxa", pct(t.resolvidos, t.callbacks));
     texto("#h-callbacks", ls.length ? `${dataBR(ls[0].data)} a ${dataBR(ls[ls.length - 1].data)}` : "Sem dados no filtro");
-    texto("#h-cancelados", base.cancelados ? `${pct(t.cancelados, base.cancelados)} dos cancelamentos da base` : "Nenhum cancelamento na base");
 
     const dia = ordenado(agrupar(ls, (l) => l.data)).map(([k, v]) => [diaCurto(k), v, dataBR(k)]);
     const mes = ordenado(agrupar(ls, (l) => l.data.slice(0, 7))).map(([k, v]) => [mesCurto(k), v, mesLongo(k)]);
@@ -123,7 +111,7 @@
     const soma = vazio(), acumulado = dia.map(([r, v, ti]) => { for (const [k] of SERIES) soma[k] += v[k]; return [r, { ...soma }, ti]; });
 
     graficoBarras("#c-mes", mes, "Comparativo mensal");
-    graficoTaxas("#c-taxas", t);
+    graficoTaxa("#c-taxas", t);
     graficoLinha("#c-dia", dia, "Evolução diária");
     graficoBarras("#c-op", op.slice(0, 12), "Comparativo por operador");
     graficoLinha("#c-ac", acumulado, "Histórico acumulado");
@@ -150,7 +138,7 @@
     const ls = dados.linhas, t = total(ls);
     texto("#a-arquivos", num(s.arquivos || 0)); texto("#a-recusados", num(s.rejeitados || 0));
     texto("#a-dias", num(new Set(ls.map((l) => l.data)).size)); texto("#a-operadores", num(new Set(ls.map((l) => l.operador)).size));
-    texto("#a-callbacks", num(t.callbacks)); texto("#a-resolvidos", num(t.resolvidos)); texto("#a-cancelados", num(t.cancelados));
+    texto("#a-callbacks", num(t.callbacks)); texto("#a-resolvidos", num(t.resolvidos));
     texto("#a-ultima", quando); texto("#a-periodo", ls.length ? `${dataBR(ls[0].data)} – ${dataBR(ls[ls.length - 1].data)}` : "—");
   }
 
@@ -164,7 +152,7 @@
 
   document.querySelectorAll("[data-legenda]").forEach((el) => {
     const linha = el.dataset.legenda === "linha";
-    el.innerHTML = SERIES.map(([, n, i]) => `<span><i class="c${i} ${linha ? `traco${i === 3 ? " tracejado" : ""}` : "dot"}"></i>${n}</span>`).join("");
+    el.innerHTML = SERIES.map(([, n, i]) => `<span><i class="c${i} ${linha ? "traco" : "dot"}"></i>${n}</span>`).join("");
   });
   for (const id of FILTROS) $(id).addEventListener("change", desenhar);
   $("#f-limpar").onclick = () => { for (const id of FILTROS) $(id).value = ""; desenhar(); };

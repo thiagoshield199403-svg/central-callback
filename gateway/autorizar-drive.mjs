@@ -18,7 +18,7 @@ const srv = createServer(async (req, res) => {
   const r = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: ID, client_secret: SEGREDO, redirect_uri: RETORNO, grant_type: "authorization_code" }) });
   const d = await r.json().catch(() => ({}));
   if (!d.refresh_token) { res.end("O Google não devolveu a autorização."); console.error("Falha: o Google não devolveu refresh token."); process.exit(1); }
-  mkdirSync(DADOS, { recursive: true }); writeFileSync(join(DADOS, "google-oauth.json"), JSON.stringify({ refresh_token: d.refresh_token }));
+  mkdirSync(DADOS, { recursive: true }); writeFileSync(join(DADOS, "google-oauth.json"), JSON.stringify({ refresh_token: d.refresh_token }), { mode: 0o600 });
   res.setHeader("Content-Type", "text/plain; charset=utf-8"); res.end("Autorizado. Pode fechar esta aba e reiniciar o gateway.");
   console.log("Autorização gravada. Reinicie o gateway."); setTimeout(() => process.exit(0), 300);
 });

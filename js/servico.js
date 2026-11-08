@@ -85,13 +85,13 @@
 
     /* ------------------------------------------------ dia */
     sessao() { return this.E.sessao && this.E.sessao.situacao === "aberta" ? this.E.sessao : null; }
-    /* 1.1.0 (regra da referência): o turno pede só a identificação do operador (sigla, ex.: TSA4). O polo vem da
+    /* 1.1.0 (regra da referência): o turno pede só a identificação do operador (sigla, ex.: ABC1). O polo vem da
        Configuração (Polo padrão, definido uma vez); só é pedido na abertura se ainda não estiver configurado. */
     abrirSessao(polo, operador) {
       return this._alterar((E) => {
         if (E.sessao && E.sessao.situacao === "aberta") throw new ErroCallback("Já existe um dia aberto. Encerre-o (e exporte) antes de abrir outro.");
         operador = limpar(operador, 40);
-        if (!operador) throw new ErroCallback("Informe a sua sigla de operador (ex.: TSA4).", 422);
+        if (!operador) throw new ErroCallback("Informe a sua sigla de operador (ex.: ABC1).", 422);
         polo = limpar(polo, 80) || limpar(E.config.polo, 80);
         if (!polo) throw new ErroCallback("Informe o polo da operação (fica salvo na Configuração).", 422);
         if (!E.config.polo) E.config.polo = polo;

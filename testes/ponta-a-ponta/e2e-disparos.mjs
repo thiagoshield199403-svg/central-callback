@@ -1,4 +1,4 @@
-/* Testes PONTA A PONTA da Central de Disparos. Navegador real -> gateway real -> API da Meta SIMULADA em 127.0.0.1.
+/* Testes PONTA A PONTA da Central de Disparos. Navegador real e gateway real; o WhatsApp Web nunca é aberto de verdade e a API não é usada.
    Dados 100% fictícios; nenhuma mensagem sai do computador. Uso: node testes\ponta-a-ponta\e2e-disparos.mjs [pasta-para-fotos] */
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
@@ -44,8 +44,8 @@ const PORTA = 8900 + Math.floor(Math.random() * 90), BASE = `http://127.0.0.1:${
 const AMB = { WHATSAPP_MODO: "producao", WHATSAPP_TOKEN: TOKEN, WHATSAPP_PHONE_NUMBER_ID: "12345", WHATSAPP_API_VERSAO: "v0", WHATSAPP_API_BASE: `http://127.0.0.1:${portaMeta}`, WHATSAPP_MODELOS: join(dados, "modelos.json") };
 let gateway = await iniciarGateway(PORTA, AMB);
 const gatewaySim = await iniciarGateway(PORTA_SIM, { WHATSAPP_MODO: "simulacao" });
-const nav = await abrirNavegador({});
-const pg = await nav.novaPagina(`${BASE}/?bd=e2ed${Date.now().toString(36)}`);
+const nav = await abrirNavegador({ exe: process.argv[3] });
+const pgUrl = `${BASE}/?bd=e2ed${Date.now().toString(36)}`, pg = await nav.novaPagina(pgUrl);
 const js = (e) => pg.js(e);
 const clicar = (s) => js(`(() => { const e = document.querySelector(${JSON.stringify(s)}); if (!e) throw new Error("não achei ${s.replace(/"/g, "'")}"); e.click(); return true; })()`);
 const texto = (s) => js(`(document.querySelector(${JSON.stringify(s)}) || {}).textContent || ""`);
@@ -58,10 +58,11 @@ const aguardarFim = (estado = "concluida") => pg.aguardar(`${filaJs}.situacao ==
 const post = (corpo, cab = {}) => fetch(`${BASE}/api/disparo/enviar`, { method: "POST", headers: { "Content-Type": "application/json", ...cab }, body: JSON.stringify(corpo) });
 
 await pg.aguardar("document.body.dataset.pronto === '1'");
-await js(`(window.__links = [], window.open = () => { const j = { closed: false, opener: 1, close() {} }; Object.defineProperty(j, "location", { value: { set href(u) { window.__links.push(u); } } }); return j; }, true)`);
+const stubAbrir = `(window.__links = window.__links || [], window.open = () => { const j = { closed: false, opener: 1, close() {}, focus() {} }; Object.defineProperty(j, "location", { value: { set href(u) { window.__links.push(u); } } }); return j; }, true)`;
+await js(stubAbrir);
 
 await teste("Turno e importação funcionam pelo endereço do gateway; Central de disparos aparece com as 3 opções", async () => {
-  await js(`(() => { const f = document.querySelector("#form-dia"); f.operador.value = "tsa4"; f.polo.value = "Aracaju"; f.requestSubmit(); return true; })()`);
+  await js(`(() => { const f = document.querySelector("#form-dia"); f.operador.value = "opt4"; f.polo.value = "Aracaju"; f.requestSubmit(); return true; })()`);
   await pg.aguardar("!!document.querySelector('#importar').offsetParent");
   const doc = await pg.cmd("DOM.getDocument", {}), { nodeId } = await pg.cmd("DOM.querySelector", { nodeId: doc.root.nodeId, selector: "#arquivo" });
   await pg.cmd("DOM.setFileInputFiles", { nodeId, files: [join(raiz, "exemplos", "navegador-chamadas-ADMS2026-FICTICIO.csv")] });
@@ -89,63 +90,80 @@ await teste("Opção 3: abre a tela CALLBACK WHATSAPP existente; as opções 1 e
   lista = await js(`${srvJs}.incidentesParaDisparo()`);
 });
 const prontos = () => lista.filter((x) => x.elegivel && x.tem_celular);
-await teste("Conferência: prepara os incidentes pedidos e mostra as colunas previstas; o botão acompanha o gateway sem recarregar a página", async () => {
-  const al = prontos().slice(0, 2);
-  verdade(al.length === 2, "o CSV de exemplo precisa de 2 incidentes com celular");
-  await js(`${srvJs}.prepararDisparo(${JSON.stringify(al.map((x) => x.chave))}, "selecao").then(() => window.CentralUI.recarregar()).then(() => true)`);
-  await clicar('[data-modo="lote"]'); await pg.aguardar("!!document.querySelector('.btn-autorizar')");
-  igual(await js(`[...document.querySelectorAll("#disparos-conteudo .tabela-disparos th")].map((t) => t.textContent)`), ["", "Incidente", "Tipo de ocorrência", "Destinatário", "Telefone", "Mensagem", ""]);
-  igual(await js("document.querySelectorAll('tr[data-item]').length"), 2);
-  igual(meta.recebidas.length, 0, "preparar não envia");
-  verdade(!(await js("document.querySelector('.btn-autorizar').disabled")), "habilitado com gateway e mensagens prontas");
-  await js(`(window.__fetch = window.fetch, window.fetch = (u, o) => (String(u).includes("/api/disparo/status") ? Promise.reject(new Error("fora")) : window.__fetch(u, o)), window.CentralDisparos.verificarConector().then(() => true))`);
-  verdade(await js("document.querySelector('.btn-autorizar').disabled"), "gateway fora: desabilitado");
-  await js("(window.fetch = window.__fetch, true)"); await pg.aguardar("!document.querySelector('.btn-autorizar').disabled", 8000);
-  await foto("d3-revisao");
+const sair = () => js(`(window.dispatchEvent(new Event("blur")), true)`);
+const voltar = () => js(`(document.hasFocus = () => true, window.dispatchEvent(new Event("focus")), document.dispatchEvent(new Event("visibilitychange")), window.dispatchEvent(new Event("focus")), true)`);
+const incidenteAtual = () => texto("#at-incidente"), rot = (i) => i.incidente || i.call_id, chaveDe = (i) => lista.find((x) => x.id === i.chamada_id).chave;
+const metr = () => js(`${srvJs}.metricasTempoReal().callbacks_realizados`);
+let filaGuiada;
+await teste("Lote: seleção com busca, marcar e desmarcar; INICIAR só com incidentes marcados", async () => {
+  await clicar('[data-modo="lote"]'); await pg.aguardar("!!document.querySelector('#ds-linhas tr[data-chave]')"); verdade(!(await visivel("#linhas")), "lista individual oculta");
+  lista = await js(`${srvJs}.incidentesParaDisparo()`); const el = lista.filter((x) => x.elegivel);
+  await clicar("[data-acao='marcar-todos']"); verdade((await texto("#ds-contagem")).startsWith(`${el.length} incidente`), "marcou todos");
+  await clicar("[data-acao='desmarcar-todos']"); verdade(await js("document.querySelector('#ds-iniciar').disabled"), "iniciar desabilitado sem seleção");
+  await js(`(() => { const e = document.querySelector("#ds-busca"); e.value = ${JSON.stringify(el[0].incidente)}; e.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`); igual(await js("document.querySelectorAll('#ds-linhas tr[data-chave]').length"), 1, "pesquisa");
+  await js(`(() => { const e = document.querySelector("#ds-busca"); e.value = ""; e.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`); await foto("d2-selecao-lote");
 });
-await teste("Revisão: ver e editar a mensagem (só desta fila), telefone inválido é identificado e corrigido", async () => {
-  const antes = await js("JSON.stringify(window.MODELOS_MENSAGEM)");
-  await clicar("tr[data-item] [data-ver]"); await pg.aguardar("!!document.querySelector('#dm-texto')");
-  await js(`(document.querySelector("#dm-texto").value = "Mensagem revisada pelo operador para o teste.", true)`); await clicar("#dm-salvar");
-  await pg.aguardar(`${filaJs}.itens[0].editada === true && document.querySelector("#modal").classList.contains("oculto")`);
-  igual(await js("JSON.stringify(window.MODELOS_MENSAGEM)"), antes, "modelo original intacto");
-  const orig = await js(`document.querySelector("tr[data-item] [data-tel]").value`);
-  await js(`(() => { const e = document.querySelector("tr[data-item] [data-tel]"); e.value = "7932001234"; e.dispatchEvent(new Event("change", { bubbles: true })); return true; })()`);
-  await pg.aguardar("document.querySelector('#toast').textContent.includes('FIXO')");
-  igual(await js(`${filaJs}.itens[0].status`), "preparado", "valor recusado não entra");
-  igual(await js(`document.querySelector("tr[data-item] [data-tel]").value`), orig, "tela volta ao telefone válido");
+await teste("INICIAR ATENDIMENTO: primeiro incidente em destaque com telefone, cliente, número e mensagem; nada é enviado", async () => {
+  const al = [...prontos().filter((x) => x.qtd > 1).slice(0, 1), ...prontos().filter((x) => x.qtd === 1).slice(0, 2)]; igual(al.length, 3, "exemplo precisa de 3 incidentes");
+  for (const x of al) await js(`document.querySelector('tr[data-chave="${x.chave}"]').click()`);
+  await clicar("#ds-iniciar"); await pg.aguardar("!!document.querySelector('#at-incidente')"); filaGuiada = await js(filaJs);
+  igual([filaGuiada.situacao, filaGuiada.assistido, filaGuiada.itens.length], ["atendimento", true, 3]); const i = filaGuiada.itens[0];
+  igual(await incidenteAtual(), rot(i)); verdade((await js(`document.querySelector("#at-telefone").value`)).replace(/\D/g, "") === i.telefone, "telefone"); igual(await texto("#at-mensagem"), i.texto); verdade((await texto("#at-cliente")).length > 1, "cliente");
+  igual(await js(`[...document.querySelectorAll(".painel-disparo .rotulo")].map((r) => r.textContent)`), ["na fila", "atendidos", "restantes", "pulados", "não confirmados", "concluído"]);
+  igual([await metr(), meta.recebidas.length], [0, 0]); await foto("d3-atendimento"); await pg.tamanho(390, 844); verdade(await js("document.documentElement.scrollWidth <= innerWidth"), "celular"); await pg.tamanho(1366, 768);
 });
-await teste("AUTORIZAR DISPARO: um clique, sem confirmar contato a contato; cada um recebe a sua mensagem; o token não aparece", async () => {
-  const f = await js(filaJs);
-  await clicar(".btn-autorizar"); await aguardarFim();
-  verdade(await js("document.querySelector('#modal').classList.contains('oculto')"), "sem janela de confirmação");
-  igual(meta.recebidas.length, 2, "uma mensagem por incidente");
-  const mt = await js(filaJs);
-  for (const i of mt.itens) { const m = meta.recebidas.find((x) => x.to === "55" + i.telefone); verdade(m, "destinatário " + i.telefone);
-    if (i.editada) { igual([m.type, m.text.body], ["text", i.texto], "texto editado nunca vira modelo"); }
-    else if (i.modelo === "manual_falta_energia") { igual([m.type, m.template.name, m.template.components[0].parameters[0].text], ["template", "falta_energia_teste", i.incidente || i.call_id]); }
-    else igual([m.type, m.text.body], ["text", i.texto]); }
-  verdade(meta.auth.every((a) => a === "Bearer " + TOKEN), "gateway autentica");
-  verdade(meta.recebidas[0].caminho === "/v0/12345/messages", "URL oficial");
-  igual(await cartoes(), [["total selecionado", "2"], ["total preparado", "2"], ["total enviado", "2"], ["total pendente", "0"], ["total com falha", "0"], ["concluído", "100%"]]);
-  const pag = await (await fetch(BASE + "/")).text(), est = await (await fetch(BASE + "/api/disparo/status")).text();
-  const armazenado = await js(`JSON.stringify(${srvJs}.E)`);
-  verdade(![pag, est, armazenado].some((x) => x.includes(TOKEN)), "token exposto");
-  verdade(f.itens.length === 2);
-  const m = await js(`${srvJs}.metricasTempoReal()`); igual(m.callbacks_realizados, 2, "cada mensagem enviada conta como callback");
-  igual(await js(`document.querySelector("#metricas .metrica.destaque .valor").firstChild.textContent.trim()`), "2", "faixa de indicadores");
-  const t0 = await js(`${srvJs}.painel().turnos[0]`); igual([t0.operador, t0.callbacks_realizados], ["TSA4", 2], "total do operador");
-  igual(await js(`[...document.querySelectorAll("#disparos-conteudo .tabela-disparos tbody tr")].every((l) => l.textContent.includes("Enviado") && l.textContent.includes("Realizado") && l.textContent.includes("TSA4"))`), true, "envio e callback em colunas separadas");
-  await foto("d4-acompanhamento");
+await teste("Foco: não avança sem abrir o WhatsApp; abrir não conta; retorno com vários eventos avança uma vez e fica ENVIO NÃO CONFIRMADO", async () => {
+  const [a, b] = filaGuiada.itens; await js("(document.hasFocus = () => true, true)");
+  await sair(); await voltar(); await espera(700); igual(await incidenteAtual(), rot(a), "sem abrir não avança");
+  const n = await js("window.__links.length"); await clicar("[data-acao='at-abrir']"); await pg.aguardar(`window.__links.length === ${n + 1}`); await pg.aguardar(`${filaJs}.itens[0].status === "aberto"`);
+  verdade((await js(`window.__links[${n}]`)).startsWith(`https://web.whatsapp.com/send?phone=55${a.telefone}&text=`), "link do WhatsApp Web"); igual([await metr(), meta.recebidas.length], [0, 0], "abrir não conta");
+  await voltar(); await espera(700); igual(await incidenteAtual(), rot(a), "sem sair da janela não avança");
+  await sair(); await voltar(); await voltar(); await pg.aguardar(`document.querySelector("#at-incidente").textContent === ${JSON.stringify(rot(b))}`); await espera(800);
+  igual([await incidenteAtual(), await js(`${filaJs}.itens[0].status`), await metr(), await js(`${filaJs}.eventos.filter((e) => e.tipo === "retorno").length`)], [rot(b), "nao_confirmado", 0, 1], "avançou uma vez e não contou");
+  verdade((await texto(".atend-confirmar")).includes("ENVIO NÃO CONFIRMADO"), "lista de confirmação");
 });
-await teste("Sem duplicar: incidente enviado não pode ser preparado de novo", async () => {
-  await clicar("[data-acao='nova']"); await pg.aguardar("!!document.querySelector('[data-acao=preparar-lote]')");
-  lista = await js(`${srvJs}.incidentesParaDisparo()`);
-  const env = lista.filter((x) => x.status === "enviado"); igual(env.length, 2); verdade(env.every((x) => !x.elegivel), "inelegíveis");
-  verdade((await js(`${srvJs}.prepararDisparo([${JSON.stringify(env[0].chave)}], "lote").then(() => "", (e) => e.message)`)).includes("Nenhum incidente"), "recusa");
+await teste("Pular identifica o incidente; pausar bloqueia e persiste ao recarregar; retomar; recarregar com WhatsApp aberto não perde progresso", async () => {
+  const [, b, c] = filaGuiada.itens; await clicar("[data-acao='at-pular']"); await pg.aguardar(`document.querySelector("#at-incidente").textContent === ${JSON.stringify(rot(c))}`); verdade((await texto(".atend-pulados")).includes(rot(b)), "pulado visível");
+  await clicar("[data-acao='at-pausar']"); await pg.aguardar("!!document.querySelector('[data-acao=at-retomar]')"); verdade(await js("document.querySelector('[data-acao=at-abrir]').disabled"), "pausado não abre"); await foto("d4-pausado");
+  const reabrir = async () => { await pg.ir(pgUrl); await pg.aguardar("document.body.dataset.pronto === '1'"); await js(stubAbrir); await clicar('[data-modo="lote"]'); };
+  await reabrir(); await pg.aguardar("!!document.querySelector('[data-acao=at-retomar]')"); igual([await incidenteAtual(), await js(`${filaJs}.situacao`)], [rot(c), "pausada"], "persistiu");
+  await clicar("[data-acao='at-retomar']"); await pg.aguardar("!document.querySelector('[data-acao=at-abrir]').disabled"); await clicar("[data-acao='at-abrir']"); await pg.aguardar(`${filaJs}.itens[2].status === "aberto"`);
+  await reabrir(); await pg.aguardar(`${filaJs}.itens[2].status === "nao_confirmado" && ${filaJs}.situacao === "concluida"`); igual(await metr(), 0, "recarregar não conta"); await pg.aguardar("!!document.querySelector('[data-confirmar]')"); await foto("d5-conclusao");
+});
+await teste("Confirmação: Enviei conta um callback do operador, sem duplicar; Não enviei não conta; incidente confirmado não volta à seleção", async () => {
+  const [a, , c] = filaGuiada.itens, conf = (it, r) => clicar(`tr[data-confirma-item="${it.id}"] [data-confirmar="${r}"]`);
+  await conf(a, "enviado"); await pg.aguardar(`${filaJs}.itens[0].status === "enviado"`); await pg.aguardar(`!document.querySelector('tr[data-confirma-item="${a.id}"]')`); igual(await metr(), 1);
+  const t0 = await js(`${srvJs}.painel().turnos[0]`); igual([t0.operador, t0.callbacks_realizados], ["OPT4", 1], "total do operador"); igual(await js(`document.querySelector("#metricas .metrica.destaque .valor").firstChild.textContent.trim()`), "1", "faixa de indicadores");
+  await conf(c, "falha"); await pg.aguardar(`${filaJs}.itens[2].status === "falha"`); igual(await metr(), 1, "não enviei não conta"); igual(await js(`${srvJs}.E.historico_atendimento.length`), 1, "um registro");
+  await pg.aguardar("!!document.querySelector('#ds-linhas tr[data-chave]')"); verdade(await js(`document.querySelector('tr[data-chave="${chaveDe(a)}"] input').disabled`), "confirmado bloqueado"); await js(`document.querySelector('tr[data-chave="${chaveDe(a)}"]').click()`); verdade((await texto("#ds-contagem")).startsWith("0 "), "não seleciona");
+  verdade(!(await js(`document.querySelector('tr[data-chave="${chaveDe(c)}"] input').disabled`)), "não enviei volta a poder");
+});
+await teste("Cancelar: o restante sai da fila, o aberto fica não confirmado; encerrar o lote é recusado durante o atendimento", async () => {
+  lista = await js(`${srvJs}.incidentesParaDisparo()`); const al = prontos().slice(0, 2); for (const x of al) await js(`document.querySelector('tr[data-chave="${x.chave}"]').click()`);
+  await clicar("#ds-iniciar"); await pg.aguardar("!!document.querySelector('#at-incidente')"); await clicar("[data-acao='at-abrir']"); await pg.aguardar(`${filaJs}.itens[0].status === "aberto"`);
+  verdade((await js(`${srvJs}.encerrarLote().then(() => "", (e) => e.message)`)).includes("em andamento"), "encerrar recusado");
+  await clicar("[data-acao='at-cancelar']"); await pg.aguardar("!!document.querySelector('#m-sim')"); await clicar("#m-sim"); await pg.aguardar(`${filaJs}.situacao === "cancelada"`);
+  igual(await js(`${filaJs}.itens.map((i) => i.status)`), ["nao_confirmado", "cancelado"]); igual(await metr(), 1, "cancelar não conta"); await js(`(() => { document.querySelector('[data-confirmar="falha"]').click(); return true; })()`); await pg.aguardar(`${filaJs}.itens[0].status === "falha"`);
+  await clicar("[data-acao='nova']");
+});
+await teste("Foco real: nova aba aberta de verdade e volta à aba da Central apresentam o próximo incidente", async () => {
+  const p = await nav.novaPagina(`${BASE}/?bd=e2er${Date.now().toString(36)}`, { largura: 1366, altura: 768 }), pjs = (e) => p.js(e), cl = (s) => pjs(`(() => { document.querySelector(${JSON.stringify(s)}).click(); return true; })()`);
+  await p.aguardar("document.body.dataset.pronto === '1'"); await pjs(`(() => { const f = document.querySelector("#form-dia"); f.operador.value = "opt4"; f.polo.value = "Aracaju"; f.requestSubmit(); return true; })()`); await p.aguardar("!!document.querySelector('#importar').offsetParent");
+  const doc = await p.cmd("DOM.getDocument", {}), { nodeId } = await p.cmd("DOM.querySelector", { nodeId: doc.root.nodeId, selector: "#arquivo" }); await p.cmd("DOM.setFileInputFiles", { nodeId, files: [join(raiz, "exemplos", "navegador-chamadas-ADMS2026-FICTICIO.csv")] }); await p.aguardar("!!document.querySelector('#btn-confirmar-import')"); await cl("#btn-confirmar-import"); await p.aguardar("document.querySelectorAll('#linhas tr[data-id]').length > 0");
+  await pjs(`(window.Nucleo.linkWhatsappWeb = () => "about:blank#teste-sem-whatsapp", true)`); const srv = "window.CentralUI.servico", ch = await pjs(`${srv}.incidentesParaDisparo().filter((x) => x.elegivel && x.tem_celular).slice(0, 2).map((x) => x.chave)`);
+  await pjs(`${srv}.iniciarAtendimento(${JSON.stringify(ch)}).then(() => window.CentralUI.recarregar()).then(() => true)`); await cl('[data-modo="lote"]'); await p.aguardar("!!document.querySelector('[data-acao=at-abrir]')");
+  await nav.enviar("Target.activateTarget", { targetId: p.targetId }); await espera(300);
+  const primeiro = await pjs(`document.querySelector("#at-incidente").textContent`), caixa = await pjs(`(() => { const r = document.querySelector("[data-acao=at-abrir]").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  for (const type of ["mousePressed", "mouseReleased"]) await p.cmd("Input.dispatchMouseEvent", { type, x: caixa.x, y: caixa.y, button: "left", clickCount: 1 });
+  await p.aguardar(`window.CentralUI.servico.filaDoLote().itens[0].status === "aberto"`); await espera(800);
+  const nova = (await nav.enviar("Target.getTargets")).targetInfos.find((t) => t.type === "page" && t.url.includes("teste-sem-whatsapp")); verdade(nova, "a aba nova abriu"); await espera(300);
+  const estado = await pjs(`({ foco: document.hasFocus(), oculta: document.hidden })`); verdade(!estado.foco || estado.oculta, "a Central perdeu o foco: " + JSON.stringify(estado));
+  igual(await pjs(`document.querySelector("#at-incidente").textContent`), primeiro, "continua no mesmo enquanto está fora");
+  await nav.enviar("Target.activateTarget", { targetId: p.targetId }); await p.aguardar(`document.querySelector("#at-incidente").textContent !== ${JSON.stringify(primeiro)}`, 6000);
+  igual(await pjs(`window.CentralUI.servico.filaDoLote().itens[0].status`), "nao_confirmado"); igual(await pjs(`window.CentralUI.servico.metricasTempoReal().callbacks_realizados`), 0); await nav.enviar("Target.closeTarget", { targetId: nova.targetId });
 });
 await teste("Contato principal: os demais continuam pendentes e o envio individual do painel segue disponível, sem passar pela API", async () => {
-  const f = (await js(`${srvJs}.historicoDisparos()`))[0], i = f.itens.find((x) => x.comunicacoes > 1); verdade(i, "fila com incidente de várias comunicações");
+  const f = (await js(`${srvJs}.historicoDisparos()`)).find((x) => x.itens.some((y) => y.comunicacoes > 1)), i = f.itens.find((x) => x.comunicacoes > 1); verdade(i, "fila com incidente de várias comunicações");
   const grupo = await js(`(() => { const g = ${srvJs}.grupoDaChamada(${i.chamada_id}); return { principal: g.principal.id, membros: g.membros }; })()`);
   igual(grupo.principal, i.chamada_id, "só o principal");
   const outro = grupo.membros.find((m) => m.id !== i.chamada_id && m.telefones.some((x) => x.tipo === "celular")); verdade(outro, "outro contato com celular"); igual(outro.estado, "pendente");
@@ -157,32 +175,12 @@ await teste("Contato principal: os demais continuam pendentes e o envio individu
   igual(meta.recebidas.length, antes, "não passa pela API"); igual(await js(`${srvJs}.obterChamada(${outro.id}).estado`), "pendente", "abrir o WhatsApp não é callback");
   await clicar("#p-fechar");
 });
-await teste("Modo 2 (lote): prepara todos os elegíveis; limite da API pausa; falha definitiva é registrada; retomar conclui sem duplicar", async () => {
-  await clicar('[data-modo="lote"]'); await pg.aguardar("!!document.querySelector('[data-acao=preparar-lote]')");
-  await foto("d5-modo-lote");
-  await clicar("[data-acao='preparar-lote']"); await pg.aguardar("!!document.querySelector('.btn-autorizar')");
-  let f = await js(filaJs); const env = f.itens.filter((i) => i.status === "preparado");
-  igual(f.modo, "lote"); verdade(env.length >= 2, `exemplo precisa de 2+ enviáveis, tem ${env.length}`);
-  const antes = meta.recebidas.length; meta.recusar.add("55" + env[0].telefone); meta.limiteUmaVez = true;
-  await clicar(".btn-autorizar"); await aguardarFim("pausada");
-  igual(meta.recebidas.length, antes, "limite: nada aceito"); verdade((await js(`${filaJs}.eventos.some((e) => e.tipo === "pausa_limite")`)), "evento");
-  await pg.aguardar("!!document.querySelector('[data-acao=retomar]')"); await foto("d6-pausada"); await clicar("[data-acao='retomar']"); await aguardarFim();
-  f = await js(filaJs);
-  igual(f.itens.find((i) => i.id === env[0].id).status, "falha", "recusada pela API"); verdade(f.itens.find((i) => i.id === env[0].id).erro.includes("não pode receber"), "motivo traduzido");
-  igual(meta.recebidas.length - antes, env.length - 1, "demais enviadas uma vez");
-  const dest = meta.recebidas.slice(antes).map((m) => m.to); igual(new Set(dest).size, dest.length, "sem duplicar");
-  meta.recusar.clear();
-  await pg.aguardar("!!document.querySelector('[data-acao=reprocessar]')"); await clicar("[data-acao='reprocessar']"); await pg.aguardar(`${filaJs}.itens.every((i) => i.status !== "falha") && ${filaJs}.situacao === "concluida" && !${filaJs}.executor`, 60000);
-  igual(meta.recebidas.length - antes, env.length, "falha reenviada só depois da nova autorização");
-  igual((await js(`${srvJs}.metricasTempoReal()`)).callbacks_realizados, 2 + env.length, "callback só das enviadas, uma vez cada");
-  await foto("d7-concluida");
-});
 await teste("Histórico: registra cada tentativa com data, hora e resultado; não expõe o telefone completo depois do lote", async () => {
   await clicar("#btn-historico-disparos"); await pg.aguardar("!!document.querySelector('#dh-csv')");
   const h = await js(`document.querySelector("#modal-caixa").innerText`); verdade(h.includes("Histórico de execução"), "título");
   igual(await js("document.querySelectorAll('.fila-historico').length"), 2);
   await foto("d8-historico"); await clicar("#dh-fechar");
-  const csv = await js(`${srvJs}.csvAuditoriaDisparos()`); verdade(csv.includes(";enviado;") && !/\b55\d{11}\b/.test(csv), "csv");
+  const csv = await js(`${srvJs}.csvAuditoriaDisparos()`); verdade(csv.includes(";enviado;") && !/\b55\d{11}\b/.test(csv), "csv"); igual(meta.recebidas.length, 0, "o lote nunca chama a API");
 });
 await teste("Gateway: mesma chave nunca envia duas vezes, mesmo depois de reiniciar", async () => {
   const c = { chave: "a".repeat(32), telefone: "79991112222", texto: "Teste", modelo: "manual_atualizacao", incidente: "INC 1", editada: false }, ori = { Origin: BASE }, antes = meta.recebidas.length;

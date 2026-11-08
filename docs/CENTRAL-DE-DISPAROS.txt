@@ -1,94 +1,44 @@
-CENTRAL DE DISPAROS WHATSAPP POR INCIDENTES
-===========================================
-Data: 08/11/2026. Dados de teste 100% ficticios. Nenhuma mensagem real foi enviada durante o desenvolvimento.
+CENTRAL DE DISPAROS - ATENDIMENTO POR WHATSAPP WEB
+===================================================
+Dados de teste 100% ficticios. Nenhuma mensagem real foi enviada durante o desenvolvimento.
 
-1. AS TRES MODALIDADES
-1) Envio individual: igual ao que ja existia. Abre o WhatsApp Web; o operador confere, envia e registra.
-2) Envio em lote: prepara de uma vez todos os incidentes elegiveis do lote aberto.
-3) Callback manual: abre a tela CALLBACK WHATSAPP (veja docs\DRIVE-BI-E-POLOS.txt, secao 2). Para enviar so parte do lote, use o envio em lote e desmarque os demais na conferencia.
-AUTORIZAR DISPARO fica desabilitado sem o gateway: abra a Central por http://127.0.0.1:8787/ (o index.html aberto direto do arquivo nao fala com o gateway). A fila preparada em um endereco nao aparece no outro.
-Observacao: NAO havia envio em lote no codigo desta copia ("lote" era so o CSV importado). A modalidade 2 foi criada agora,
-sobre a mesma fila da modalidade 3.
+1. AS TRES OPCOES
+1) Envio individual: abre um incidente na lista e usa o WhatsApp Web. O operador confere, envia e registra.
+2) Envio em lote: atendimento guiado (secao 2). Nao usa API da Meta nem envia nada sozinho.
+3) Callback manual: abre a tela CALLBACK WHATSAPP (docs\DRIVE-BI-E-POLOS.txt, secao 2).
 
-Fluxo de 2 e 3: preparar > conferir > AUTORIZAR DISPARO (um clique) > a fila segue sozinha > acompanhar.
+2. ENVIO EM LOTE, PASSO A PASSO
+a) Marque os incidentes na tela e clique em INICIAR ATENDIMENTO.
+b) O primeiro incidente aparece em destaque com cliente, telefone, numero e mensagem.
+c) ABRIR WHATSAPP abre o WhatsApp Web com o contato e a mensagem prontos, sempre na mesma aba. Quem envia e o operador.
+d) Ao voltar para a janela da Central, o proximo incidente aparece sozinho.
+e) Pausar, Retomar, Pular e Cancelar ficam na propria tela. O progresso fica gravado: fechar ou recarregar a pagina nao perde nada.
 
-2. REGRAS
-- Mensagens: as mesmas funcoes do envio individual (sugerirMensagem, _textoMensagem). js\modelos.js nao foi alterado.
-- Incidente = linha da lista: a mensagem vai SO para o contato principal. Os demais contatos nao entram automaticamente (chip "N com.").
-  Para falar com outro contato: abra o incidente e use os botoes de envio do painel (funcao individual, preservada).
-- Nao elegiveis: callback ja realizado ou mensagem ja enviada no lote.
-- Bloqueiam o item na conferencia: sem celular, telefone invalido ou fixo, telefone achado no comentario sem confirmacao,
-  mensagem duplicada (mesmo telefone e mesmo texto).
-- Editar a mensagem muda so aquele envio. Depois de autorizar, nada pode ser alterado (cada item recebe uma assinatura).
-- Mensagem EFETIVAMENTE enviada (status Enviado) conta como callback realizado pelo operador que autorizou, com data e hora, pelo meio WhatsApp,
-  uma unica vez por chamada, e soma no total do operador, no painel e na exportacao do dia.
-  NAO conta: preparada, pendente, com falha, incerta, cancelada ou simulada.
-  Sem duplicidade: callback manual registrado ANTES do envio cancela aquele item (nao envia, nao conta de novo); registrado com a mensagem em
-  transito, o envio fica como Enviado e o callback nao soma de novo. Depois do disparo, o registro manual e recusado, como sempre.
-  Status de envio (fila) e resultado operacional (callback, servico, resolucao) sao registros separados: "Reabrir" corrige o callback e nao muda o envio.
-  Callback vindo de disparo nao impede enviar a OUTRO numero pelo painel. Callback manual continua bloqueando o envio individual, como antes.
-- Status: Aguardando (com pendencia) / Preparado / Enviando / Enviado / Falha / Cancelado.
-  "Enviado" = aceito pela API da Meta. Entrega e leitura exigem webhook (nao implementado; secao 4).
+3. CONTABILIZACAO (LIMITACAO DO WHATSAPP WEB)
+O navegador nao consegue saber se a mensagem saiu. Abrir o WhatsApp e voltar para a Central NAO contam como callback.
+Ao voltar, o incidente fica como ENVIO NAO CONFIRMADO, sem impedir o avanco. Na lista "Envio nao confirmado":
+- "Enviei": registra UM callback do operador, com data, hora e meio WhatsApp. Entra no painel, no fechamento diario e no BI.
+- "Nao enviei": nao conta, e o incidente volta a poder ser selecionado.
+Enquanto nao confirmado, o incidente nao pode ser selecionado de novo (evita mensagem repetida).
+Encerrar o lote sem confirmar: o envio fica sem contar, e a Central avisa antes.
 
-3. PROTECOES CONTRA DUPLICIDADE E PERDA
-- Cada mensagem tem uma chave unica. O gateway grava a chave em disco ANTES de chamar a API; a mesma chave nunca gera outro envio,
-  mesmo com a aba fechada no meio, clique repetido ou gateway reiniciado.
-- O item e gravado como "Enviando" antes do envio. Se a gravacao falhar, nada e enviado.
-- So uma aba executa a fila por vez.
-- Sem conexao, limite da API ou credencial recusada: o item volta para a fila e a fila PAUSA. Retomar reaproveita a mesma chave.
-- Recusa definitiva da API: Falha, a fila continua. Novo envio das falhas exige novo clique do operador.
-- Resultado incerto (a API nao respondeu): Falha com marca "incerto" e reenvio BLOQUEADO. So o operador libera, depois de verificar
-  que a mensagem nao chegou. Essa liberacao e o unico caso em que pode haver duplicidade.
-- Aba fechada durante o envio: a fila aparece como "Interrompida" e so continua com o clique em Retomar.
-- Encerrar o lote e recusado com fila em andamento. Ao encerrar, nome, telefone e texto sao apagados das filas; ficam o telefone
-  mascarado, o hash do texto e as tentativas (auditoria, sem limite de filas).
-- O telefone corrigido na conferencia fica gravado ate o encerramento do lote (necessario para a fila sobreviver a quedas). No envio
-  manual individual ele continua NAO sendo gravado.
+4. REGRAS
+- Mensagens: as mesmas funcoes do envio individual. js\modelos.js nao foi alterado.
+- A mensagem vai so para o contato principal do incidente; os demais usam o envio individual do painel.
+- Nao podem ser selecionados: callback ja realizado, mensagem confirmada ou envio nao confirmado.
+- Sem celular, telefone invalido ou achado no comentario: corrija ou confirme no cartao, ou pule o incidente.
+- Callback registrado por outra via durante o atendimento: o incidente e pulado sozinho e nao conta de novo.
+- Pop-up bloqueado: o incidente nao avanca. Permita pop-ups para a Central.
+- Encerrar o lote e recusado com atendimento em andamento ou pausado. Ao encerrar, nome, telefone e texto sao apagados.
 
-4. O QUE DEPENDE DE CONFIGURACAO EXTERNA
-a) Conta WhatsApp Business Platform (Meta): empresa verificada, numero registrado, token de usuario do sistema, Phone Number ID.
-b) Modelos aprovados: fora da janela de 24 horas (cliente que nao falou com a empresa pelo WhatsApp) a Meta so entrega modelos
-   aprovados. Sem isso as mensagens falham com "Fora da janela de 24 horas". Cada modelo aprovado deve ser mapeado em
-   gateway\modelos-aprovados.json (exemplo: modelos-aprovados.exemplo.json). O texto aprovado precisa ser equivalente ao de
-   js\modelos.js: quem envia o conteudo e a Meta, pelo nome do modelo. Texto editado na conferencia sempre vai como texto livre.
-c) Consentimento (LGPD e politica do WhatsApp): o CSV do ADMS nao traz consentimento nem opt-out, entao a Central NAO consegue verificar.
-   Precisa de definicao juridica e, se for o caso, de uma base de consentimento.
-d) Limites de envio do numero: definidos pela Meta. Ao atingir, a fila pausa. Intervalo entre mensagens: 1,2 s (js\disparos.js).
-e) Webhook para "entregue/lido" e para respostas de clientes: exige endereco publico HTTPS. Nao implementado.
-f) Node.js 20 ou superior no computador que roda o gateway.
-g) Validacao pendente dos textos (E-9) antes de submete-los a Meta.
+5. CODIGO ANTERIOR DA API OFICIAL
+A tela nao usa mais a fila por API. O motor antigo (js\disparos.js, processarFila) e a rota /api/disparo/enviar do gateway continuam no codigo, sem uso pela tela,
+para abrir o historico de filas antigas. O gateway segue necessario para o fechamento no Drive e o BI.
 
-5. COMO LIGAR
-Treino (nao entrega nada):        node gateway\servidor.mjs
-Producao:                         copie gateway\.env.exemplo para gateway\.env, preencha e rode
-                                  node --env-file=gateway\.env gateway\servidor.mjs
-Abra http://127.0.0.1:8787/ no Edge ou Chrome.
-ATENCAO: o navegador guarda os dados separados por endereco. Turnos e lotes abertos pelo index.html (file://) NAO aparecem em
-http://127.0.0.1:8787/ e vice-versa. Use sempre o mesmo endereco no turno.
-Aberta direto pelo index.html a Central continua funcionando como antes: preparar e conferir funcionam, disparar nao.
+6. COMO LIGAR
+node --env-file=gateway\.env gateway\servidor.mjs  e abra http://127.0.0.1:8787/ no Edge ou Chrome (sem .env: node gateway\servidor.mjs).
+O envio em lote tambem funciona pelo index.html, mas o navegador separa os dados por endereco: use sempre o mesmo no turno.
 
-6. SEGURANCA DO GATEWAY
-- Token so no ambiente do processo; nunca vai para a pagina, o registro ou o navegador. Nao colocar gateway\.env em pasta publicada.
-- Escuta so em 127.0.0.1. Recusa pedido de outra origem ou Host desconhecido e serve apenas index.html, css\ e js\.
-- NAO tem login proprio. Para uso em servidor compartilhado: colocar atras de proxy HTTPS com autenticacao corporativa
-  e declarar o dominio em GATEWAY_HOSTS. Decisao e implantacao da TI.
-- Registro: gateway\dados\registro-envios.jsonl (chave, incidente, telefone mascarado, resultado; sem texto). Nao apagar
-  durante uma fila: e ele que impede o reenvio. Politica de retencao a definir (LGPD).
-- A CSP da pagina passou de connect-src 'none' para 'self': a pagina so fala com o proprio endereco.
-
-7. O QUE NAO FOI TESTADO
-- A chamada a API real da Meta (nao ha credenciais). O formato foi testado contra uma API simulada local; os codigos de erro
-  tratados vem da documentacao publica da Meta. Faca o primeiro envio real com um numero proprio e poucos itens.
-- Computador corporativo do COI: politicas do navegador, proxy de saida para graph.facebook.com.
-
-8. TESTES
-node testes\ponta-a-ponta\rodar-testes-unitarios.mjs   (inclui os testes da fila)
-node testes\ponta-a-ponta\e2e.mjs                      (Central original, por file://)
-node testes\ponta-a-ponta\e2e-disparos.mjs             (navegador > gateway > API simulada em 127.0.0.1)
-
-9. ARQUIVOS
-Novos: js\disparos.js, js\central-disparos.js, gateway\servidor.mjs, gateway\.env.exemplo, gateway\modelos-aprovados.exemplo.json,
-  .gitignore, docs\CENTRAL-DE-DISPAROS.txt, testes\ponta-a-ponta\e2e-disparos.mjs.
-Alterados: index.html (secao, scripts, CSP), css\estilo.css (acrescimos), js\app.js (ganchos), js\servico.js (gravacoes em ordem,
-  campo disparos, encerramento do lote), testes\testes.js, testes\testes.html, LEIA-ME.txt, docs\LIMITACOES-E-PENDENCIAS.txt, MANIFESTO_SHA256.txt.
-Inalterados: js\modelos.js, js\nucleo.js, js\armazenamento.js.
+7. TESTES
+node testes\ponta-a-ponta\rodar-testes-unitarios.mjs
+node testes\ponta-a-ponta\e2e-disparos.mjs

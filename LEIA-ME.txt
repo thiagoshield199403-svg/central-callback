@@ -48,9 +48,10 @@ TESTE RAPIDO (sem dados reais)
 - Desenvolvimento (opcional, exige Node.js): node testes\ponta-a-ponta\rodar-testes-unitarios.mjs  e
   node testes\ponta-a-ponta\e2e.mjs  (testes pela interface, sem janela).
 
-CENTRAL DE DISPAROS (opcional; exige o gateway com Node.js e, para envio real, a API oficial do WhatsApp)
-- Tres opcoes na tela do lote: envio individual (como acima), envio em lote e callback manual (abre a tela Callback WhatsApp).
-- Treino sem entregar nada: node gateway\servidor.mjs  e abra http://127.0.0.1:8787/ (os dados desse endereco sao separados dos do index.html).
+CENTRAL DE DISPAROS
+- Tres opcoes na tela do lote: envio individual (como acima), envio em lote (atendimento guiado pelo WhatsApp Web, um incidente por vez) e callback manual (abre a tela Callback WhatsApp).
+- Envio em lote: marque os incidentes > INICIAR ATENDIMENTO > ABRIR WHATSAPP > envie > volte para a Central: o proximo aparece sozinho. So "Enviei" conta como callback.
+- Fechamento no Drive e BI exigem o gateway: node --env-file=gateway\.env gateway\servidor.mjs  e abra http://127.0.0.1:8787/ (os dados desse endereco sao separados dos do index.html).
 - Como funciona, protecoes e configuracao externa: docs\CENTRAL-DE-DISPAROS.txt
 
 HISTORICO, CALLBACK WHATSAPP, FECHAMENTO E BI

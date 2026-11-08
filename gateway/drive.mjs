@@ -29,12 +29,19 @@ export function criarDrive(amb, dados) {
     acesso = d.access_token; validade = Date.now() + (d.expires_in || 3600) * 1000;
     return acesso;
   }
-  async function api(caminho, op = {}) {
+  async function chamar(caminho, op) {
     let r;
     try { r = await fetch(API + caminho, { ...op, headers: { Authorization: `Bearer ${await token()}`, ...(op.headers || {}) }, signal: AbortSignal.timeout(TEMPO) }); }
     catch (e) { if (e instanceof ErroDrive) throw e; throw new ErroDrive("Sem resposta do Google Drive.", 0); }
     if (!r.ok) throw new ErroDrive(`O Google Drive respondeu ${r.status}.`, r.status);
     return r;
+  }
+  /* Só consultas são repetidas: repetir um envio sem saber se o anterior chegou poderia duplicar o arquivo. Envio falho volta na próxima tentativa, que confere o nome antes. */
+  async function api(caminho, op = {}) {
+    for (let n = 0; ; n++) {
+      try { return await chamar(caminho, op); }
+      catch (e) { if ((op.method && op.method !== "GET") || n >= 2 || !(e.status === 0 || e.status === 429 || e.status >= 500)) throw e; await new Promise((ok) => setTimeout(ok, 300 * 3 ** n)); }
+    }
   }
   async function listar(consulta, campos = "id,name") {
     const itens = []; let pagina = "";
@@ -46,22 +53,24 @@ export function criarDrive(amb, dados) {
     return itens;
   }
   async function achar(nome, pai) { return (await listar(`name='${q(nome)}' and '${q(pai)}' in parents and mimeType='${PASTA}' and trashed=false`))[0] || null; }
-  async function pasta(nome, pai) {
+  /* Guarda a promessa, não o resultado: envio e sincronização simultâneos não criam a mesma pasta duas vezes. */
+  function pasta(nome, pai) {
     const k = pai + "/" + nome;
-    if (cachePastas.has(k)) return cachePastas.get(k);
-    let p = await achar(nome, pai);
-    if (!p) p = await (await api("/drive/v3/files?fields=id,name", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: nome, mimeType: PASTA, parents: [pai] }) })).json();
-    cachePastas.set(k, p.id);
-    return p.id;
+    if (!cachePastas.has(k)) {
+      const p = (async () => { const a = await achar(nome, pai); if (a) return a.id; return (await (await api("/drive/v3/files?fields=id,name", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: nome, mimeType: PASTA, parents: [pai] }) })).json()).id; })();
+      cachePastas.set(k, p); p.catch(() => cachePastas.delete(k));
+    }
+    return cachePastas.get(k);
   }
   const raiz = async () => amb.GOOGLE_DRIVE_RAIZ_ID || pasta("CENTRAL CALLBACK COI", "root");
-  const pastaBI = async () => pasta("BI", await raiz());
+  const pastaFechamentos = async () => pasta("FECHAMENTOS", await raiz());
 
   return {
     configurado,
-    /* Publica um fechamento na pasta do mês. */
+    async garantirEstrutura() { const r = await raiz(); for (const nome of ["BI", "HISTORICO", "FECHAMENTOS"]) await pasta(nome, r); },
+    /* Publica um fechamento em FECHAMENTOS/<ano>/<mês>. */
     async publicar({ nome, data, conteudo, sha256, versao }) {
-      const destino = await pasta(nomePastaMes(data), await pasta(data.slice(0, 4), await pastaBI()));
+      const destino = await pasta(nomePastaMes(data), await pasta(data.slice(0, 4), await pastaFechamentos()));
       const ja = (await listar(`name='${q(nome)}' and '${q(destino)}' in parents and trashed=false`, "id,name,appProperties"))[0];
       if (ja) {
         if (ja.appProperties && ja.appProperties.sha256 === sha256) return { arquivo_id: ja.id, reaproveitado: true };
@@ -73,16 +82,18 @@ export function criarDrive(amb, dados) {
       const d = await (await api("/upload/drive/v3/files?uploadType=multipart&fields=id,name", { method: "POST", headers: { "Content-Type": `multipart/related; boundary=${limite}` }, body: corpo })).json();
       return { arquivo_id: d.id, reaproveitado: false };
     },
-    /* Lista os fechamentos de BI/<ano>/<mês>. */
+    /* Lista os fechamentos de FECHAMENTOS/<ano>/<mês>. */
     async listarFechamentos() {
-      const bi = await pastaBI(), arquivos = [];
-      for (const ano of await listar(`'${q(bi)}' in parents and mimeType='${PASTA}' and trashed=false`)) {
+      const base = await pastaFechamentos(), arquivos = [];
+      for (const ano of await listar(`'${q(base)}' in parents and mimeType='${PASTA}' and trashed=false`)) {
         if (!/^\d{4}$/.test(ano.name)) continue;
         for (const mes of await listar(`'${q(ano.id)}' in parents and mimeType='${PASTA}' and trashed=false`))
           arquivos.push(...await listar(`'${q(mes.id)}' in parents and name contains 'fechamento_callbacks_' and trashed=false`, "id,name,modifiedTime"));
       }
       return arquivos.map((a) => ({ id: a.id, nome: a.name, revisao: a.modifiedTime || a.id }));
     },
+    /* Só para o teste de integração: vai para a lixeira do Drive, nunca é apagado definitivamente. */
+    async moverParaLixeira(id) { await api(`/drive/v3/files/${encodeURIComponent(id)}?fields=id`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ trashed: true }) }); },
     async baixar(id) { return (await api(`/drive/v3/files/${encodeURIComponent(id)}?alt=media`)).text(); },
   };
 }

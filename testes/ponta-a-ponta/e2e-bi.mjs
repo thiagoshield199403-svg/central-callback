@@ -17,7 +17,7 @@ const igual = (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw 
 const SEGREDO = "segredo-oauth-de-teste", ACESSO = "acesso-de-teste", PASTA = "application/vnd.google-apps.folder";
 
 /* Google Drive simulado */
-const drive = { arquivos: [{ id: "bi", name: "BI", mimeType: PASTA, parents: ["raiz"] }, { id: "a26", name: "2026", mimeType: PASTA, parents: ["bi"] }], fora: false, n: 0 };
+const drive = { arquivos: [], fora: false, n: 0 };
 const servidor = (f) => new Promise((ok) => { const s = createServer(f); s.listen(0, "127.0.0.1", () => ok(s)); });
 const googleS = await servidor((req, res) => {
   const partes = []; req.on("data", (p) => partes.push(p)); req.on("end", () => {
@@ -40,7 +40,7 @@ const dados = mkdtempSync(join(tmpdir(), "central-bi-")), PORTA = 9100 + Math.fl
 const gatewayP = spawn(process.execPath, [join(raiz, "gateway", "servidor.mjs")], { env: { ...process.env, GATEWAY_PORTA: String(PORTA), GATEWAY_DADOS: dados, WHATSAPP_MODO: "producao", WHATSAPP_TOKEN: "t", WHATSAPP_PHONE_NUMBER_ID: "1", WHATSAPP_API_VERSAO: "v0", WHATSAPP_API_BASE: `http://127.0.0.1:${metaS.address().port}`,
   GOOGLE_CLIENT_ID: "cliente", GOOGLE_CLIENT_SECRET: SEGREDO, GOOGLE_REFRESH_TOKEN: "refresh-teste", GOOGLE_DRIVE_RAIZ_ID: "raiz", GOOGLE_API_BASE: `http://127.0.0.1:${googleS.address().port}`, GOOGLE_OAUTH_BASE: `http://127.0.0.1:${googleS.address().port}`, BI_INTERVALO_MS: "700" }, stdio: ["ignore", "pipe", "pipe"] });
 await new Promise((ok) => gatewayP.stdout.on("data", (x) => String(x).includes("BI:") && ok()));
-const nav = await abrirNavegador({}), bd = "e2eb" + Date.now().toString(36), pg = await nav.novaPagina(`${BASE}/?bd=${bd}`);
+const nav = await abrirNavegador({ exe: process.argv[3] }), bd = "e2eb" + Date.now().toString(36), pg = await nav.novaPagina(`${BASE}/?bd=${bd}`);
 const js = (e) => pg.js(e), S = "window.CentralUI.servico";
 const clicar = (s) => js(`(() => { const e = document.querySelector(${JSON.stringify(s)}); if (!e) throw new Error("não achei ${s.replace(/"/g, "'")}"); e.click(); return true; })()`);
 const digitar = (s, v) => js(`(() => { const e = document.querySelector(${JSON.stringify(s)}); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event("input", { bubbles: true })); e.dispatchEvent(new Event("change", { bubbles: true })); return true; })()`);
@@ -55,13 +55,11 @@ let atendidos;
 
 await pg.aguardar("document.body.dataset.pronto === '1'"); await janela();
 await teste("Fluxo do lote: importar, marcar, preparar, autorizar e concluir; envio confirmado vira callback", async () => {
-  await js(`(() => { const f = document.querySelector("#form-dia"); f.operador.value = "tsa4"; f.polo.value = "Aracaju"; f.requestSubmit(); return true; })()`);
+  await js(`(() => { const f = document.querySelector("#form-dia"); f.operador.value = "opt4"; f.polo.value = "Aracaju"; f.requestSubmit(); return true; })()`);
   await pg.aguardar("!!document.querySelector('#importar').offsetParent"); await importar();
   const l = await js(`${S}.incidentesParaDisparo()`); atendidos = l.filter((x) => x.elegivel && x.tem_celular && x.incidente).slice(0, 2);
-  await js(`${S}.prepararDisparo(${JSON.stringify(atendidos.map((x) => x.chave))}, "lote").then(() => window.CentralUI.recarregar()).then(() => true)`);
-  await clicar('[data-modo="lote"]'); await pg.aguardar("!!document.querySelector('.btn-autorizar')"); await clicar(".btn-autorizar");
-  await pg.aguardar(`${S}.filaDoLote().situacao === "concluida" && !${S}.filaDoLote().executor`, 30000);
-  igual([(await metricas()).callbacks_realizados, metaR.length], [2, 2]);
+  await js(`(async () => { const s = ${S}, f = await s.iniciarAtendimento(${JSON.stringify(atendidos.map((x) => x.chave))}); for (const i of f.itens) { await s.abrirAtendimento(f.id, i.id); await s.registrarRetornoAtendimento(f.id, i.id); await s.confirmarEnvioAtendimento(f.id, i.id, "enviado"); } await window.CentralUI.recarregar(); return true; })()`);
+  igual([(await metricas()).callbacks_realizados, metaR.length, await js(`${S}.filaDoLote().situacao`)], [2, 0, "concluida"]);
 });
 await teste("Linha inteira verde-claro para callback realizado; pendente continua normal", async () => {
   await clicar('[data-modo="individual"]');
@@ -78,7 +76,7 @@ await teste("Cancelamento depois da autorização é registrado; aberta a págin
 });
 await teste("CALLBACK WHATSAPP: sem campo de operador, prévia ao vivo, só conta após confirmar, resolver não gera callback, histórico persiste", async () => {
   await clicar("#btn-manual"); await pg.aguardar("!!document.querySelector('#cm-enviar').offsetParent");
-  verdade(!(await js(`!!document.querySelector("#callback-manual input[id*=operador]")`)), "não pode haver campo de operador"); verdade((await js(`document.querySelector("#cm-operador").textContent`)).includes("TSA4"), "operador do turno");
+  verdade(!(await js(`!!document.querySelector("#callback-manual input[id*=operador]")`)), "não pode haver campo de operador"); verdade((await js(`document.querySelector("#cm-operador").textContent`)).includes("OPT4"), "operador do turno");
   verdade(!(await js("!!document.querySelector('#linhas').offsetParent")), "módulo independente da lista");
   await digitar("#cm-incidente", "900123"); await digitar("#cm-modelo", "manual_falta_energia");
   verdade((await js(`document.querySelector("#cm-previa-texto").textContent`)).includes("INC 900123"), "prévia");
@@ -108,7 +106,7 @@ await teste("Opção 3 abre a tela manual; incidente e telefone lado a lado; per
   await clicar("#cm-ex-cancelar"); igual(await js("document.querySelectorAll('#cm-linhas tr[data-id]').length"), 1, "cancelar não muda nada");
   await clicar("#cm-excluir"); await pg.aguardar("!!document.querySelector('#cm-ex-palavra')"); await digitar("#cm-ex-palavra", "excluir"); verdade(await js("document.querySelector('#cm-ex-confirmar').disabled"), "palavra errada"); await digitar("#cm-ex-palavra", "EXCLUIR"); await clicar("#cm-ex-confirmar");
   await pg.aguardar("document.querySelectorAll('#cm-linhas tr[data-id]').length === 0"); igual(await js(`JSON.stringify([${S}.metricasTempoReal(), ${S}.E.historico_atendimento])`), antes, "indicadores intactos");
-  igual(await js(`[...document.querySelectorAll("#cm-indicadores .valor")].map((v) => v.textContent)`), ["1", "1", "0", "0"], "indicadores da tela"); igual(await js(`${S}.E.auditoria_manual.map((r) => [r.operador, r.quantidade])`), [["TSA4", 1]], "auditoria");
+  igual(await js(`[...document.querySelectorAll("#cm-indicadores .valor")].map((v) => v.textContent)`), ["1", "1", "0", "0"], "indicadores da tela"); igual(await js(`${S}.E.auditoria_manual.map((r) => [r.operador, r.quantidade])`), [["OPT4", 1]], "auditoria");
   await clicar("#btn-manual");
 });
 await teste("Limpar o lote preserva o histórico; novo CSV reconhece atendidos: linha verde, sem seleção e com histórico visível", async () => {
@@ -117,9 +115,9 @@ await teste("Limpar o lote preserva o histórico; novo CSV reconhece atendidos: 
   await importar();
   await pg.aguardar(`${S}.incidentesParaDisparo().some((x) => x.chave === ${JSON.stringify(atendidos[0].chave)})`); // a lista antiga pode seguir na tela até o novo lote gravar
   const sel = `#linhas tr[data-grupo="${atendidos[0].chave}"]`, inc = await js(`${S}.incidentesParaDisparo().find((x) => x.chave === ${JSON.stringify(atendidos[0].chave)})`);
-  igual(await cor(sel), VERDE); igual([inc.elegivel, inc.atendido], [false, true], "bloqueado no lote"); verdade(inc.motivo_inelegivel.includes("TSA4"), "operador visível");
+  igual(await cor(sel), VERDE); igual([inc.elegivel, inc.atendido], [false, true], "bloqueado no lote"); verdade(inc.motivo_inelegivel.includes("OPT4"), "operador visível");
   verdade((await js(`${S}.prepararDisparo([${JSON.stringify(atendidos[0].chave)}], "lote").then(() => "", (e) => e.message)`)).includes("Nenhum incidente"), "não prepara");
-  await foto(pg, "b4-reconhecidos"); await clicar(sel); await pg.aguardar("!!document.querySelector('#p-fechar')"); verdade((await js(`document.querySelector("#painel").textContent`)).includes("TSA4"), "histórico no painel"); await clicar("#p-fechar");
+  await foto(pg, "b4-reconhecidos"); await clicar(sel); await pg.aguardar("!!document.querySelector('#p-fechar')"); verdade((await js(`document.querySelector("#painel").textContent`)).includes("OPT4"), "histórico no painel"); await clicar("#p-fechar");
   igual((await metricas()).callbacks_realizados, 3, "reconhecer não conta");
   await clicar('[data-modo="individual"]');
 });
@@ -127,21 +125,22 @@ let hoje;
 const arquivosCsv = () => drive.arquivos.filter((a) => a.name.startsWith("fechamento_"));
 await teste("Fechamento: encerrar o dia publica no Drive, cria a pasta do mês sem duplicar e só leva agregados", async () => {
   hoje = await js(`${S}.sessao().data_operacional`);
-  await js(`(async () => { await ${S}.encerrarLote(); await ${S}.encerrarDia(); await window.CentralFechamento.aposEncerrarDia(${JSON.stringify(hoje)}, "TSA4"); return true; })()`);
+  await js(`(async () => { await ${S}.encerrarLote(); await ${S}.encerrarDia(); await window.CentralFechamento.aposEncerrarDia(${JSON.stringify(hoje)}, "OPT4"); return true; })()`);
   await pg.aguardar(`${S}.E.fechamentos[0] && ${S}.E.fechamentos[0].status === "enviado"`, 15000);
   igual(arquivosCsv().map((a) => a.name), [`fechamento_callbacks_${hoje}_ARACAJU.csv`]);
   igual(drive.arquivos.filter((a) => a.mimeType === PASTA && a.name === "2026").length, 1, "sem pasta duplicada");
-  const mes = drive.arquivos.find((a) => a.id === arquivosCsv()[0].parents[0]); verdade(/^\d{2}-[A-Z]+$/.test(mes.name) && mes.parents[0] === "a26", "pasta do mês");
+  const porId = (id) => drive.arquivos.find((a) => a.id === id), mes = porId(arquivosCsv()[0].parents[0]), ano = porId(mes.parents[0]); igual([/^\d{2}-[A-Z]+$/.test(mes.name), ano.name, porId(ano.parents[0]).name], [true, "2026", "FECHAMENTOS"], "ano e mês em FECHAMENTOS");
+  for (const n of ["BI", "HISTORICO", "FECHAMENTOS"]) igual(drive.arquivos.filter((a) => a.mimeType === PASTA && a.name === n && a.parents[0] === "raiz").length, 1, "pasta " + n);
   const c = arquivosCsv()[0].conteudo.replace("﻿", "").trim().split("\r\n"); igual(c[0], "data;polo;operador;callbacks_realizados;incidentes_resolvidos;incidentes_cancelados;versao");
-  igual(c.slice(1), [`${hoje};Aracaju;TSA4;3;1;1;1`, `${hoje};TOTAL;TOTAL;3;1;1;1`]);
+  igual(c.slice(1), [`${hoje};Aracaju;OPT4;3;1;1;1`, `${hoje};TOTAL;TOTAL;3;1;1;1`]);
   for (const p of ["INC", "CALL", "Fictício", "99100", "Energisa"]) verdade(!arquivosCsv()[0].conteudo.includes(p), "vazou " + p);
   await pg.ir(`${BASE}/?bd=${bd}`); await pg.aguardar("document.body.dataset.pronto === '1'"); await espera(800); igual(arquivosCsv().length, 1, "reabrir não duplica");
 });
 await teste("Novo turno gera nova versão auditável sem apagar a anterior; o BI usa só a maior versão", async () => {
-  await js(`(async () => { await ${S}.abrirSessao("", "TSA5"); const a = await ${S}.abrirCallbackManual({ incidente: "900200", telefone: "79991000901", modo: "padronizada", modelo: "manual_falta_energia" }); await ${S}.confirmarEnvioManual(a.item.id, "enviado"); await ${S}.encerrarDia(); await window.CentralFechamento.aposEncerrarDia(${JSON.stringify(hoje)}, "TSA5"); return true; })()`);
+  await js(`(async () => { await ${S}.abrirSessao("", "OPT5"); const a = await ${S}.abrirCallbackManual({ incidente: "900200", telefone: "79991000901", modo: "padronizada", modelo: "manual_falta_energia" }); await ${S}.confirmarEnvioManual(a.item.id, "enviado"); await ${S}.encerrarDia(); await window.CentralFechamento.aposEncerrarDia(${JSON.stringify(hoje)}, "OPT5"); return true; })()`);
   await pg.aguardar(`${S}.E.fechamentos[1] && ${S}.E.fechamentos[1].status === "enviado"`, 15000);
   igual(arquivosCsv().map((a) => a.name), [`fechamento_callbacks_${hoje}_ARACAJU.csv`, `fechamento_callbacks_${hoje}_ARACAJU_v2.csv`]);
-  verdade(await js(`${S}.E.fechamentos[1].motivo.includes("TSA5")`), "motivo registrado");
+  verdade(await js(`${S}.E.fechamentos[1].motivo.includes("OPT5")`), "motivo registrado");
   await pg.aguardar("true"); await espera(1800);
   const d = await (await fetch(BASE + "/api/bi/dados")).json();
   igual(d.linhas.reduce((t, l) => t + l.callbacks, 0), 4, "não soma a versão antiga"); igual(d.sincronizacao.situacao, "ok");
@@ -149,22 +148,22 @@ await teste("Novo turno gera nova versão auditável sem apagar a anterior; o BI
 });
 await teste("BI: identidade do painel, indicadores, tabela por operador, todas as visões na mesma tela e situação da sincronização", async () => {
   const bi = await nav.novaPagina(`${BASE}/bi.html`, { largura: 1366, altura: 900 }); await bi.aguardar("document.body.dataset.pronto === '1' && !!document.querySelector('.bi-kpis')");
-  igual((await bi.js(`[...document.querySelectorAll(".bi-kpis .valor")].map((v) => v.textContent)`)).slice(0, 3), ["4", "1", "1"]);
-  igual(await bi.js(`[...document.querySelectorAll("#bi-tab-operador th")].map((t) => t.textContent)`), ["Operador", "Callbacks", "Resolvidos", "Cancelados"]);
-  igual(await bi.js(`[...document.querySelectorAll("#bi-tab-operador tbody tr")].map((t) => t.textContent)`), ["TSA4311", "TSA5100"]);
+  igual((await bi.js(`[...document.querySelectorAll(".bi-kpis .valor")].map((v) => v.textContent)`)), ["4", "1", "25,0%", "2"]);
+  igual(await bi.js(`[...document.querySelectorAll("#bi-tab-operador th")].map((t) => t.textContent)`), ["Operador", "Executados", "Resolvidos", "Taxa"]);
+  igual(await bi.js(`[...document.querySelectorAll("#bi-tab-operador tbody tr")].map((t) => t.textContent)`), ["OPT43133,3%", "OPT5100,0%"]);
   verdade((await bi.js(`document.querySelector("#bi-sync").textContent`)).includes("Última atualização"), "situação"); await foto(bi, "b5-bi-geral");
   igual(await bi.js(`[getComputedStyle(document.body).backgroundColor, document.querySelector("h1").textContent, document.querySelector(".eyebrow").textContent]`), ["rgb(8, 17, 31)", "Painel de Callbacks", "ADMS · Inteligência operacional"], "identidade da referência");
   for (const c of ["c-mes", "c-taxas", "c-dia", "c-op", "c-ac"]) verdade(await bi.js(`!!document.querySelector("#${c} svg")`), "gráfico " + c);
-  const tela = await bi.js("document.body.innerText"); for (const p of [/INC\s*\d/, /\d{8,}/, /900123|900200|99100/, /Fictício|Energisa/]) verdade(!p.test(tela), "dado de cliente na tela: " + p);
-  await bi.js(`(() => { const s = document.querySelector("#f-operador"); s.value = "TSA5"; s.dispatchEvent(new Event("change")); return true; })()`); igual(await bi.js(`document.querySelector(".bi-kpis .valor").textContent`), "1", "filtro operador");
+  const tela = await bi.js("document.body.innerText"); verdade(!/cancelad/i.test(tela), "sem métrica de cancelados"); for (const p of [/INC\s*\d/, /\d{8,}/, /900123|900200|99100/, /Fictício|Energisa/]) verdade(!p.test(tela), "dado de cliente na tela: " + p);
+  await bi.js(`(() => { const s = document.querySelector("#f-operador"); s.value = "OPT5"; s.dispatchEvent(new Event("change")); return true; })()`); igual(await bi.js(`document.querySelector(".bi-kpis .valor").textContent`), "1", "filtro operador");
   await bi.js(`document.querySelector("#f-limpar").click()`);
   await bi.js(`(() => { const a = document.querySelector("#f-ano"); a.value = "1999"; const o = document.createElement("option"); o.value = "1999"; a.appendChild(o); a.value = "1999"; a.dispatchEvent(new Event("change")); return true; })()`); verdade(await bi.js(`document.querySelector(".bi-vazio").textContent.includes("Nenhum dado")`), "sem dados no filtro");
   for (const [l, a] of [[1920, 1080], [1366, 768], [768, 1024], [390, 844]]) { await bi.tamanho(l, a); verdade(await bi.js("document.documentElement.scrollWidth <= innerWidth"), "rolagem em " + l); }
   igual(bi.erros, [], "console");
-  drive.fora = true; await espera(1800);
+  drive.fora = true; await espera(3500);
   await bi.ir(`${BASE}/bi.html`); await bi.aguardar("document.body.dataset.pronto === '1' && !!document.querySelector('.bi-kpis')");
   verdade((await bi.js(`document.querySelector("#bi-sync").textContent`)).includes("pendente"), "informa pendência"); verdade((await bi.js(`document.querySelector("#bi-aviso").offsetParent && document.querySelector("#bi-aviso").textContent`)).includes("últimos dados"), "aviso visível"); igual(await bi.js(`document.querySelector(".bi-kpis .valor").textContent`), "4", "mantém os últimos dados"); await foto(bi, "b7-bi-drive-fora");
-  drive.fora = false;
+  drive.fora = false; await espera(1500); verdade(await (async () => { for (let n = 0; n < 40; n++) { if ((await (await fetch(BASE + "/api/bi/dados")).json()).sincronizacao.situacao === "ok") return true; await espera(250); } return false; })(), "sincronização se recupera sozinha");
 });
 await teste("BI com fechamentos locais (sem Drive): lê os arquivos, avisa, recusa arquivo com telefone e todos os filtros mudam cartões, tabelas e gráficos", async () => {
   const base = mkdtempSync(join(tmpdir(), "central-bi-local-")), pasta = join(base, "fechamentos"); mkdirSync(pasta);
@@ -180,15 +179,15 @@ await teste("BI com fechamentos locais (sem Drive): lê os arquivos, avisa, recu
     const cartoes = () => bi.js(`[...document.querySelectorAll(".bi-kpis .valor")].map((v) => v.textContent)`);
     const linhas = (id) => bi.js(`[...document.querySelectorAll("#${id} tr")].map((t) => [...t.children].map((c) => c.textContent).join("|"))`);
     const filtrar = async (f) => { await bi.js(`document.querySelector("#f-limpar").click()`); for (const [k, v] of Object.entries(f)) await bi.js(`(() => { const s = document.querySelector("#f-${k}"); s.value = ${JSON.stringify(v)}; s.dispatchEvent(new Event("change")); return true; })()`); };
-    igual(await cartoes(), ["39", "19", "4", "48,7%", "9,3%"], "todos os dados");
+    igual(await cartoes(), ["39", "19", "48,7%", "2"], "todos os dados");
     verdade((await bi.js(`document.querySelector("#bi-aviso").textContent`)).includes("não configurado"), "aviso de Drive não configurado");
     igual(await bi.js(`[document.querySelector("#a-arquivos").textContent, document.querySelector("#a-recusados").textContent]`), ["3", "1"], "arquivo com telefone recusado");
     verdade(!(await bi.js("document.body.innerText")).includes("79991000900"), "telefone não aparece");
-    await filtrar({ ano: "2025" }); igual(await cartoes(), ["4", "1", "1", "25,0%", "20,0%"], "ano"); igual(await linhas("t-operador"), ["OPB|4|1|1"], "ano na tabela");
-    await filtrar({ mes: "09" }); igual(await cartoes(), ["15", "8", "1", "53,3%", "6,3%"], "mês"); igual(await linhas("t-mes"), ["Setembro/2026|15|8|1"], "mês no resumo"); igual(await bi.js(`document.querySelectorAll("#c-mes path.s1").length`), 1, "mês no gráfico");
-    await filtrar({ de: "2026-10-01", ate: "2026-10-31" }); igual(await cartoes(), ["20", "10", "2", "50,0%", "9,1%"], "período"); igual(await linhas("t-dia"), ["05/10/2026|20|10|2"], "período na tabela diária");
-    await filtrar({ operador: "OPB" }); igual(await cartoes(), ["9", "3", "1", "33,3%", "10,0%"], "operador"); igual(await linhas("t-operador"), ["OPB|9|3|1"], "operador na tabela"); igual(await bi.js(`document.querySelectorAll("#c-op path.s1").length`), 1, "operador no gráfico");
-    await filtrar({ ano: "2026", mes: "10", operador: "OPB" }); igual(await cartoes(), ["0", "0", "0", "—", "—"], "combinação sem dados"); verdade(await bi.js(`document.querySelector(".bi-vazio").textContent.includes("Nenhum dado")`), "mensagem de filtro vazio");
+    await filtrar({ ano: "2025" }); igual(await cartoes(), ["4", "1", "25,0%", "1"], "ano"); igual(await linhas("t-operador"), ["OPB|4|1|25,0%"], "ano na tabela");
+    await filtrar({ mes: "09" }); igual(await cartoes(), ["15", "8", "53,3%", "2"], "mês"); igual(await linhas("t-mes"), ["Setembro/2026|15|8|53,3%"], "mês no resumo"); igual(await bi.js(`document.querySelectorAll("#c-mes path.s1").length`), 1, "mês no gráfico");
+    await filtrar({ de: "2026-10-01", ate: "2026-10-31" }); igual(await cartoes(), ["20", "10", "50,0%", "1"], "período"); igual(await linhas("t-dia"), ["05/10/2026|20|10|50,0%"], "período na tabela diária");
+    await filtrar({ operador: "OPB" }); igual(await cartoes(), ["9", "3", "33,3%", "1"], "operador"); igual(await linhas("t-operador"), ["OPB|9|3|33,3%"], "operador na tabela"); igual(await bi.js(`document.querySelectorAll("#c-op path.s1").length`), 1, "operador no gráfico");
+    await filtrar({ ano: "2026", mes: "10", operador: "OPB" }); igual(await cartoes(), ["0", "0", "—", "0"], "combinação sem dados"); verdade(await bi.js(`document.querySelector(".bi-vazio").textContent.includes("Nenhum dado")`), "mensagem de filtro vazio");
     igual(bi.erros, [], "console");
   } finally { gw.kill(); }
 });
