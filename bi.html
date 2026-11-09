@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <title>Painel de Callbacks</title>
+  <link rel="stylesheet" href="css/conector-apps-script.css">
   <link rel="stylesheet" href="css/bi.css">
 </head>
 <body>
@@ -110,6 +111,7 @@
   <p class="foot">Painel local · Somente datas, siglas de operadores e quantidades agregadas. Nenhum dado de cliente é lido ou exibido.</p>
 </div>
 <div id="bi-dica" class="bi-dica oculto" role="tooltip"></div>
-<script src="js/bi.js"></script>
+<script src="js/conector-apps-script.js"></script>
+  <script src="js/bi.js"></script>
 </body>
 </html>

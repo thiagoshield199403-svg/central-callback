@@ -143,7 +143,7 @@
   }
 
   async function carregar() {
-    try { const r = await fetch("/api/bi/dados", { cache: "no-store" }); if (!r.ok) throw new Error(); dados = await r.json(); semResposta = false; }
+    try { dados = await window.ConectorAppsScript.dadosBI(); semResposta = false; }
     catch (e) { semResposta = true; }
     const anos = [...new Set(dados.linhas.map((l) => l.data.slice(0, 4)))].sort().reverse(), mesesD = [...new Set(dados.linhas.map((l) => l.data.slice(5, 7)))].sort();
     opcoes($("#f-ano"), anos, "Todos os anos"); opcoes($("#f-mes"), mesesD, "Todos os meses", (m) => MESES[Number(m) - 1]); opcoes($("#f-operador"), [...new Set(dados.linhas.map((l) => l.operador))].sort(), "Todos os operadores");
@@ -158,5 +158,5 @@
   $("#f-limpar").onclick = () => { for (const id of FILTROS) $(id).value = ""; desenhar(); };
   let timerResize = null;
   window.addEventListener("resize", () => { clearTimeout(timerResize); timerResize = setTimeout(desenhar, 120); });
-  carregar().finally(() => { document.body.dataset.pronto = "1"; setInterval(carregar, 60000); });
+  carregar().finally(() => { document.body.dataset.pronto = "1"; setInterval(carregar, 300000); window.addEventListener("as-credencial", carregar); });
 })();

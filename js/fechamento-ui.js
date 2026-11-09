@@ -3,7 +3,7 @@
 (function () {
   const N = window.Nucleo, $ = (s) => document.querySelector(s);
   const UI = () => window.CentralUI, srv = () => UI().servico, esc = (v) => UI().esc(v), toast = (m, e) => UI().toastErro(m, !!e);
-  const conector = new window.Disparos.ConectorGateway();
+  const conector = new window.ConectorAppsScript();
   const horaBR = (iso) => (iso ? new Date(iso).toLocaleString("pt-BR") : "—");
   const dataBR = (d) => d.split("-").reverse().join("/");
   const ST = { enviado: ["Salvo no Drive", "e-callback_realizado"], pendente: ["Pendente", "e-pendente"], falha: ["Falha", "e-contato_invalido"] };
