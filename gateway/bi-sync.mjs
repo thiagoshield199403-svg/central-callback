@@ -10,7 +10,7 @@ export function criarSync({ drive, dados, intervalo = 300000 }) {
   let base = { arquivos: {}, rejeitados: {} };
   if (existsSync(ARQ)) { try { base = JSON.parse(readFileSync(ARQ, "utf8")); } catch { /* base corrompida: reconstrói na sincronização */ } }
   const st = { situacao: drive.configurado ? "aguardando" : "nao_configurado", ultima_sincronizacao: base.ultima_sincronizacao || null, ultima_tentativa: null, detalhe: null, fonte: drive.configurado ? "drive" : "local" };
-  let rodando = false, timer = null;
+  let atual = null, repetir = null, timer = null;
 
   function salvar() { const t = ARQ + ".tmp"; writeFileSync(t, JSON.stringify(base)); renameSync(t, ARQ); }
   const fonteLocal = () => readdirSync(LOCAL).filter((n) => n.endsWith(".csv")).map((nome) => ({ id: nome, nome, revisao: String(statSync(join(LOCAL, nome)).mtimeMs), ler: async () => readFileSync(join(LOCAL, nome), "utf8") }));
@@ -24,17 +24,21 @@ export function criarSync({ drive, dados, intervalo = 300000 }) {
     }
     return novos;
   }
-  async function sincronizar() {
-    if (rodando) return st;
-    rodando = true; st.ultima_tentativa = new Date().toISOString();
+  async function rodar() {
+    st.ultima_tentativa = new Date().toISOString();
     try {
       if (drive.configurado) { await drive.garantirEstrutura(); const lista = await drive.listarFechamentos(); await incorporar(lista, (a) => drive.baixar(a.id)); st.situacao = "ok"; st.detalhe = null; st.fonte = "drive"; }
       else { await incorporar(fonteLocal(), (a) => a.ler()); st.situacao = "nao_configurado"; st.detalhe = "Google Drive ainda não configurado: mostrando os fechamentos guardados neste computador."; st.fonte = "local"; }
       st.ultima_sincronizacao = base.ultima_sincronizacao = new Date().toISOString();
       salvar();
     } catch (e) { st.situacao = "pendente"; st.detalhe = `Atualização pendente: ${e.message}`; }
-    finally { rodando = false; }
     return st;
+  }
+  /* Pedido durante uma sincronização em curso gera mais uma rodada depois dela: um arquivo recém-enviado nunca fica de fora. */
+  function sincronizar() {
+    if (!atual) { atual = rodar().finally(() => { atual = null; }); return atual; }
+    if (!repetir) repetir = atual.then(() => { repetir = null; return sincronizar(); });
+    return repetir;
   }
   function linhas() {
     const melhor = new Map();
@@ -43,6 +47,7 @@ export function criarSync({ drive, dados, intervalo = 300000 }) {
   }
   return {
     sincronizar, linhas,
+    incluido: (nome) => !!base.arquivos[nome],
     estado: () => ({ ...st, arquivos: Object.keys(base.arquivos).length, rejeitados: Object.keys(base.rejeitados).length, intervalo_min: Math.round(intervalo / 60000) }),
     iniciar() { sincronizar(); timer = setInterval(sincronizar, intervalo); timer.unref(); },
     guardarLocal(nome, conteudo) { const alvo = join(LOCAL, nome); if (existsSync(alvo)) return readFileSync(alvo, "utf8") === conteudo ? "igual" : "diferente"; writeFileSync(alvo, conteudo); return "novo"; },

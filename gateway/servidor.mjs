@@ -121,15 +121,25 @@ function servirArquivo(req, res, caminho) {
   res.writeHead(200, { ...SEGURANCA, "Content-Type": TIPOS[extname(alvo)] }); res.end(readFileSync(alvo));
 }
 const drive = criarDrive(amb, DADOS), sync = criarSync({ drive, dados: DADOS, intervalo: Number(amb.BI_INTERVALO_MS || 300000) });
-/* Barreira de privacidade no servidor: só passa CSV agregado. Guarda localmente antes de publicar: nada se perde se o Drive estiver fora. */
+/* Um envio por nome de cada vez: duas abas ou dois cliques não criam arquivos repetidos no Drive. */
+const enviosFechamento = new Map();
+function umEnvioPorNome(nome, f) { if (!enviosFechamento.has(nome)) enviosFechamento.set(nome, f().finally(() => enviosFechamento.delete(nome))); return enviosFechamento.get(nome); }
+/* Barreira de privacidade no servidor: só passa CSV agregado. Guarda localmente antes de publicar: nada se perde se o Drive estiver fora.
+   "enviado" só depois de ler o arquivo de volta do Drive e conferir o SHA-256. */
 async function receberFechamento(d) {
   let p; try { p = analisarFechamento(d && d.nome, d && d.conteudo); } catch (e) { return { resultado: "falha", codigo: "fora_do_padrao", detalhe: e.message }; }
   const sha = createHash("sha256").update(d.conteudo, "utf8").digest("hex");
   if (sha !== d.sha256 || d.data !== p.data || d.versao !== p.versao) return { resultado: "falha", codigo: "integridade", detalhe: "Conteúdo não confere." };
   if (sync.guardarLocal(d.nome, d.conteudo) === "diferente") return { resultado: "falha", codigo: "conflito", detalhe: "Já existe outro arquivo com este nome: nada foi sobrescrito." };
   if (!drive.configurado) { sync.sincronizar(); return { resultado: "pendente", detalhe: "Google Drive ainda não configurado: arquivo guardado neste computador." }; }
-  try { const r = await drive.publicar({ nome: d.nome, data: p.data, conteudo: d.conteudo, sha256: sha, versao: p.versao }); sync.sincronizar(); return { resultado: "enviado", ...r }; }
-  catch (e) { if (e instanceof ErroDrive) return e.status === 409 ? { resultado: "falha", codigo: "conflito", detalhe: e.message } : { resultado: "pendente", detalhe: e.message }; throw e; }
+  return umEnvioPorNome(d.nome, async () => {
+    try {
+      const r = await drive.publicar({ nome: d.nome, data: p.data, conteudo: d.conteudo, sha256: sha, versao: p.versao });
+      await drive.confirmar(r.arquivo_id, sha);
+      await sync.sincronizar();
+      return { resultado: "enviado", confirmado: true, ...r, bi: sync.incluido(d.nome) ? "atualizado" : "pendente" };
+    } catch (e) { if (e instanceof ErroDrive) return e.status === 409 ? { resultado: "falha", codigo: "conflito", detalhe: e.message } : { resultado: "pendente", detalhe: e.message }; throw e; }
+  });
 }
 const servidor = createServer(async (req, res) => {
   try {

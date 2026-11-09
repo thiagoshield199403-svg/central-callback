@@ -220,20 +220,27 @@
       const l = this.E.fechamentos.filter((f) => f.data === data).pop();
       return !!l && l.assinatura !== N.sha256Hex(JSON.stringify(this._consolidar(this.E, data)));
     },
+    /* Só conta como enviado o que o gateway confirmou lendo o arquivo de volta do Drive. Cada tentativa fica no histórico do próprio fechamento. */
     async enviarFechamentosPendentes(conector) {
       const r = { enviados: 0, pendentes: 0 };
       for (const f of this.E.fechamentos.filter((x) => x.status !== "enviado")) {
         const resp = await conector.enviarFechamento({ nome: f.nome, data: f.data, versao: f.versao, conteudo: f.conteudo, sha256: f.sha256 });
+        const ok = resp.resultado === "enviado" && resp.confirmado === true && !!resp.arquivo_id;
         await this._alterar((E) => {
           const x = E.fechamentos.find((y) => y.id === f.id);
-          if (resp.resultado === "enviado") Object.assign(x, { status: "enviado", drive_id: resp.arquivo_id || null, enviado_em: agora(), erro: null });
-          else Object.assign(x, { status: resp.resultado === "pendente" ? "pendente" : "falha", erro: resp.detalhe || null });
+          if (!x) return;
+          const erro = ok ? null : resp.detalhe || "O Google Drive não confirmou o envio.", status = ok ? "enviado" : resp.resultado === "falha" ? "falha" : "pendente";
+          if (ok) Object.assign(x, { status, drive_id: resp.arquivo_id, enviado_em: agora(), erro, caminho_drive: resp.caminho || null, bi: resp.bi || null });
+          else Object.assign(x, { status, erro });
+          x.historico_envio = [...(x.historico_envio || []), { em: agora(), resultado: status, detalhe: erro, reaproveitado: !!resp.reaproveitado, bi: resp.bi || null }].slice(-30);
         });
-        if (resp.resultado === "enviado") r.enviados++; else r.pendentes++;
+        if (ok) r.enviados++; else r.pendentes++;
       }
       return r;
     },
     listaFechamentos() { return this.E.fechamentos.slice().reverse().map((f) => ({ ...f, conteudo: undefined, desatualizado: this.fechamentoDesatualizado(f.data) && this.E.fechamentos.filter((x) => x.data === f.data).pop().id === f.id })); },
     fechamento(id) { return this.E.fechamentos.find((f) => f.id === id) || null; },
+    ultimoFechamentoDoDia(data) { return this.E.fechamentos.filter((f) => f.data === data).pop() || null; },
+    ultimosFechamentos(n = 10) { return this.E.fechamentos.slice(-n).reverse().map(({ conteudo, ...f }) => f); },
   });
 })(typeof window !== "undefined" ? window : globalThis);

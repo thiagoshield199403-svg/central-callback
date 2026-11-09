@@ -1247,9 +1247,12 @@
     await S.abrirSessao("Polo Fictício", "OPT5"); const b = await S.abrirCallbackManual({ incidente: "711", telefone: "79991000712", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(b.item.id, "enviado"); await S.encerrarDia();
     verdade(S.fechamentoDesatualizado(hoje), "detecta dados novos"); await falhaCom(() => S.gerarFechamento(hoje), "motivo");
     const v2 = await S.gerarFechamento(hoje, { motivo: "Novo turno" }); igual([v2.versao, v2.substitui, v2.nome.endsWith("_v2.csv"), S.E.fechamentos.length], [2, v1.nome, true, 2]);
-    const chamadas = []; const c = { enviarFechamento: async (d) => { chamadas.push(d.nome); return { resultado: "enviado", arquivo_id: "x" }; } };
+    await S.enviarFechamentosPendentes({ enviarFechamento: async () => ({ resultado: "enviado", arquivo_id: "x" }) }); igual([S.E.fechamentos[0].status, S.E.fechamentos[0].drive_id], ["pendente", null], "sem confirmação não conta como enviado");
+    await S.enviarFechamentosPendentes({ enviarFechamento: async () => ({ resultado: "pendente", detalhe: "Drive fora" }) }); igual([S.E.fechamentos[0].status, S.E.fechamentos[0].erro, S.E.fechamentos[0].historico_envio.length], ["pendente", "Drive fora", 2], "registra cada tentativa");
+    const chamadas = []; const c = { enviarFechamento: async (d) => { chamadas.push(d.nome); return { resultado: "enviado", confirmado: true, arquivo_id: "x", caminho: "FECHAMENTOS/2026/11-NOVEMBRO", bi: "atualizado" }; } };
     igual((await S.enviarFechamentosPendentes(c)).enviados, 2); igual((await S.enviarFechamentosPendentes(c)).enviados, 0); igual(chamadas.length, 2);
     await S.enviarFechamentosPendentes({ enviarFechamento: async () => { throw new Error("não deveria"); } });
+    igual([S.E.fechamentos[0].caminho_drive, S.E.fechamentos[0].erro, S.E.fechamentos[0].historico_envio.at(-1).resultado, S.ultimoFechamentoDoDia(hoje).id, S.ultimosFechamentos()[0].conteudo], ["FECHAMENTOS/2026/11-NOVEMBRO", null, "enviado", v2.id, undefined]);
   });
 
   S.arm.fechar();

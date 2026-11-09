@@ -390,9 +390,17 @@ await teste("Configuração mostra o destino obrigatório (sem opção de outra 
   await foto("13-configuracao-destino-1366");
   await clicar("#cfg-cancelar");
 });
-await teste("Encerrar o dia: arquivo definitivo no destino; próxima abertura pede SÓ a sigla", async () => {
-  await clicar("#btn-encerrar-dia"); await pg.aguardar("!document.querySelector('#modal').classList.contains('oculto')");
+await teste("Encerrar o dia sem gateway: não pede pasta, avisa que não sincronizou e preserva; a cópia local manual continua; próxima abertura pede SÓ a sigla", async () => {
+  const antes = [await js("window.__nPasta"), await js("window.__nSalvar")];
+  await clicar("#btn-encerrar-dia"); await pg.aguardar("!!document.querySelector('#m-sim')");
   await clicar("#m-sim");
+  await pg.aguardar(`document.querySelector("#modal-caixa").textContent.includes("NÃO sincronizado")`);
+  verdade(!(await texto("#modal-caixa")).includes("Destino da exportação"), "não pode pedir pasta");
+  igual([await js("window.__nPasta"), await js("window.__nSalvar")], antes, "nenhuma janela de pasta ou Salvar");
+  await clicarEscolha("Fechar");
+  igual(await js("window.CentralUI.servico.E.fechamentos.map((f) => [f.status, f.conteudo.length > 50])"), [["pendente", true]], "fechamento guardado para nova tentativa");
+  verdade((await texto("#lista-exportacoes")).includes("ainda não sincronizado"), "registrado no histórico");
+  await clicar("#lista-exportacoes [data-baixar]");
   await pg.aguardar(`window.__lerDestino(${JSON.stringify(nomeEsperado)}).then((t) => !!t && t.includes(";sim;"))`);
   await pg.aguardar("!!document.querySelector('#abrir-dia').offsetParent");
   verdade(!(await visivel("#campo-polo")), "polo não deveria ser pedido de novo");

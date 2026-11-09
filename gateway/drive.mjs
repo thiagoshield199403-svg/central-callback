@@ -1,5 +1,6 @@
 /* Cliente mínimo da Google Drive API (OAuth 2.0, refresh token só no servidor). Nunca registra tokens.
    Regras: não cria pasta duplicada; não sobrescreve arquivo: mesmo nome e mesmo conteúdo = reaproveita; mesmo nome e conteúdo diferente = recusa. */
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -72,15 +73,22 @@ export function criarDrive(amb, dados) {
     async publicar({ nome, data, conteudo, sha256, versao }) {
       const destino = await pasta(nomePastaMes(data), await pasta(data.slice(0, 4), await pastaFechamentos()));
       const ja = (await listar(`name='${q(nome)}' and '${q(destino)}' in parents and trashed=false`, "id,name,appProperties"))[0];
+      const caminho = `${amb.GOOGLE_DRIVE_RAIZ_ID ? "" : "CENTRAL CALLBACK COI/"}FECHAMENTOS/${data.slice(0, 4)}/${nomePastaMes(data)}`;
       if (ja) {
-        if (ja.appProperties && ja.appProperties.sha256 === sha256) return { arquivo_id: ja.id, reaproveitado: true };
+        if (ja.appProperties && ja.appProperties.sha256 === sha256) return { arquivo_id: ja.id, reaproveitado: true, caminho };
         throw new ErroDrive("Já existe um arquivo com este nome e conteúdo diferente: nada foi sobrescrito.", 409);
       }
       const limite = "central-callback-" + sha256.slice(0, 16);
       const meta = { name: nome, mimeType: "text/csv", parents: [destino], appProperties: { sha256, versao: String(versao), origem: "central-callback" } };
       const corpo = `--${limite}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${limite}\r\nContent-Type: text/csv; charset=UTF-8\r\n\r\n${conteudo}\r\n--${limite}--`;
       const d = await (await api("/upload/drive/v3/files?uploadType=multipart&fields=id,name", { method: "POST", headers: { "Content-Type": `multipart/related; boundary=${limite}` }, body: corpo })).json();
-      return { arquivo_id: d.id, reaproveitado: false };
+      return { arquivo_id: d.id, reaproveitado: false, caminho };
+    },
+    /* Confirmação real do envio: lê os bytes de volta do Drive (text() removeria o BOM) e compara o SHA-256. */
+    async confirmar(id, sha256) {
+      if (!id) throw new ErroDrive("O Google Drive não informou o arquivo criado.", 502);
+      const bytes = Buffer.from(await (await api(`/drive/v3/files/${encodeURIComponent(id)}?alt=media`)).arrayBuffer());
+      if (createHash("sha256").update(bytes).digest("hex") !== sha256) throw new ErroDrive("O arquivo lido de volta do Drive difere do enviado.", 502);
     },
     /* Lista os fechamentos de FECHAMENTOS/<ano>/<mês>. */
     async listarFechamentos() {

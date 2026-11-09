@@ -46,6 +46,10 @@ ESCOPO: o padrao e drive.file, o mais restrito disponivel: o app so enxerga o qu
 propria arvore CENTRAL CALLBACK COI, separada das pastas criadas pelo navegador. Para usar pastas existentes seria preciso GOOGLE_ESCOPO=.../auth/drive (Drive inteiro) e GOOGLE_DRIVE_RAIZ_ID.
 Sem essa configuracao os fechamentos ficam em gateway\dados\fechamentos e o BI le de la, avisando que o Drive nao esta configurado.
 
+ENCERRAR O DIA: gera o fechamento, o gateway publica em FECHAMENTOS/ano/mes, le o arquivo de volta e confere o SHA-256, atualiza o BI e so entao a Central mostra "Fechamento concluido".
+Sem essa confirmacao o resultado e "ainda NAO sincronizado": o arquivo fica na Central e em gateway\dados\fechamentos para nova tentativa. Mesmo nome e mesmo conteudo reaproveita; conteudo diferente e recusado (nada e sobrescrito).
+A pasta local/W: vale so para o botao manual EXPORTAR DO DIA e para "salvar" no historico.
+
 5. BI (http://127.0.0.1:8787/bi.html)
 Central > fechamento > Drive > sincronizacao (a cada 5 min, BI_INTERVALO_MS) > base agregada (gateway\dados\bi-base.json) > BI (recarrega a cada 1 min).
 Tela unica no visual do Painel de Callbacks ADMS, com todas as visoes (mensal, operador, diaria, acumulado). Metricas principais: CALLBACKS EXECUTADOS e CALLBACKS RESOLVIDOS; taxa = resolvidos / executados x 100.

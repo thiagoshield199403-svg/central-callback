@@ -15,7 +15,8 @@ o turno e o lote continuam de onde pararam.
 
 PRIMEIRA VEZ NO COMPUTADOR
 - Configuracao > Polo padrao (ex.: Aracaju).
-- No primeiro EXPORTAR DO DIA a Central pede, uma unica vez, a pasta de destino OBRIGATORIA:
+- O ENCERRAR O DIA nao pede pasta: envia ao Google Drive. Abra a Central por http://127.0.0.1:8787/ (gateway).
+- So para o botao manual EXPORTAR DO DIA: no primeiro uso a Central pede, uma unica vez, a pasta de destino:
   <pasta de rede do COI>\CENTRAL DE CALLBACK (so a pasta CENTRAL DE CALLBACK e aceita).
 
 USO DIARIO
@@ -34,7 +35,9 @@ USO DIARIO
 5. "Encerrar e limpar o lote": os indicadores ficam; os dados dos clientes sao apagados.
 6. EXPORTAR DO DIA: gera CALLBACK_<POLO>_<data>.csv e abre a janela Salvar do Windows NA PASTA DE DESTINO, com o nome
    pronto; confirme em Salvar. Salvar fora do destino e recusado. Unidade de rede indisponivel: "Arquivo NAO salvo no destino"
-   (o arquivo continua guardado na Central; ha copia de contingencia opcional para Downloads). "Encerrar o dia" gera a versao definitiva. O arquivo nao tem dados de clientes.
+   (o arquivo continua guardado na Central; ha copia de contingencia opcional para Downloads). O arquivo nao tem dados de clientes.
+   ENCERRAR O DIA: gera o fechamento e envia direto ao Google Drive (FECHAMENTOS/ano/mes). So mostra "Fechamento concluido" com o envio confirmado;
+   sem Drive, avisa "ainda NAO sincronizado", guarda o arquivo e tenta de novo ao abrir a Central (ou em Tentar novamente / Fechamento > Enviar pendentes).
 7. Botao PAINEL: indicadores de hoje e por dia, operador e polo (turnos feitos neste navegador).
 
 ONDE FICAM OS DADOS

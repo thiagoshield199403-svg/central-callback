@@ -17,7 +17,7 @@ const igual = (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw 
 const SEGREDO = "segredo-oauth-de-teste", ACESSO = "acesso-de-teste", PASTA = "application/vnd.google-apps.folder";
 
 /* Google Drive simulado */
-const drive = { arquivos: [], fora: false, n: 0 };
+const drive = { arquivos: [], fora: false, n: 0, atraso: 0, corromper: false };
 const servidor = (f) => new Promise((ok) => { const s = createServer(f); s.listen(0, "127.0.0.1", () => ok(s)); });
 const googleS = await servidor((req, res) => {
   const partes = []; req.on("data", (p) => partes.push(p)); req.on("end", () => {
@@ -30,8 +30,8 @@ const googleS = await servidor((req, res) => {
       return js(200, { files: drive.arquivos.filter((a) => (!nome || a.name === nome[1]) && (!pai || a.parents.includes(pai[1])) && (!contem || a.name.includes(contem[1])) && (!soPasta || a.mimeType === PASTA)) });
     }
     if (u.pathname === "/drive/v3/files" && req.method === "POST") { const d = JSON.parse(corpo), a = { ...d, id: "p" + ++drive.n }; drive.arquivos.push(a); return js(200, a); }
-    if (u.pathname === "/upload/drive/v3/files") { const lim = /boundary=(.+)$/.exec(req.headers["content-type"])[1], p = corpo.split("--" + lim), meta = JSON.parse(p[1].split("\r\n\r\n")[1]), conteudo = p[2].split("\r\n\r\n").slice(1).join("\r\n\r\n").replace(/\r\n$/, ""); const a = { ...meta, id: "f" + ++drive.n, conteudo, modifiedTime: new Date().toISOString() }; drive.arquivos.push(a); return js(200, a); }
-    const m = /^\/drive\/v3\/files\/(.+)$/.exec(u.pathname); if (m) { res.end(drive.arquivos.find((a) => a.id === m[1]).conteudo); return; }
+    if (u.pathname === "/upload/drive/v3/files") { const lim = /boundary=(.+)$/.exec(req.headers["content-type"])[1], p = corpo.split("--" + lim), meta = JSON.parse(p[1].split("\r\n\r\n")[1]), conteudo = p[2].split("\r\n\r\n").slice(1).join("\r\n\r\n").replace(/\r\n$/, ""); const a = { ...meta, id: "f" + ++drive.n, conteudo, modifiedTime: new Date().toISOString() }; drive.arquivos.push(a); return setTimeout(() => js(200, a), drive.atraso); }
+    const m = /^\/drive\/v3\/files\/(.+)$/.exec(u.pathname); if (m) { res.end(drive.corromper ? "conteudo-diferente" : drive.arquivos.find((a) => a.id === m[1]).conteudo); return; }
     js(404, {});
   });
 });
@@ -201,6 +201,47 @@ await teste("Privacidade no servidor: recusa CSV fora do padrão, com telefone o
   igual((await post(envio(""), { Origin: "https://site-malicioso.example" })).status, 403);
   for (const c of ["/gateway/drive.mjs", "/gateway/dados/bi-base.json", "/testes/testes.js"]) igual((await fetch(BASE + c)).status, 404, c);
   const pub = await Promise.all(["/", "/bi.html", "/js/bi.js", "/js/fechamento-ui.js", "/api/bi/dados", "/api/drive/status"].map(async (c) => (await fetch(BASE + c)).text())); verdade(!pub.some((t) => t.includes(SEGREDO) || t.includes(ACESSO) || t.includes("refresh-teste")), "segredo exposto");
+  igual(pg.erros, [], "console");
+});
+/* ENCERRAR O DIA pela tela: Drive direto, sem pasta local. */
+const novoTurnoComCallback = (op, inc) => js(`(async () => { const s = ${S}; await s.abrirSessao("", "${op}"); const a = await s.abrirCallbackManual({ incidente: "${inc}", telefone: "79991000902", modo: "padronizada", modelo: "manual_falta_energia" }); await s.confirmarEnvioManual(a.item.id, "enviado"); await window.CentralUI.recarregar(); return true; })()`);
+const semPasta = () => js("(window.__pasta = 0, window.showDirectoryPicker = window.showSaveFilePicker = async () => { window.__pasta++; throw new DOMException('x', 'AbortError'); }, true)");
+const modalCom = (t) => pg.aguardar(`document.querySelector("#modal-caixa").textContent.includes(${JSON.stringify(t)})`, 20000);
+const modalTexto = () => js(`document.querySelector("#modal-caixa").textContent`);
+const clicarEscolha = (r) => js(`([...document.querySelectorAll("#modal [data-escolha]")].find((b) => b.textContent === ${JSON.stringify(r)}).click(), true)`);
+const encerrarPelaTela = async () => { await clicar("#btn-encerrar-dia"); await pg.aguardar("!!document.querySelector('#m-sim')"); igual(await js("document.querySelector('#m-sim').textContent"), "Encerrar e enviar ao Drive"); await clicar("#m-sim"); };
+const fotografarAnteriores = () => js(`JSON.stringify(${S}.E.fechamentos.map((f) => [f.id, f.nome, f.conteudo, f.sha256, f.versao]))`);
+await teste("ENCERRAR O DIA: sem pasta local, só informa concluído após o upload confirmado; sem duplicar, BI atualizado e histórico registrado", async () => {
+  await pg.ir(`${BASE}/?bd=${bd}`); await pg.aguardar("document.body.dataset.pronto === '1'"); await janela(); await semPasta(); await novoTurnoComCallback("OPT6", "900210");
+  const n0 = arquivosCsv().length; drive.atraso = 900; await encerrarPelaTela();
+  await modalCom("Enviando o fechamento"); verdade(!(await modalTexto()).includes("concluído"), "não pode concluir antes do upload");
+  await modalCom("Fechamento concluído"); drive.atraso = 0;
+  const m = await modalTexto(); verdade(m.includes("_v3.csv") && m.includes(`FECHAMENTOS/${hoje.slice(0, 4)}/`) && m.includes("BI: atualizado"), m); await foto(pg, "b8-fechamento-concluido");
+  await clicarEscolha("OK"); igual([arquivosCsv().length, await js("window.__pasta")], [n0 + 1, 0], "um arquivo novo e nenhuma pasta local");
+  igual(await js(`${S}.E.fechamentos.at(-1).historico_envio.map((h) => h.resultado)`), ["enviado"]);
+  await pg.aguardar(`document.querySelector("#lista-exportacoes").textContent.includes("BI atualizado")`);
+  igual((await (await fetch(BASE + "/api/bi/dados")).json()).linhas.reduce((t, l) => t + l.callbacks, 0), 5, "BI já inclui o novo arquivo");
+});
+await teste("Drive indisponível: avisa que não sincronizou, preserva os dados, não altera fechamentos anteriores e o reenvio não duplica", async () => {
+  await novoTurnoComCallback("OPT7", "900220"); const antes = await fotografarAnteriores(), n0 = arquivosCsv().length;
+  drive.fora = true; await encerrarPelaTela(); await modalCom("NÃO sincronizado");
+  verdade(!(await modalTexto()).includes("concluído"), "não pode informar concluído"); await foto(pg, "b9-fechamento-pendente");
+  igual([arquivosCsv().length, await js(`${S}.E.fechamentos.at(-1).status`), await js("window.__pasta")], [n0, "pendente", 0]);
+  verdade((await js(`${S}.E.fechamentos.at(-1).conteudo`)).includes(";OPT7;"), "dados preservados"); igual(await js(`JSON.stringify(${S}.E.fechamentos.slice(0, -1).map((f) => [f.id, f.nome, f.conteudo, f.sha256, f.versao]))`), antes, "anteriores intactos");
+  await clicarEscolha("Tentar novamente"); await modalCom("Enviando o fechamento"); await modalCom("NÃO sincronizado");
+  drive.fora = false; await clicarEscolha("Tentar novamente"); await modalCom("Fechamento concluído"); await clicarEscolha("OK");
+  igual(arquivosCsv().length, n0 + 1, "um único arquivo depois de repetir"); igual(await js(`${S}.E.fechamentos.at(-1).historico_envio.map((h) => h.resultado).at(-1)`), "enviado");
+  verdade((await js(`${S}.E.fechamentos.at(-1).historico_envio.length`)) >= 3, "cada tentativa registrada");
+  await pg.ir(`${BASE}/?bd=${bd}`); await pg.aguardar("document.body.dataset.pronto === '1'"); await espera(800); igual(arquivosCsv().length, n0 + 1, "reabrir não duplica");
+});
+await teste("Sem confirmação não há sucesso: arquivo lido do Drive diferente fica pendente; envios simultâneos do mesmo arquivo criam um só", async () => {
+  await janela(); await semPasta(); await novoTurnoComCallback("OPT8", "900230"); const n0 = arquivosCsv().length;
+  drive.corromper = true; await encerrarPelaTela(); await modalCom("NÃO sincronizado"); verdade((await modalTexto()).includes("difere do enviado"), await modalTexto());
+  drive.corromper = false; await clicarEscolha("Tentar novamente"); await modalCom("Fechamento concluído"); await clicarEscolha("OK"); igual(arquivosCsv().length, n0 + 1, "reaproveita, não duplica");
+  const { createHash } = await import("node:crypto"), CAB = "data;polo;operador;callbacks_realizados;incidentes_resolvidos;incidentes_cancelados;versao", conteudo = `${CAB}\r\n2026-11-02;Aracaju;OPX;1;0;0;1\r\n2026-11-02;TOTAL;TOTAL;1;0;0;1\r\n`;
+  const corpo = JSON.stringify({ nome: "fechamento_callbacks_2026-11-02_ARACAJU.csv", data: "2026-11-02", versao: 1, conteudo, sha256: createHash("sha256").update(conteudo, "utf8").digest("hex") });
+  drive.atraso = 400; const r = await Promise.all([1, 2, 3].map(async () => (await fetch(BASE + "/api/fechamento", { method: "POST", headers: { "Content-Type": "application/json", Origin: BASE }, body: corpo })).json())); drive.atraso = 0;
+  igual(r.map((x) => [x.resultado, x.confirmado]), [["enviado", true], ["enviado", true], ["enviado", true]]); igual(arquivosCsv().filter((a) => a.name.includes("2026-11-02")).length, 1, "um arquivo só");
   igual(pg.erros, [], "console");
 });
 await nav.fechar(); gatewayP.kill(); googleS.close(); metaS.close();
