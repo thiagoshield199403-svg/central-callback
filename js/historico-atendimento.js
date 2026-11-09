@@ -226,7 +226,7 @@
     /* Só conta como enviado o que o gateway confirmou lendo o arquivo de volta do Drive. Cada tentativa fica no histórico do próprio fechamento. */
     async enviarFechamentosPendentes(conector) {
       const r = { enviados: 0, pendentes: 0 };
-      for (const f of this.E.fechamentos.filter((x) => x.status !== "enviado")) {
+      for (const f of this.E.fechamentos.filter((x) => x.status !== "enviado" && x.status !== "nao_enviado" && x.envio_autorizado === true)) {
         const resp = await conector.enviarFechamento({ nome: f.nome, data: f.data, versao: f.versao, conteudo: f.conteudo, sha256: f.sha256 });
         const ok = resp.resultado === "enviado" && resp.confirmado === true && !!resp.arquivo_id;
         await this._alterar((E) => {
@@ -240,6 +240,16 @@
         if (ok) r.enviados++; else r.pendentes++;
       }
       return r;
+    },
+    /* Decisão do operador antes do envio. Sem autorização, o fechamento fica só neste navegador. */
+    decidirEnvioFechamento(id, autorizar) {
+      return this._alterar((E) => {
+        const x = E.fechamentos.find((y) => y.id === id);
+        if (!x) return null;
+        x.decisao_envio = { autorizado: !!autorizar, em: agora() };
+        if (autorizar) x.envio_autorizado = true; else Object.assign(x, { status: "nao_enviado", envio_autorizado: false, erro: null });
+        return x;
+      });
     },
     listaFechamentos() { return this.E.fechamentos.slice().reverse().map((f) => ({ ...f, conteudo: undefined, desatualizado: this.fechamentoDesatualizado(f.data) && this.E.fechamentos.filter((x) => x.data === f.data).pop().id === f.id })); },
     fechamento(id) { return this.E.fechamentos.find((f) => f.id === id) || null; },

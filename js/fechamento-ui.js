@@ -1,4 +1,4 @@
-/* Fechamento diário: gera os arquivos agregados e envia ao Drive pelo gateway. Sem gateway, ficam pendentes na Central. */
+/* Fechamento diário: gera os arquivos agregados e, com a confirmação do operador, envia ao Drive. Sem internet, ficam pendentes na Central. */
 "use strict";
 (function () {
   const N = window.Nucleo, $ = (s) => document.querySelector(s);
@@ -6,7 +6,7 @@
   const conector = new window.ConectorAppsScript();
   const horaBR = (iso) => (iso ? new Date(iso).toLocaleString("pt-BR") : "—");
   const dataBR = (d) => d.split("-").reverse().join("/");
-  const ST = { enviado: ["Salvo no Drive", "e-callback_realizado"], pendente: ["Pendente", "e-pendente"], falha: ["Falha", "e-contato_invalido"] };
+  const ST = { enviado: ["Salvo no Drive", "e-callback_realizado"], pendente: ["Pendente", "e-pendente"], falha: ["Falha", "e-contato_invalido"], nao_enviado: ["Não enviado", "e-pendente"] };
   let aberto = false, filaEnvio = Promise.resolve();
 
   /* Um envio por vez nesta aba: o seguinte só começa depois e já encontra o anterior marcado como enviado. */
@@ -50,11 +50,26 @@
     await enviarPendentes(); await UI().recarregar();
     return mostrarResultado(data);
   }
-  /* ENCERRAR O DIA: gera, envia pelo gateway e só então mostra o resultado. Não pede pasta local. */
-  async function concluirEncerramento(data, operador) {
+  const aguardaDecisao = (f) => f.status !== "enviado" && f.status !== "nao_enviado" && !f.envio_autorizado;
+  function totais(f) { const c = f.conteudo.replace(/^﻿/, "").trim().split(/\r?\n/).pop().split(";"); return { executados: Number(c[3]), resolvidos: Number(c[4]) }; }
+  /* O operador confere os números e decide. Só com a confirmação o fechamento é transmitido. */
+  async function decidirEnvio(id, data) {
+    const t = totais(srv().fechamento(id));
+    const v = await UI().escolher("Enviar métricas ao BI", `<p><b>Você realmente deseja enviar estas métricas para o BI?</b></p><p>Confira os números antes de confirmar. Se forem apenas testes, você pode optar por não enviar.</p>
+      <p id="fe-totais">Callbacks executados: <b>${t.executados}</b><br>Callbacks resolvidos: <b>${t.resolvidos}</b></p>`, [{ valor: "nao", rotulo: "NÃO ENVIAR" }, { valor: "sim", rotulo: "CONFIRMAR ENVIO", classe: "acao" }]);
+    await srv().decidirEnvioFechamento(id, v === "sim"); await UI().recarregar();
+    if (v !== "sim") { toast("Métricas não enviadas ao BI."); return "nao_enviado"; }
     aguarde("Enviando o fechamento ao Google Drive…");
+    await enviarPendentes(); await UI().recarregar();
+    return mostrarResultado(data);
+  }
+  /* ENCERRAR O DIA: gera o fechamento, pergunta se deve ser enviado e só então mostra o resultado. Não pede pasta local. */
+  async function concluirEncerramento(data, operador) {
+    aguarde("Preparando o fechamento…");
     const { fechamento, erro } = await aposEncerrarDia(data, operador);
     await UI().recarregar();
+    if (fechamento && aguardaDecisao(fechamento)) return decidirEnvio(fechamento.id, data);
+    if (fechamento && fechamento.status === "nao_enviado") { $("#modal").classList.add("oculto"); toast("Turno encerrado. Métricas não enviadas ao BI."); return "nao_enviado"; }
     if (fechamento) return mostrarResultado(data);
     $("#modal").classList.add("oculto");
     if (!erro) toast("Turno encerrado. Não há callbacks registrados neste dia: nenhum fechamento foi enviado ao Drive.");
@@ -66,7 +81,7 @@
     if (!l.length) return "";
     return "<h3>Fechamentos no Google Drive</h3><ul class='lista'>" + l.map((f) => {
       const n = (f.historico_envio || []).length, tent = n > 1 ? ` · ${n} tentativas` : "";
-      const situacao = f.status === "enviado" ? `salvo em ${esc(f.caminho_drive || "FECHAMENTOS")} em ${horaBR(f.enviado_em)}${f.bi === "atualizado" ? " · BI atualizado" : ""}` : `<b>ainda não sincronizado</b>${f.erro ? " · " + esc(f.erro) : ""}`;
+      const situacao = f.status === "nao_enviado" ? "não enviado ao BI, por decisão do operador" : aguardaDecisao(f) ? "aguardando decisão de envio" : f.status === "enviado" ? `salvo em ${esc(f.caminho_drive || "FECHAMENTOS")} em ${horaBR(f.enviado_em)}${f.bi === "atualizado" ? " · BI atualizado" : ""}` : `<b>ainda não sincronizado</b>${f.erro ? " · " + esc(f.erro) : ""}`;
       return `<li>${esc(f.nome)} · v${f.versao}<div class="mini">${situacao}${tent}</div></li>`;
     }).join("") + "</ul>";
   }
@@ -83,17 +98,18 @@
       <div class="tabela-rolagem rolagem-curta"><table><thead><tr><th>Dia</th><th>Arquivo</th><th>Versão</th><th>Gerado</th><th>Destino</th><th></th></tr></thead><tbody>
       ${l.map((f) => `<tr data-f="${esc(f.id)}" data-dia="${esc(f.data)}"><td>${dataBR(f.data)}</td><td>${esc(f.nome)}${f.motivo ? `<div class="mini">${esc(f.motivo)}</div>` : ""}</td><td class="c-num">${f.versao}</td><td class="mini">${esc(f.gerado_por)} · ${horaBR(f.gerado_em)}</td>
         <td><span class="etq ${ST[f.status][1]}">${ST[f.status][0]}</span>${f.erro ? `<div class="mini">${esc(f.erro)}</div>` : ""}${(f.historico_envio || []).length ? `<div class="mini">Última tentativa: ${horaBR(f.historico_envio[f.historico_envio.length - 1].em)} · ${f.historico_envio.length} no total</div>` : ""}</td>
-        <td class="c-acao-fila"><button type="button" class="mini-botao" data-baixar-f>Baixar</button>${f.desatualizado ? ' <button type="button" class="mini-botao verde" data-reprocessar>Reprocessar</button>' : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="mini">Nenhum fechamento gerado ainda. Ele é criado ao encerrar o dia.</td></tr>'}
+        <td class="c-acao-fila">${aguardaDecisao(f) ? '<button type="button" class="mini-botao verde" data-decidir>Decidir envio</button> ' : ""}<button type="button" class="mini-botao" data-baixar-f>Baixar</button>${f.desatualizado ? ' <button type="button" class="mini-botao verde" data-reprocessar>Reprocessar</button>' : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="mini">Nenhum fechamento gerado ainda. Ele é criado ao encerrar o dia.</td></tr>'}
       </tbody></table></div><div id="fe-reproc"></div>`;
     $("#modal").classList.remove("oculto");
     $("#fe-fechar").onclick = () => { aberto = false; $("#modal").classList.add("oculto"); };
-    $("#fe-tentar").onclick = async () => { const r = await enviarPendentes(); toast(r ? `${r.enviados} enviado(s) · ${r.pendentes} pendente(s).` : "Gateway indisponível.", !r); };
+    $("#fe-tentar").onclick = async () => { const r = await enviarPendentes(); toast(r ? `${r.enviados} enviado(s) · ${r.pendentes} pendente(s).` : "Serviço indisponível.", !r); };
     $("#modal-caixa").querySelectorAll("[data-baixar-f]").forEach((b) => { b.onclick = () => baixar(srv().fechamento(b.closest("tr").dataset.f)); });
+    $("#modal-caixa").querySelectorAll("[data-decidir]").forEach((b) => { b.onclick = async () => { const l = b.closest("tr"); await decidirEnvio(l.dataset.f, l.dataset.dia); desenhar(); }; });
     $("#modal-caixa").querySelectorAll("[data-reprocessar]").forEach((b) => { b.onclick = () => {
       const dia = b.closest("tr").dataset.dia;
       $("#fe-reproc").innerHTML = `<div class="linha-form"><label class="flex1">Motivo do reprocessamento de ${dataBR(dia)} <input id="fe-motivo" maxlength="300"></label><button type="button" class="acao" id="fe-confirmar">Gerar nova versão</button></div>`;
       $("#fe-confirmar").onclick = async () => {
-        try { await srv().gerarFechamento(dia, { motivo: $("#fe-motivo").value }); toast("Nova versão gerada."); await enviarPendentes(); desenhar(); } catch (e) { toast(e.message, true); }
+        try { await srv().gerarFechamento(dia, { motivo: $("#fe-motivo").value }); toast("Nova versão gerada."); await decidirEnvio(srv().ultimoFechamentoDoDia(dia).id, dia); desenhar(); } catch (e) { toast(e.message, true); }
       };
     }; });
   }

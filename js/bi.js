@@ -1,4 +1,4 @@
-/* BI próprio: lê só agregados do gateway (/api/bi/dados), sem bibliotecas externas. Atualiza sozinho; sem resposta, mantém os últimos dados. */
+/* BI próprio: lê só agregados do Google Apps Script, sem bibliotecas externas. Atualiza sozinho; sem resposta, mantém os últimos dados. */
 "use strict";
 (function () {
   const $ = (s) => document.querySelector(s);
@@ -158,5 +158,5 @@
   $("#f-limpar").onclick = () => { for (const id of FILTROS) $(id).value = ""; desenhar(); };
   let timerResize = null;
   window.addEventListener("resize", () => { clearTimeout(timerResize); timerResize = setTimeout(desenhar, 120); });
-  carregar().finally(() => { document.body.dataset.pronto = "1"; setInterval(carregar, 300000); window.addEventListener("as-credencial", carregar); });
+  carregar().finally(() => { document.body.dataset.pronto = "1"; setInterval(carregar, 300000); });
 })();

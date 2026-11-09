@@ -267,8 +267,8 @@
   $("#btn-encerrar-dia").onclick = async () => {
     if (estado.lote_aberto) { toast("Encerre e limpe o lote aberto antes de encerrar o dia.", true); return; }
     const m = estado.metricas_dia;
-    if (!await confirmar("Encerrar o dia", `<p>Será gerado o fechamento do dia (${m.chamadas_processadas} chamadas e ${m.callbacks_realizados} callbacks) e enviado ao <b>Google Drive</b>.
-        Depois disso o turno não recebe mais lotes.</p>`, "Encerrar e enviar ao Drive")) return;
+    if (!await confirmar("Encerrar o dia", `<p>Será gerado o fechamento do dia (${m.chamadas_processadas} chamadas e ${m.callbacks_realizados} callbacks) e você poderá conferir os números e decidir se envia ao BI.
+        Depois disso o turno não recebe mais lotes.</p>`, "Encerrar o dia")) return;
     const operadorDia = estado.sessao.operador, dataDia = estado.sessao.data_operacional;
     const r = await executar(() => srv.encerrarDia());
     if (!r) return;
