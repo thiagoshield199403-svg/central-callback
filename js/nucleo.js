@@ -675,7 +675,7 @@
     const polo = semAcento(sessao.polo || "").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "SEM-POLO";
     return `CALLBACK_${polo}_${d}-${m}-${a}${turno > 1 ? "_T" + turno : ""}.csv`;
   };
-  N.PASTA_EXPORTACAO_SUGERIDA = "W:\\DTEC\\DEOP\\DECO\\CO\\USUÁRIOS\\TSA4\\CENTRAL DE CALLBACK";
+  N.PASTA_EXPORTACAO_SUGERIDA = "W:\\SUA-PASTA-DE-REDE\\CENTRAL DE CALLBACK";
 
   raiz.Nucleo = N;
 })(typeof window !== "undefined" ? window : globalThis);

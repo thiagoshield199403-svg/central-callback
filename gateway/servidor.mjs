@@ -10,14 +10,14 @@ import { createServer } from "node:http";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { criarDrive, ErroDrive } from "./drive.mjs";
 import { criarSync } from "./bi-sync.mjs";
 import { analisarFechamento } from "./fechamento-csv.mjs";
 
 const AQUI = dirname(fileURLToPath(import.meta.url)), RAIZ = join(AQUI, "..");
 const amb = process.env;
-const MODO = amb.WHATSAPP_MODO || "simulacao", PORTA = Number(amb.GATEWAY_PORTA || 8787);
+const MODO = amb.WHATSAPP_MODO || "simulacao", PORTA = Number(amb.PORT || amb.GATEWAY_PORTA || 8787), ENDERECO = amb.GATEWAY_ENDERECO || "127.0.0.1";
 const DADOS = amb.GATEWAY_DADOS || join(AQUI, "dados"), REGISTRO = join(DADOS, "registro-envios.jsonl");
 const API_BASE = (amb.WHATSAPP_API_BASE || "https://graph.facebook.com").replace(/\/+$/, "");
 const TEMPO_API = Number(amb.WHATSAPP_TEMPO_MS || 20000), TEXTO_MAX = 1500, CORPO_MAX = 16 * 1024;
@@ -25,6 +25,16 @@ const TEMPO_API = Number(amb.WHATSAPP_TEMPO_MS || 20000), TEXTO_MAX = 1500, CORP
 const POLO_GATEWAY = amb.GATEWAY_POLO || null, NUMERO_ROTULO = amb.WHATSAPP_NUMERO_ROTULO || null;
 function encerrar(msg) { console.error("ERRO DE CONFIGURAÇÃO: " + msg); process.exit(1); }
 if (!["simulacao", "producao"].includes(MODO)) encerrar("WHATSAPP_MODO deve ser simulacao ou producao.");
+/* Fora do próprio computador: usuário e senha (só no ambiente do servidor) e endereço público declarado. Sem isso o gateway não inicia. */
+const USUARIO = amb.GATEWAY_USUARIO || "", SENHA = amb.GATEWAY_SENHA || "";
+if (ENDERECO !== "127.0.0.1" && (!USUARIO || SENHA.length < 16)) encerrar("Fora de 127.0.0.1, GATEWAY_USUARIO e GATEWAY_SENHA (16 caracteres ou mais) são obrigatórios.");
+if (ENDERECO !== "127.0.0.1" && !amb.GATEWAY_HOSTS) encerrar("Fora de 127.0.0.1, informe em GATEWAY_HOSTS o endereço público.");
+const resumo = (t) => createHash("sha256").update(t).digest();
+function autorizado(req) {
+  if (!USUARIO) return true;
+  const m = /^Basic (.+)$/.exec(req.headers.authorization || "");
+  return !!m && timingSafeEqual(resumo(Buffer.from(m[1], "base64").toString("utf8")), resumo(`${USUARIO}:${SENHA}`));
+}
 if (!/^https:\/\/graph\.facebook\.com$|^http:\/\/127\.0\.0\.1:\d+$/.test(API_BASE)) encerrar("WHATSAPP_API_BASE só aceita o endereço oficial da Meta (ou 127.0.0.1 em teste).");
 if (MODO === "producao") for (const k of ["WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_API_VERSAO"]) if (!amb[k]) encerrar(`${k} é obrigatório em producao.`);
 const URL_API = MODO === "producao" ? `${API_BASE}/${amb.WHATSAPP_API_VERSAO}/${amb.WHATSAPP_PHONE_NUMBER_ID}/messages` : null;
@@ -144,6 +154,7 @@ async function receberFechamento(d) {
 const servidor = createServer(async (req, res) => {
   try {
     if (!HOSTS.has(req.headers.host)) { res.writeHead(403, SEGURANCA); res.end("Host não permitido"); return; }
+    if (!autorizado(req)) { res.writeHead(401, { ...SEGURANCA, "WWW-Authenticate": 'Basic realm="Central de Callback", charset="UTF-8"' }); res.end("Acesso restrito"); return; }
     const caminho = new URL(req.url, "http://x").pathname;
     if (caminho === "/api/disparo/status" && req.method === "GET")
       return json(res, 200, { pronto: true, modo: MODO, modelos_aprovados: Object.keys(APROVADOS), polo: POLO_GATEWAY, numero_rotulo: NUMERO_ROTULO });
@@ -168,7 +179,7 @@ const servidor = createServer(async (req, res) => {
     res.writeHead(405, SEGURANCA); res.end();
   } catch (e) { console.error("Erro interno:", e.message); if (!res.headersSent) recusa(res, 500, "Erro interno do gateway."); else res.end(); }
 });
-servidor.listen(PORTA, "127.0.0.1", () => {
+servidor.listen(PORTA, ENDERECO, () => {
   console.log(`Central de Callback: http://127.0.0.1:${PORTA}/  ·  modo: ${MODO.toUpperCase()}  ·  modelos aprovados: ${Object.keys(APROVADOS).length}`);
   if (MODO === "simulacao") console.log("SIMULAÇÃO: nenhuma mensagem será entregue a ninguém.");
   console.log(`BI: http://127.0.0.1:${PORTA}/bi.html  ·  Google Drive: ${drive.configurado ? "configurado" : "NÃO configurado (fechamentos ficam neste computador)"}`);

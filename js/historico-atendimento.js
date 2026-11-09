@@ -205,7 +205,10 @@
         const assinatura = N.sha256Hex(JSON.stringify(linhas));
         if (ant && ant.assinatura === assinatura) throw new Erro("O fechamento deste dia já foi concluído e os dados não mudaram.");
         if (ant && !String(motivo || "").trim()) throw new Erro("Reprocessamento exige um motivo.", 422);
-        const versao = ant ? ant.versao + 1 : 1, base = `fechamento_callbacks_${data}_${nomePolo(E.config.polo)}`, conteudo = this._csvFechamento(data, linhas, versao);
+        if (!E.config.instalacao_id) E.config.instalacao_id = N.novoId();
+        // Cada instalação (navegador/computador) tem a própria sequência de arquivos. Uma sequência antiga, sem identificação, continua com o mesmo nome.
+        const pc = N.sha256Hex(String(E.config.instalacao_id)).slice(0, 8).toUpperCase();
+        const versao = ant ? ant.versao + 1 : 1, base = ant ? ant.nome.replace(/(_v\d+)?\.csv$/, "") : `fechamento_callbacks_${data}_${nomePolo(E.config.polo)}_PC${pc}`, conteudo = this._csvFechamento(data, linhas, versao);
         const f = { id: N.novoId(), data, polo: E.config.polo, versao, nome: `${base}${versao > 1 ? "_v" + versao : ""}.csv`, conteudo, sha256: N.sha256Hex(conteudo), assinatura, gerado_em: agora(),
           gerado_por: (s && s.operador) || operador || E.config.operador || "—", motivo: motivo ? String(motivo).trim().slice(0, 300) : null, substitui: ant ? ant.nome : null, status: "pendente", drive_id: null, enviado_em: null, erro: null };
         E.fechamentos.push(f);

@@ -127,7 +127,7 @@ await teste("Fechamento: encerrar o dia publica no Drive, cria a pasta do mês s
   hoje = await js(`${S}.sessao().data_operacional`);
   await js(`(async () => { await ${S}.encerrarLote(); await ${S}.encerrarDia(); await window.CentralFechamento.aposEncerrarDia(${JSON.stringify(hoje)}, "OPT4"); return true; })()`);
   await pg.aguardar(`${S}.E.fechamentos[0] && ${S}.E.fechamentos[0].status === "enviado"`, 15000);
-  igual(arquivosCsv().map((a) => a.name), [`fechamento_callbacks_${hoje}_ARACAJU.csv`]);
+  igual(arquivosCsv().length, 1); verdade(new RegExp(`^fechamento_callbacks_${hoje}_ARACAJU_PC[A-F0-9]{8}\\.csv$`).test(arquivosCsv()[0].name), arquivosCsv()[0].name);
   igual(drive.arquivos.filter((a) => a.mimeType === PASTA && a.name === "2026").length, 1, "sem pasta duplicada");
   const porId = (id) => drive.arquivos.find((a) => a.id === id), mes = porId(arquivosCsv()[0].parents[0]), ano = porId(mes.parents[0]); igual([/^\d{2}-[A-Z]+$/.test(mes.name), ano.name, porId(ano.parents[0]).name], [true, "2026", "FECHAMENTOS"], "ano e mês em FECHAMENTOS");
   for (const n of ["BI", "HISTORICO", "FECHAMENTOS"]) igual(drive.arquivos.filter((a) => a.mimeType === PASTA && a.name === n && a.parents[0] === "raiz").length, 1, "pasta " + n);
@@ -139,7 +139,7 @@ await teste("Fechamento: encerrar o dia publica no Drive, cria a pasta do mês s
 await teste("Novo turno gera nova versão auditável sem apagar a anterior; o BI usa só a maior versão", async () => {
   await js(`(async () => { await ${S}.abrirSessao("", "OPT5"); const a = await ${S}.abrirCallbackManual({ incidente: "900200", telefone: "79991000901", modo: "padronizada", modelo: "manual_falta_energia" }); await ${S}.confirmarEnvioManual(a.item.id, "enviado"); await ${S}.encerrarDia(); await window.CentralFechamento.aposEncerrarDia(${JSON.stringify(hoje)}, "OPT5"); return true; })()`);
   await pg.aguardar(`${S}.E.fechamentos[1] && ${S}.E.fechamentos[1].status === "enviado"`, 15000);
-  igual(arquivosCsv().map((a) => a.name), [`fechamento_callbacks_${hoje}_ARACAJU.csv`, `fechamento_callbacks_${hoje}_ARACAJU_v2.csv`]);
+  igual(arquivosCsv().map((a) => a.name), [arquivosCsv()[0].name, arquivosCsv()[0].name.replace(".csv", "_v2.csv")]);
   verdade(await js(`${S}.E.fechamentos[1].motivo.includes("OPT5")`), "motivo registrado");
   await pg.aguardar("true"); await espera(1800);
   const d = await (await fetch(BASE + "/api/bi/dados")).json();
@@ -243,6 +243,20 @@ await teste("Sem confirmação não há sucesso: arquivo lido do Drive diferente
   drive.atraso = 400; const r = await Promise.all([1, 2, 3].map(async () => (await fetch(BASE + "/api/fechamento", { method: "POST", headers: { "Content-Type": "application/json", Origin: BASE }, body: corpo })).json())); drive.atraso = 0;
   igual(r.map((x) => [x.resultado, x.confirmado]), [["enviado", true], ["enviado", true], ["enviado", true]]); igual(arquivosCsv().filter((a) => a.name.includes("2026-11-02")).length, 1, "um arquivo só");
   igual(pg.erros, [], "console");
+});
+await teste("Dois computadores no mesmo polo e dia: encerramento simultâneo gera arquivos distintos, todos sincronizados, sem sobrescrita e sem contar em dobro", async () => {
+  const biTotal = async () => (await (await fetch(BASE + "/api/bi/dados")).json()).linhas.reduce((t, l) => t + l.callbacks, 0);
+  const abrir = async (sufixo) => { const p = await nav.novaPagina(`${BASE}/?bd=${bd}${sufixo}`); await p.aguardar("document.body.dataset.pronto === '1'"); return p; };
+  const pcA = await abrir("pca"), pcB = await abrir("pcb"), turno = (p, op, inc) => p.js(`(async () => { const s = ${S}; await s.abrirSessao("Aracaju", "${op}"); const a = await s.abrirCallbackManual({ incidente: "${inc}", telefone: "79991000903", modo: "padronizada", modelo: "manual_falta_energia" }); await s.confirmarEnvioManual(a.item.id, "enviado"); await window.CentralUI.recarregar(); return true; })()`);
+  const encerrar = async (p) => { await p.js("(document.querySelector('#btn-encerrar-dia').click(), true)"); await p.aguardar("!!document.querySelector('#m-sim')"); await p.js("(document.querySelector('#m-sim').click(), true)"); await p.aguardar(`document.querySelector("#modal-caixa").textContent.includes("Fechamento concluído")`, 20000); await p.js(`([...document.querySelectorAll("#modal [data-escolha]")].find((b) => b.textContent === "OK").click(), true)`); };
+  await Promise.all([turno(pcA, "PCA1", "900301"), turno(pcB, "PCB1", "900302")]);
+  const n0 = arquivosCsv().length, t0 = await biTotal(); await Promise.all([encerrar(pcA), encerrar(pcB)]);
+  const nomes = await Promise.all([pcA, pcB].map((p) => p.js(`${S}.E.fechamentos.at(-1).nome`))); verdade(nomes[0] !== nomes[1], "nomes distintos: " + nomes);
+  igual(arquivosCsv().length, n0 + 2, "os dois no Drive"); for (const n of nomes) igual(arquivosCsv().filter((a) => a.name === n).length, 1, "sem duplicar " + n);
+  igual(await biTotal(), t0 + 2, "o BI soma os dois computadores");
+  const fotoA = arquivosCsv().find((a) => a.name === nomes[0]).conteudo; await turno(pcA, "PCA2", "900303"); await encerrar(pcA);
+  const v2 = await pcA.js(`${S}.E.fechamentos.at(-1).nome`); igual(v2, nomes[0].replace(".csv", "_v2.csv"), "nova versão na sequência do computador");
+  igual(arquivosCsv().find((a) => a.name === nomes[0]).conteudo, fotoA, "versão anterior intacta"); igual(await biTotal(), t0 + 3, "maior versão por computador, sem somar a antiga"); igual([...pcA.erros, ...pcB.erros], [], "console");
 });
 await nav.fechar(); gatewayP.kill(); googleS.close(); metaS.close();
 const falhas = resultados.filter((r) => !r[0]).length;

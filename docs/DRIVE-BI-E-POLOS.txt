@@ -54,7 +54,7 @@ A pasta local/W: vale so para o botao manual EXPORTAR DO DIA e para "salvar" no 
 Central > fechamento > Drive > sincronizacao (a cada 5 min, BI_INTERVALO_MS) > base agregada (gateway\dados\bi-base.json) > BI (recarrega a cada 1 min).
 Tela unica no visual do Painel de Callbacks ADMS, com todas as visoes (mensal, operador, diaria, acumulado). Metricas principais: CALLBACKS EXECUTADOS e CALLBACKS RESOLVIDOS; taxa = resolvidos / executados x 100.
 A coluna incidentes_cancelados continua no arquivo de fechamento, mas nao aparece no BI.
-Por dia e polo vale so a maior versao. Drive fora do ar: mostra os ultimos dados e informa "pendente". Um BI unico para todos os polos precisa rodar num
+Por dia, polo e computador vale so a maior versao; computadores diferentes se somam (o nome do arquivo traz _PC e a identificacao da instalacao). Drive fora do ar: mostra os ultimos dados e informa "pendente". Um BI unico para todos os polos precisa rodar num
 gateway que leia a mesma pasta do Drive; os gateways dos polos podem publicar nela com a mesma credencial.
 
 6. POLOS E WHATSAPP (arquitetura)

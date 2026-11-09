@@ -1,0 +1,15 @@
+PUBLICACAO DA CENTRAL EM SERVIDOR (Node.js 20+, sem dependencias)
+Comando de inicio: npm start (ou node gateway/servidor.mjs). HTTPS fica a cargo da hospedagem.
+O GitHub Pages nao serve: ele nao executa o gateway.
+
+VARIAVEIS DE AMBIENTE (configure SOMENTE no painel da hospedagem, nunca no repositorio)
+GATEWAY_ENDERECO=0.0.0.0
+GATEWAY_HOSTS=<endereco publico, sem https://>
+GATEWAY_USUARIO=<usuario de acesso dos operadores>
+GATEWAY_SENHA=<senha longa, 16 caracteres ou mais>
+WHATSAPP_MODO=simulacao
+GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN, GOOGLE_ESCOPO
+PORT costuma ser definida pela propria hospedagem.
+
+Fora de 127.0.0.1 o gateway NAO inicia sem usuario, senha e GATEWAY_HOSTS: todas as paginas e APIs exigem login.
+Disco temporario nao perde fechamentos: a base do BI e refeita lendo o Drive, e o fechamento nao enviado continua guardado no navegador do operador.

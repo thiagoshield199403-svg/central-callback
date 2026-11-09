@@ -1,5 +1,5 @@
 /* Sincronização do BI: detecta fechamentos novos e atualiza a base agregada (arquivo JSON, gravação atômica).
-   Por dia e polo vale só a MAIOR versão. Se o Drive falhar, a base continua servindo os últimos dados e o estado fica "pendente". */
+   Por dia, polo e computador vale só a MAIOR versão; computadores diferentes se somam. Se o Drive falhar, a base continua servindo os últimos dados e o estado fica "pendente". */
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { analisarFechamento } from "./fechamento-csv.mjs";
@@ -42,7 +42,7 @@ export function criarSync({ drive, dados, intervalo = 300000 }) {
   }
   function linhas() {
     const melhor = new Map();
-    for (const a of Object.values(base.arquivos)) { const k = a.data + "|" + a.polo_arquivo; if (!melhor.has(k) || melhor.get(k).versao < a.versao) melhor.set(k, a); }
+    for (const a of Object.values(base.arquivos)) { const k = a.data + "|" + a.polo_arquivo + "|" + (a.computador || ""); if (!melhor.has(k) || melhor.get(k).versao < a.versao) melhor.set(k, a); }
     return [...melhor.values()].flatMap((a) => a.linhas).sort((x, y) => x.data.localeCompare(y.data));
   }
   return {

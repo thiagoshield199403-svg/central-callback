@@ -1252,7 +1252,16 @@
     const chamadas = []; const c = { enviarFechamento: async (d) => { chamadas.push(d.nome); return { resultado: "enviado", confirmado: true, arquivo_id: "x", caminho: "FECHAMENTOS/2026/11-NOVEMBRO", bi: "atualizado" }; } };
     igual((await S.enviarFechamentosPendentes(c)).enviados, 2); igual((await S.enviarFechamentosPendentes(c)).enviados, 0); igual(chamadas.length, 2);
     await S.enviarFechamentosPendentes({ enviarFechamento: async () => { throw new Error("não deveria"); } });
+    verdade(/_PC[A-F0-9]{8}\.csv$/.test(v1.nome) && v2.nome === v1.nome.replace(".csv", "_v2.csv"), "identificação do computador estável entre versões");
     igual([S.E.fechamentos[0].caminho_drive, S.E.fechamentos[0].erro, S.E.fechamentos[0].historico_envio.at(-1).resultado, S.ultimoFechamentoDoDia(hoje).id, S.ultimosFechamentos()[0].conteudo], ["FECHAMENTOS/2026/11-NOVEMBRO", null, "enviado", v2.id, undefined]);
+  });
+
+  await teste("Fechamento: sequência antiga, sem identificação do computador, continua com o mesmo nome e não é contada em dobro", async () => {
+    await abrirDia(S, "Polo Fictício", "OPT4"); const a = await S.abrirCallbackManual({ incidente: "720", telefone: "79991000721", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(a.item.id, "enviado");
+    const hoje = S.sessao().data_operacional; await S.encerrarDia(); const v1 = await S.gerarFechamento(hoje), antigo = v1.nome.replace(/_PC[A-F0-9]{8}/, "");
+    await S._alterar((E) => { E.fechamentos[E.fechamentos.length - 1].nome = antigo; });
+    await S.abrirSessao("Polo Fictício", "OPT5"); const b = await S.abrirCallbackManual({ incidente: "721", telefone: "79991000722", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(b.item.id, "enviado"); await S.encerrarDia();
+    const v2 = await S.gerarFechamento(hoje, { motivo: "Novo turno" }); igual(v2.nome, antigo.replace(".csv", "_v2.csv"));
   });
 
   S.arm.fechar();
