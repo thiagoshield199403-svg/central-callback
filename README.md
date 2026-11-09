@@ -7,7 +7,7 @@ Ferramenta local para organizar callbacks de incidentes: importa o CSV do ADMS, 
 - **Sem servidor:** abra `index.html` no Edge ou no Chrome. Disponível: atendimento individual, preparação e revisão da fila.
 - **Com gateway (Node 20+):** `node gateway\servidor.mjs` e abra `http://127.0.0.1:8787/`. Sem configuração, roda em **simulação** e não entrega mensagens.
 - **BI:** `http://127.0.0.1:8787/bi.html`.
-- **Com Google Drive:** `node --env-file=gateway.env gatewayservidor.mjs` (configuração em `docs/DRIVE-BI-E-POLOS.txt`).
+- **Com Google Drive:** `node --env-file=gateway\.env gateway\servidor.mjs` (configuração em `docs/DRIVE-BI-E-POLOS.txt`).
 
 Os dados de `file://` e de `http://127.0.0.1` ficam separados pelo navegador.
 

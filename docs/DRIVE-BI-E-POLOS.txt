@@ -36,8 +36,8 @@ Data: 08/11/2026.
 4. GOOGLE DRIVE - O QUE VOCE PRECISA FAZER (uma vez)
 O app cria sozinho: CENTRAL CALLBACK COI > FECHAMENTOS > ano > mes (arquivos diarios), BI e HISTORICO (reservadas). As pastas criadas antes pelo navegador nao sao vistas pelo app.
 1) console.cloud.google.com, na conta do Drive: criar um projeto e ativar a Google Drive API.
-2) Tela de consentimento: tipo Externo, incluir a propria conta como usuario de teste. Em modo "teste" o Google expira a autorizacao em 7 dias: publique o app
-   (sem verificacao, uso proprio) para que ela nao expire.
+2) Tela de consentimento: tipo Externo, incluir a propria conta como usuario de teste. Em modo "teste" o Google expira a autorizacao em 7 dias: repita o passo 5
+   e reinicie o gateway. Para deixar de expirar, publique o app; o Console so libera "Publicar app" com a pagina de branding completa (pagina inicial e politica de privacidade publicas).
 3) Credenciais > Criar ID do cliente OAuth > App para computador > baixar o JSON.
 4) node gateway\importar-credencial-google.mjs "caminho\client_secret_....json"  (grava em gateway\.env sem exibir o segredo; apague o JSON depois).
 5) node --env-file=gateway\.env gateway\autorizar-drive.mjs  e autorize no navegador, com a conta do Drive.
