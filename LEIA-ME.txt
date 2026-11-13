@@ -21,7 +21,7 @@ PRIMEIRA VEZ NO COMPUTADOR
 
 PASTA ADMS (ATUALIZACAO AUTOMATICA DO CSV)
 - Na faixa "Pasta ADMS", clique uma vez em "Selecionar pasta" e escolha a pasta onde o ADMS grava chamadas_incidentes.csv
-  (ex.: \\SERVIDOR\PASTA\ADMS (caminho real em js\config-local.js, nao versionado; modelo: js\config-local.exemplo.js)). A Central le SO esse arquivo, ao abrir, no F5 e em "Verificar agora".
+  (\\fs-bi\ESE\DTEC\DEOP\ADMS; o botao "Copiar caminho" copia esse caminho). A Central le SO esse arquivo, ao abrir, no F5 e em "Verificar agora".
 - Sem alteracao: nao rele. Arquivo novo: atualiza o lote sem duplicar. "Aguardando permissao": clique em "Reconectar pasta".
 - A importacao manual (passo 2 abaixo) continua disponivel. Detalhes e limitacoes: docs\PASTA-ADMS.txt
 

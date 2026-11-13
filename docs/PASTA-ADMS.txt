@@ -1,8 +1,8 @@
 CENTRAL DE CALLBACK COI - ATUALIZACAO AUTOMATICA PELO ADMS (chamadas_incidentes.csv)
 ====================================================================================
 Arquivo lido: chamadas_incidentes.csv (SOMENTE ele; os demais arquivos da pasta nunca sao abertos).
-Origem na Energisa: \\SERVIDOR\PASTA\ADMS\chamadas_incidentes.csv
-O caminho real fica em js\config-local.js (pasta_adms; nao versionado, modelo em js\config-local.exemplo.js). Aqui: exemplo generico.
+Origem na Energisa: \\fs-bi\ESE\DTEC\DEOP\ADMS\chamadas_incidentes.csv
+O botao "Copiar caminho" da faixa Pasta ADMS copia esse caminho na hora (fixo em js\pasta-adms.js), sem janela nem pergunta.
 Codigo: js/pasta-adms.js + srv.atualizarLote (js/servico.js). Testes: testes/ponta-a-ponta/e2e-pasta-adms.mjs e
 e2e-adms-conexao.mjs.
 
@@ -14,7 +14,7 @@ O LOCAL DA CENTRAL NAO IMPORTA
 
 PRIMEIRA VEZ EM CADA COMPUTADOR / NAVEGADOR
 1. Abra a Central no Edge (fora de janela InPrivate).
-2. Na faixa "Pasta ADMS", clique em "Selecionar pasta". Na janela do Windows, cole \\SERVIDOR\PASTA\ADMS na barra de
+2. Na faixa "Pasta ADMS", clique em "Selecionar pasta". Na janela do Windows, cole \\fs-bi\ESE\DTEC\DEOP\ADMS na barra de
    endereco, Enter, e clique em "Selecionar pasta". Se o Edge perguntar, escolha "Permitir".
    - Se o Edge disser "nao pode abrir esta pasta porque ela contem arquivos do sistema": e o bloqueio do navegador para
      pastas "sensiveis" (ex.: a RAIZ de uma unidade mapeada, como Y:\). Use o caminho \\SERVIDOR\... em vez da letra da
@@ -125,7 +125,7 @@ O QUE PEDIR A TI (somente se o teste mostrar que a autorizacao nao persiste ou q
 
 ROTEIRO DE TESTE NA MAQUINA DA ENERGISA (o que os testes automaticos NAO cobrem)
 1. Abrir a Central (anotar: local, compartilhamento ou HTTPS). Clicar "Diagnostico" e copiar.
-2. "Selecionar pasta" pelo caminho \\SERVIDOR\PASTA\ADMS. Se der "arquivos do sistema", usar "Selecionar arquivo".
+2. "Selecionar pasta" pelo caminho \\fs-bi\ESE\DTEC\DEOP\ADMS. Se der "arquivos do sistema", usar "Selecionar arquivo".
 3. Conferir: nenhuma faixa vermelha "nao guardou"; abrir o turno; conferir a coluna Data e hora.
 4. F5: deve mostrar "Arquivo sem alteracoes".
 5. Fechar TODAS as janelas do Edge, abrir de novo a Central: anotar se pediu "Renovar autorizacao" e se o Edge ofereceu

@@ -32,7 +32,7 @@ const colId = linhas[cab].split(";").indexOf('"ID"'), ultima = linhas[linhas.len
 const CSV2 = linhas.concat([ultima.join(";")]).join("\r\n") + "\r\n";
 const ultima3 = [...ultima]; ultima3[colId] = '"9999102"';
 const CSV3 = linhas.concat([ultima.join(";"), ultima3.join(";")]).join("\r\n") + "\r\n"; // versão nova para o "Verificar agora"
-const CAMINHO_PADRAO = CONFIG_TESTE.pasta_adms; // fictício (cdp.mjs); o real fica em js/config-local.js
+const CAMINHO_PADRAO = "\\\\fs-bi\\ESE\\DTEC\\DEOP\\ADMS"; // fixo em js/pasta-adms.js
 // Mesmo conteúdo do CSV2, datas no formato ISO com milissegundos (como costuma sair de exportação automática).
 const CSV2_ISO = CSV2.replace(/"(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})"/g, '"$3-$2-$1 $4:$5:$6.000"');
 verdade(CSV2_ISO !== CSV2 && /"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.000"/.test(CSV2_ISO), "montagem do CSV ISO");

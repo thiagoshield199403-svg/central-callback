@@ -17,7 +17,7 @@ Os dados de `file://` e de `http://127.0.0.1` ficam separados pelo navegador.
 - `docs/DRIVE-BI-E-POLOS.txt`: histórico, fechamento, Google Drive e polos (o painel BI integrado foi retirado).
 - `docs/PASTA-ADMS.txt`: atualização automática pelo `chamadas_incidentes.csv` da pasta ADMS (F5).
 - `docs/EXPORTACAO-PASTA-REDE.txt`: exportação do fechamento diário para a pasta de rede definida em `js/config-local.js` (não versionado; modelo em `js/config-local.exemplo.js`).
-- `js/config-local.exemplo.js`: copie para `js/config-local.js` e preencha os caminhos reais da pasta de rede e da pasta ADMS (esse arquivo não é publicado).
+- `js/config-local.exemplo.js`: copie para `js/config-local.js` e preencha o caminho real da pasta de rede (esse arquivo não é publicado). O caminho da pasta ADMS é fixo em `js/pasta-adms.js`.
 - `docs/LOCALIDADES-POLOS.txt`: filtro REGIONAIS E MUNICÍPIOS (sete regionais, seleção múltipla, reconhecimento no ADMS).
 
 ## Testes (exigem Node)

@@ -1,7 +1,7 @@
 # Central de Callback COI - manifesto SHA-256 - gerado em 13/11/2026 - conferir: sha256sum -c MANIFESTO_SHA256.txt
 a34e090cdfb662899658b7ed7a4f80b0c4505d1d3ebb26efa9ef79d7e4e21567 *./.gitignore
-f4fbbc671392d297e3afd6b3fa4ef549b0522648d97a343e562c19aece5b208a *./LEIA-ME.txt
-505f6984d55701496df94f358ea5c8ed73f0fed0253400eb1864c33a590b3d68 *./README.md
+a6176ea4cda9d6446599386bb4cb40d71c1c30bcbdcc0a4bace67e4bf622675b *./LEIA-ME.txt
+bc916117fbaa30dc3763bae4470823872091d3f5acc98bb1069916ac69bd5d1c *./README.md
 970acbaefbe2d5c924de00af733c70778f644cd661fab93c2b9888c9d861ce7a *./apps-script/Codigo.gs
 5b636fdc67522b8ccd153b24e3f48c234a2e8fb28b5b4489085d47c299f2d926 *./apps-script/appsscript.json
 a1b0aef430d458c286b04906f71085b584546e16ddc08cbe5fe785ddc690f10d *./apps-script/central-producao/css/conector-apps-script.css
@@ -73,7 +73,7 @@ d2efd558be24b112d16937c38d80a2b06b080b0edbd776232f0ba9716c46827c *./docs/DRIVE-B
 89b35c001212ceb72c5994e3eaa9816c804e2a70d5188f59497b41226e6a4375 *./docs/INTEGRACAO-SHAREPOINT-FUTURA.txt
 979efa6da0e531a8107c6e7d82fe34b44834797ab5083d4eee594c36a0ee569d *./docs/LIMITACOES-E-PENDENCIAS.txt
 fa859666e53e4aa38f39cc3c0c395c8ba05699a1fc44645126983a2ebd67de40 *./docs/LOCALIDADES-POLOS.txt
-d59064b1e2fd1fe1a0da45a59a3e33d27f94da5ce2d41625aaff9e122b4e8d25 *./docs/PASTA-ADMS.txt
+daf594e8f59e219f839369f5a2e214b9dd6088aa71741873754da3f7d56206e8 *./docs/PASTA-ADMS.txt
 5ac7173850337f543f4f56f8e3219c495d9cfdecdaf93c9f7a05d0a35b827f05 *./docs/PUBLICACAO-SERVIDOR.txt
 d497bbf2b4af373163035cd2db5c436e80db7deda48a1d854445467e4801babc *./docs/RECONHECIMENTO-MENSAGENS.txt
 0ca3d76922e036bd60efc0d1861a751ac96ed1e15e1dcc3d92e1918bf9ae5fbc *./docs/RELATORIO-TESTES-1.1.0.txt
@@ -98,7 +98,7 @@ c1e7f09214dc2c0c5979ab0bf9a86b9e22e5e219640307fd742cb6614c45eb51 *./js/app.js
 e034933503da1523ed873276b333c19f7c2270850d803faa33ec505aff215265 *./js/armazenamento.js
 3f35f13fd61387de55adda001aed95f9c04bdf16d30ecc29762f590d6c3daa68 *./js/callback-manual.js
 3601e3bf08eb8afc2b4b292fdc85d0ac4ad80d79386fe5d387c3f05b13f18efa *./js/central-disparos.js
-893e89ac2808103a48f986dcfa585a92bc0a9c1b1570c5cb984bbf0a3417d432 *./js/config-local.exemplo.js
+0245236f4e5cf8b47a329e9e2c7d757532b724eab73c415242a5d8c6fced1bcb *./js/config-local.exemplo.js
 f07797f69a8feda4872f4a9a650389e466e5873d1b5f7676619c21e383acd3f4 *./js/disparos.js
 6700ee515d9bdffec53adf3065bf449ef7acca33f09ddbc660e42c257b30dcc9 *./js/exportacao-rede.js
 c988398aa1fcfad346cbbcfa05394ef32856afbd160915548bda6c45ba8b9681 *./js/fechamento-ui.js
@@ -108,13 +108,13 @@ c988398aa1fcfad346cbbcfa05394ef32856afbd160915548bda6c45ba8b9681 *./js/fechament
 2d7172923a60cd12becad0ef56f25d09847418eef3cf5a3b52f0f968babb353c *./js/localidades.js
 0a3d7752321e33144be4e7cff49ce29bfa690ef27e980f630e2103cc09adb080 *./js/modelos.js
 82cf3a56967e10389fd91352e7808cac7d11f8aec3a8539924e324732b5ca70c *./js/nucleo.js
-43a194767213a2a26f7c65f3376a25614c7798b80b6c0047b9f7cb2525b2abc9 *./js/pasta-adms.js
+3c00cb644b593fc548798d4832aa67ab14bd031ee56cc4786d5ddb46b9aa2dd4 *./js/pasta-adms.js
 8d116872b881bf66f4957648f6e49571bb7955296c91970164b42a1fc8ebc950 *./js/servico.js
 9ba668217ffa492f44e053430706f72587b0ed00d8ce54450e30d5f307a3231e *./package.json
-312a30e4cde9c7cc36863eb66b3e31a4a1c192787bf72a21d9b58f8523baf644 *./testes/ponta-a-ponta/cdp.mjs
-04ad4d2a0949d0b0c1cb5af34209fccbc890d7f7d7f0364d0103d1d1cca4343e *./testes/ponta-a-ponta/e2e-adms-conexao.mjs
+4cc5e88f15fff6c88f22e2777fc11c59c72468b1c2663ac4f4436162d112f25e *./testes/ponta-a-ponta/cdp.mjs
+5248c754855735815e25c7d20e37594f224d61b0decda9b247ddea28d70eb212 *./testes/ponta-a-ponta/e2e-adms-conexao.mjs
 58660b67a236f037461bacaea32057c9cef0738c7c900bb2cc8e083ce1436dbb *./testes/ponta-a-ponta/e2e-bi.mjs
-41260b94c677bd5b073fca77218d2e05c8e9a0b5c11fa52a2dd4a6d0a88d0f0d *./testes/ponta-a-ponta/e2e-copiar-caminho.mjs
+66e2b3904e0c54fc0efd01998345a8369c75acb945022c0f4628baf91ecb9425 *./testes/ponta-a-ponta/e2e-copiar-caminho.mjs
 41bd16373ecb0b37caab537defa30e7888087807ad2538b6fdb03cd8693a6b71 *./testes/ponta-a-ponta/e2e-disparos.mjs
 3423d90a341c66b40d49c6838ce4b19a3b877e1a05343bbd8a9d83cb0203d4a2 *./testes/ponta-a-ponta/e2e-exportacao-rede.mjs
 e52710c7f99b4df7481bc6d15e26b1524707c3a395cdc5018c11124915768d02 *./testes/ponta-a-ponta/e2e-filtro-data.mjs

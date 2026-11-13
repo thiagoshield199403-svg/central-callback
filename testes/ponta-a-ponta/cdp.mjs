@@ -11,7 +11,7 @@ const CANDIDATOS = [
   "C:/Program Files/Microsoft/Edge/Application/msedge.exe",
 ];
 export const espera = (ms) => new Promise((ok) => setTimeout(ok, ms));
-export const CONFIG_TESTE = { pasta_rede: "W:\\PASTA-TESTE\\central-callback", pasta_adms: "\\\\servidor-teste\\ADMS" };
+export const CONFIG_TESTE = { pasta_rede: "W:\\PASTA-TESTE\\central-callback" };
 
 export async function abrirNavegador({ exe, largura = 1366, altura = 768, porta = 9300 + Math.floor(Math.random() * 500), downloads, perfil: perfilFixo } = {}) {
   exe = exe || CANDIDATOS.find(existsSync);
