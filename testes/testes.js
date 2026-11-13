@@ -1196,25 +1196,68 @@
   });
   const tresIncidentes = async () => { await abrirDia(S, "Polo Fictício", "OPT4"); return importarLinhas([umaLinha("CALL 0000661", "INC 0000660"), umaLinha("CALL 0000663", "INC 0000662"), umaLinha("CALL 0000665", "INC 0000664")]); };
   const atualDe = (id) => S.itemAtual(S.fila(id));
-  await teste("Lote guiado: não usa outra fila; abrir e voltar não contam; retorno repetido não avança duas vezes; só Enviei conta, uma vez", async () => {
+  const cbs = () => S.metricasTempoReal().callbacks_realizados;
+  await teste("Lote guiado: abrir, voltar, erro e recarregar não contam nem avançam; só CALLBACK REALIZADO conta, uma vez; sem avanço automático fica no incidente", async () => {
     const l = await tresIncidentes(), filas = S.E.disparos.length, f = await S.iniciarAtendimento(l.map((x) => x.chave));
     igual([S.E.disparos.length, f.situacao, f.assistido, f.autorizacao.conector_modo], [filas + 1, "atendimento", true, "whatsapp_web"]);
     const i1 = atualDe(f.id), i2 = f.itens[1]; igual(i1.incidente, "INC 0000660");
     await falhaCom(() => S.abrirAtendimento(f.id, i2.id), "não é o atual");
-    const r = await S.abrirAtendimento(f.id, i1.id); verdade(r.url.startsWith("https://web.whatsapp.com/send?phone=55"), "mesmo link do envio individual"); igual([atualDe(f.id).status, S.metricasTempoReal().callbacks_realizados], ["aberto", 0], "abrir não conta");
-    await S.registrarRetornoAtendimento(f.id, i1.id); await S.registrarRetornoAtendimento(f.id, i1.id);
-    igual([S.fila(f.id).itens[0].status, atualDe(f.id).incidente, S.metricasTempoReal().callbacks_realizados, S.fila(f.id).eventos.filter((e) => e.tipo === "retorno").length], ["nao_confirmado", "INC 0000662", 0, 1], "retorno não conta nem avança duas vezes");
-    igual(S.incidentesParaDisparo().find((x) => x.incidente === "INC 0000660").elegivel, false); await S.pularAtendimento(f.id, i2.id); await S.pularAtendimento(f.id, atualDe(f.id).id); igual(S.fila(f.id).situacao, "concluida");
-    await falhaCom(() => S.prepararDisparo([l[0].chave], "lote"), "Nenhum incidente");
+    await falhaCom(() => S.confirmarEnvioAtendimento(f.id, i1.id, "enviado"), "abra o WhatsApp"); igual(cbs(), 0, "sem abrir não confirma");
+    const r = await S.abrirAtendimento(f.id, i1.id); verdade(r.url.startsWith("https://web.whatsapp.com/send?phone=55"), "mesmo link do envio individual"); igual([atualDe(f.id).status, cbs()], ["aberto", 0], "abrir não conta");
+    // 1) voltar sem enviar (mesmo repetido) e 2) erro no WhatsApp com nova tentativa: continua no mesmo incidente, sem callback
+    await S.registrarRetornoAtendimento(f.id, i1.id); await S.registrarRetornoAtendimento(f.id, i1.id); await S.abrirAtendimento(f.id, i1.id);
+    igual([S.fila(f.id).itens[0].status, atualDe(f.id).incidente, cbs(), S.fila(f.id).itens[0].tentativas.length, S.fila(f.id).eventos.filter((e) => e.tipo === "retorno").length], ["aberto", "INC 0000660", 0, 2, 1], "retorno não conta nem avança");
+    // 9) recarregar a página não transforma o pendente em realizado
+    await S.carregar(); igual([atualDe(f.id).incidente, atualDe(f.id).status, cbs(), S.obterChamada(l[0].id).estado], ["INC 0000660", "aberto", 0, "pendente"], "recarregar não conta");
+    // 3) e 6) CALLBACK REALIZADO sem avanço automático: registra uma vez e continua no incidente
     await S.confirmarEnvioAtendimento(f.id, i1.id, "enviado"); const data = S.sessao().data_operacional;
     igual([S.metricasTempoReal().callbacks_realizados, S.E.historico_atendimento.length, S.consolidadoDia(data)[0].callbacks, S.obterChamada(l[0].id).estado], [1, 1, 1, "callback_realizado"]);
-    await falhaCom(() => S.confirmarEnvioAtendimento(f.id, i1.id, "enviado"), "não está aguardando"); igual(S.metricasTempoReal().callbacks_realizados, 1, "sem duplicar");
+    igual([atualDe(f.id).incidente, atualDe(f.id).status, S.fila(f.id).situacao], ["INC 0000660", "enviado", "atendimento"], "não avança sozinho");
+    // 8) confirmar de novo não duplica; o WhatsApp não reabre para quem já teve callback
+    await falhaCom(() => S.confirmarEnvioAtendimento(f.id, i1.id, "enviado"), "não está aguardando"); igual([cbs(), S.E.historico_atendimento.length], [1, 1], "sem duplicar");
+    await falhaCom(() => S.abrirAtendimento(f.id, i1.id), "já foi registrado");
+    await S.pularAtendimento(f.id, i1.id); igual([S.fila(f.id).itens[0].status, atualDe(f.id).incidente, cbs()], ["enviado", "INC 0000662", 1], "PULAR depois do callback só avança, sem desfazer");
+    await S.pularAtendimento(f.id, i1.id); igual(atualDe(f.id).incidente, "INC 0000662", "clique repetido não avança duas vezes");
+    igual([S.anteriorAtendimento(S.fila(f.id)).incidente, S.painelAtendimento(S.fila(f.id)).posicao], ["INC 0000660", 2]);
+    await falhaCom(() => S.prepararDisparo([l[0].chave], "lote"), "Já existe uma fila");
+    await S.cancelarAtendimento(f.id); await falhaCom(() => S.prepararDisparo([l[0].chave], "lote"), "Nenhum incidente");
     await S.encerrarLote();
+  });
+  await teste("Lote guiado: PRÓXIMO INC e PULAR não registram callback; avanço automático só depois da confirmação explícita", async () => {
+    const l = await tresIncidentes(), f = await S.iniciarAtendimento(l.map((x) => x.chave)), [a, b, c] = f.itens, st = () => S.fila(f.id).itens.map((x) => x.status);
+    // 4) abrir e ir ao PRÓXIMO INC sem confirmar: fica "não realizado", sem callback; clique repetido não avança duas vezes
+    await S.abrirAtendimento(f.id, a.id); const r = await S.proximoAtendimento(f.id, a.id); await S.proximoAtendimento(f.id, a.id);
+    igual([st()[0], r.proximo.id, atualDe(f.id).id, cbs(), S.obterChamada(a.chamada_id).estado], ["nao_confirmado", b.id, b.id, 0, "pendente"]);
+    // 5) PULAR depois de abrir: ignorado, sem callback
+    await S.abrirAtendimento(f.id, b.id); await S.pularAtendimento(f.id, b.id); await S.pularAtendimento(f.id, b.id);
+    igual([st()[1], atualDe(f.id).id, cbs()], ["pulado", c.id, 0]);
+    // 7) avanço automático: abrir não avança; só a confirmação avança (aqui conclui a fila)
+    await S.abrirAtendimento(f.id, c.id); await S.registrarRetornoAtendimento(f.id, c.id); igual([atualDe(f.id).id, S.fila(f.id).situacao], [c.id, "atendimento"], "abrir e voltar não avançam");
+    await S.confirmarEnvioAtendimento(f.id, c.id, "enviado", { avancar: true });
+    igual([st(), S.fila(f.id).situacao, cbs()], [["nao_confirmado", "pulado", "enviado"], "concluida", 1]);
+    const p = S.painelAtendimento(S.fila(f.id)); igual([p.confirmados, p.nao_realizados, p.pulados, p.restantes], [1, 1, 1, 0]);
+    const sel = S.incidentesParaDisparo(); igual(["INC 0000660", "INC 0000662", "INC 0000664"].map((n) => sel.find((x) => x.incidente === n).elegivel), [true, true, false], "não realizado e ignorado podem ser atendidos de novo");
+    await S.encerrarLote();
+  });
+  await teste("Lote guiado: PRÓXIMO INC sem abrir deixa para depois; o único pendente continua na tela até PULAR", async () => {
+    const l = await tresIncidentes(), f = await S.iniciarAtendimento(l.map((x) => x.chave)), [a, b, c] = f.itens;
+    await S.proximoAtendimento(f.id, a.id); igual([atualDe(f.id).id, S.fila(f.id).itens[0].status], [b.id, "preparado"], "continua pendente");
+    await S.pularAtendimento(f.id, b.id); await S.pularAtendimento(f.id, c.id); igual(atualDe(f.id).id, a.id, "volta ao que ficou para depois");
+    const r = await S.proximoAtendimento(f.id, a.id); igual([r.mesmo, atualDe(f.id).id, S.fila(f.id).situacao], [true, a.id, "atendimento"]);
+    await S.pularAtendimento(f.id, a.id); igual([S.fila(f.id).situacao, cbs()], ["concluida", 0]);
+    await S.encerrarLote();
+  });
+  await teste("Lote guiado: fila gravada pela versão anterior (sem ponteiro) continua no incidente aberto e passa a usar o ponteiro", async () => {
+    const l = await tresIncidentes(), f = await S.iniciarAtendimento(l.map((x) => x.chave)), [a, b] = f.itens;
+    await S.abrirAtendimento(f.id, a.id); await S._alterar((E) => { const x = E.disparos.find((y) => y.id === f.id); delete x.atual_id; delete x.anterior_id; });
+    igual(atualDe(f.id).id, a.id, "regra antiga: o aberto é o atual"); await S.registrarRetornoAtendimento(f.id, a.id); igual(atualDe(f.id).id, a.id, "voltar não avança");
+    await S.proximoAtendimento(f.id, a.id); igual([atualDe(f.id).id, S.fila(f.id).atual_id, S.fila(f.id).itens[0].status], [b.id, b.id, "nao_confirmado"]);
+    await S.cancelarAtendimento(f.id); await S.encerrarLote();
   });
   await teste("Lote guiado: pular, pausar, retomar, cancelar e persistência; Não enviei libera o incidente; encerrar é recusado em andamento", async () => {
     const l = await tresIncidentes(), f = await S.iniciarAtendimento(l.map((x) => x.chave));
     await S.pularAtendimento(f.id, atualDe(f.id).id); await S.pausarAtendimento(f.id); const i = atualDe(f.id); igual(i.incidente, "INC 0000662");
-    await falhaCom(() => S.abrirAtendimento(f.id, i.id), "Retome"); await falhaCom(() => S.encerrarLote(), "em andamento");
+    await falhaCom(() => S.abrirAtendimento(f.id, i.id), "Retome"); await falhaCom(() => S.proximoAtendimento(f.id, i.id), "Retome"); await falhaCom(() => S.pularAtendimento(f.id, i.id), "Retome"); await falhaCom(() => S.encerrarLote(), "em andamento");
     await S.carregar(); igual([S.fila(f.id).situacao, atualDe(f.id).incidente, S.painelAtendimento(S.fila(f.id)).pulados], ["pausada", "INC 0000662", 1], "persistiu");
     await S.retomarAtendimento(f.id); await S.abrirAtendimento(f.id, i.id); await S.cancelarAtendimento(f.id);
     igual(S.fila(f.id).itens.map((x) => x.status), ["pulado", "nao_confirmado", "cancelado"]); igual(S.pendentesConfirmacao().length, 1);
@@ -1223,7 +1266,7 @@
   });
   await teste("Lote guiado: telefone com pendência bloqueia a abertura até corrigir; callback por outra via pula sem contar de novo", async () => {
     await abrirDia(S, "Polo Fictício", "OPT4"); const l = await importarLinhas([linha("CALL 0000671", "INC 0000670", ""), umaLinha("CALL 0000673", "INC 0000672")]), f = await S.iniciarAtendimento(l.map((x) => x.chave));
-    const i = atualDe(f.id); await falhaCom(() => S.abrirAtendimento(f.id, i.id), "celular"); await S.corrigirTelefoneItem(f.id, i.id, "79991000671"); await S.abrirAtendimento(f.id, i.id); await S.registrarRetornoAtendimento(f.id, i.id);
+    const i = atualDe(f.id); await falhaCom(() => S.abrirAtendimento(f.id, i.id), "celular"); await S.corrigirTelefoneItem(f.id, i.id, "79991000671"); await S.abrirAtendimento(f.id, i.id); await S.registrarRetornoAtendimento(f.id, i.id); await S.proximoAtendimento(f.id, i.id);
     await S.registrar(l[1].id, "callback_realizado", "ligacao"); const r = await S.abrirAtendimento(f.id, atualDe(f.id).id);
     igual([r.pulado, S.fila(f.id).situacao, S.metricasTempoReal().callbacks_realizados], [true, "concluida", 1]);
     await S.encerrarLote();
@@ -1240,6 +1283,19 @@
     for (const p of ["INC", "CALL", "79991", "Cliente", "Rua", "secreta", "FIC_UC"]) verdade(!x.conteudo.includes(p), "vazou " + p);
     await falhaCom(() => S.gerarFechamento(hoje), "já foi concluído");
     igual(S.diasSemFechamento(), []);
+  });
+  await teste("Fechamento: registro da exportação para a pasta de rede não altera o fechamento nem o Drive; falha depois de exportado não apaga a confirmação", async () => {
+    await abrirDia(S, "Polo Fictício", "OPT6"); const a = await S.abrirCallbackManual({ incidente: "720", telefone: "79991000721", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(a.item.id, "enviado");
+    const hoje = S.sessao().data_operacional; await S.encerrarDia(); const f = await S.gerarFechamento(hoje), antes = JSON.stringify([f.conteudo, f.sha256, f.nome, f.versao, f.status, f.assinatura]);
+    await S.registrarExportacaoRede(f.id, { arquivo: "x_OP-OPT6.csv", operador: "OPT6", resultado: "falha", detalhe: "NotFoundError" });
+    igual([S.fechamento(f.id).exportacao_rede.status, S.fechamento(f.id).historico_rede.length], ["pendente", 1], "falha registrada como pendente, não exportado");
+    const r = await S.registrarExportacaoRede(f.id, { arquivo: "x_OP-OPT6.csv", operador: "OPT6", pasta: "central-callback", resultado: "exportado" });
+    igual([r.status, r.arquivo, r.operador, r.sha256 === f.sha256], ["exportado", "x_OP-OPT6.csv", "OPT6", true]);
+    await S.registrarExportacaoRede(f.id, { arquivo: "x_OP-OPT6.csv", operador: "OPT6", resultado: "conflito", detalhe: "diferente" });
+    const x = S.fechamento(f.id); igual([x.exportacao_rede.status, x.historico_rede.map((h) => h.resultado)], ["exportado", ["falha", "exportado", "conflito"]]);
+    igual(JSON.stringify([x.conteudo, x.sha256, x.nome, x.versao, x.status, x.assinatura]), antes, "fechamento e status do Drive intactos");
+    verdade(!S.fechamentoDesatualizado(hoje), "registrar não torna o fechamento desatualizado");
+    await falhaCom(() => S.registrarExportacaoRede("inexistente", { resultado: "exportado" }), "não encontrado");
   });
   await teste("Fechamento: dados novos exigem motivo e geram nova versão, sem substituir a anterior; envio idempotente", async () => {
     await abrirDia(S, "Polo Fictício", "OPT4"); const a = await S.abrirCallbackManual({ incidente: "710", telefone: "79991000711", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(a.item.id, "enviado");
@@ -1262,6 +1318,502 @@
     await S._alterar((E) => { E.fechamentos[E.fechamentos.length - 1].nome = antigo; });
     await S.abrirSessao("Polo Fictício", "OPT5"); const b = await S.abrirCallbackManual({ incidente: "721", telefone: "79991000722", modo: "padronizada", modelo: "manual_falta_energia" }); await S.confirmarEnvioManual(b.item.id, "enviado"); await S.encerrarDia();
     const v2 = await S.gerarFechamento(hoje, { motivo: "Novo turno" }); igual(v2.nome, antigo.replace(".csv", "_v2.csv"));
+  });
+
+  /* Filtro REGIONAIS E MUNICÍPIOS (js/localidades.js + js/filtro-regionais.js): divisão oficial, reconhecimento no ADMS e seleção. */
+  const REG_ESPERADAS = {
+    aracaju: [["001", "Aracaju"], ["010", "Barra dos Coqueiros"], ["020", "Nossa Senhora do Socorro"]],
+    sao_cristovao: [["620", "São Cristóvão"], ["630", "Itaporanga d'Ajuda"]],
+    itabaiana: [["030", "Itabaiana"], ["050", "Areia Branca"], ["060", "Campo do Brito"], ["070", "Carira"], ["080", "Frei Paulo"], ["090", "Macambira"], ["100", "Malhador"],
+      ["110", "Moita Bonita"], ["120", "Aparecida"], ["130", "Pedra Mole"], ["140", "Pinhão"], ["150", "Ribeirópolis"], ["160", "São Domingos"], ["170", "São Miguel do Aleixo"]],
+    lagarto: [["180", "Lagarto"], ["190", "Salgado"], ["200", "Poço Verde"], ["210", "Simão Dias"]],
+    gloria: [["340", "Nossa Senhora das Dores"], ["350", "Canindé de São Francisco"], ["360", "Capela"], ["370", "Cumbe"], ["380", "Feira Nova"], ["390", "Gararu"],
+      ["400", "Graccho Cardoso"], ["410", "Itabi"], ["420", "Monte Alegre de Sergipe"], ["430", "Nossa Senhora da Glória"], ["440", "Lourdes"], ["450", "Poço Redondo"], ["461", "Porto da Folha"]],
+    propria: [["468", "Propriá"], ["480", "Amparo de São Francisco"], ["490", "Aquidabã"], ["500", "Telha"], ["510", "Canhoba"], ["521", "Cedro de São João"], ["530", "Ilha das Flores"],
+      ["541", "Japoatã"], ["550", "Malhada dos Bois"], ["560", "Muribeca"], ["570", "Neópolis"], ["580", "Pacatuba"], ["590", "Santana do São Francisco"], ["600", "São Francisco"], ["700", "Brejo Grande"]],
+    maruim: [["220", "Maruim"], ["230", "Carmópolis"], ["240", "Divina Pastora"], ["250", "General Maynard"], ["260", "Japaratuba"], ["270", "Laranjeiras"], ["280", "Pirambu"],
+      ["290", "Riachuelo"], ["300", "Rosário do Catete"], ["310", "Santa Rosa de Lima"], ["320", "Santo Amaro das Brotas"], ["330", "Siriri"]],
+  };
+  await teste("Regionais: sete regionais, com todos os municípios e os códigos confirmados (001/010/020, 620/630, 200 Poço Verde)", async () => {
+    const L = window.Localidades;
+    igual(L.REGIONAIS.map((r) => r.nome), ["Regional Aracaju", "Regional São Cristóvão", "Regional Itabaiana", "Regional Lagarto", "Regional Glória", "Regional Propriá", "Regional Maruim"]);
+    for (const r of L.REGIONAIS) igual(r.municipios.map((m) => [m.codigo, m.nome]), REG_ESPERADAS[r.id], r.nome);
+    igual(L.MUNICIPIOS.length, 63, "63 municípios");
+    igual(new Set(L.MUNICIPIOS.map((m) => m.chave)).size, 63, "chave única por município");
+    igual(new Set(L.MUNICIPIOS.map((m) => m.codigo)).size, 63, "cada código em um único município (sem cruzamento entre regionais)");
+    igual(new Set(L.MUNICIPIOS.map((m) => m.normal)).size, 63, "cada nome em um único município (sem duplicidade)");
+    verdade(L.MUNICIPIOS.every((m) => /^\d{3}$/.test(m.codigo)), "todos com código de três dígitos");
+    igual(L.chavesDaRegional("aracaju"), ["001", "010", "020"], "Aracaju: só os três");
+    igual(L.chavesDaRegional("sao_cristovao"), ["620", "630"], "São Cristóvão: só os dois");
+    for (const [k, r, n] of [["001", "aracaju", "Aracaju"], ["010", "aracaju", "Barra dos Coqueiros"], ["020", "aracaju", "Nossa Senhora do Socorro"], ["620", "sao_cristovao", "São Cristóvão"], ["630", "sao_cristovao", "Itaporanga d'Ajuda"]])
+      igual([L.municipioPorChave(k).regional, L.municipioPorChave(k).nome, L.MUNICIPIOS.filter((m) => m.codigo === k).length], [r, n, 1], "código " + k);
+  });
+  await teste("Regionais: reconhecimento no formato real do ADMS (código + nome, Dispositivo:, acento, maiúsculas, apóstrofo)", async () => {
+    const L = window.Localidades, k = (loc) => L.classificar(loc).chave;
+    igual([k("End:: RUA X_10_CENTRO; 1_ARACAJU"), k("End:: R A_1_X; 10_BARRA DOS COQUEIROS"), k("End:: R; 20_NOSSA SENHORA DO SOCORRO"), k("y; 620_SÃO CRISTOVÃO"),
+      k("y; 630_ITAPORANGA D AJUDA"), k("Rua A; Bairro; Itaporanga d'Ajuda")], ["001", "010", "020", "620", "630", "630"]);
+    igual([k("x; 001_ARACAJU"), k("Dispositivo: ARACAJU"), k("x; 620_ARACAJU"), k("x; 1_SAO CRISTOVAO"), k("x; 10_NOSSA SENHORA DO SOCORRO")],
+      ["001", "001", "?divergente", "?divergente", "?divergente"], "código e nome validados juntos nos cinco códigos novos");
+    igual([k("x; 30_ITABAIANA"), k("x; 030_Itabaiana"), k("Dispositivo: ITABAIANA"), k("x; 350_CANINDE DE SAO FRANCISCO"), k("x; 461_PORTO DA FOLHA"), k("x;   700_brejo   grande ")],
+      ["030", "030", "030", "350", "461", "700"]);
+    const c = L.classificar("End:: RUA I; 430_NOSSA SENHORA DA GLÓRIA");
+    igual([c.status, c.regional, c.nome, c.codigo, c.codigo_adms, c.municipio, c.original], ["ok", "gloria", "Nossa Senhora da Glória", "430", 430, "NOSSA SENHORA DA GLORIA", "430_NOSSA SENHORA DA GLÓRIA"]);
+  });
+  await teste("Regionais: aliases confirmados (Aparecida, Graccho Cardoso, Lourdes, Santo Amaro, Amparo do São Francisco) e nada por aproximação", async () => {
+    const L = window.Localidades, k = (loc) => L.classificar(loc).chave, st = (loc) => L.classificar(loc).status;
+    igual([k("x; 120_NOSSA SENHORA APARECIDA"), k("x; 400_GRACHO CARDOSO"), k("x; 440_NOSSA SENHORA DE LOURDES"), k("x; 400_GRACCHO CARDOSO"), k("x; 120_APARECIDA")], ["120", "400", "440", "400", "120"]);
+    igual(Object.keys(L.ALIASES).sort(), ["AMPARO DO SAO FRANCISCO", "GRACHO CARDOSO", "NOSSA SENHORA APARECIDA", "NOSSA SENHORA DE LOURDES", "SANTO AMARO"]);
+    igual([st("x; NSRA DA GLORIA"), st("x; N SRA DO SOCORRO"), st("x; M BONITA"), st("x; ITABAIAN"), st("x; SANTO AMAR"), st("x; AMPARO DO SAO")], ["nao_reconhecido", "nao_reconhecido", "nao_reconhecido", "nao_reconhecido", "nao_reconhecido", "nao_reconhecido"]);
+    igual([k("RUA ARACAJU_10_CENTRO; 620_SAO CRISTOVAO"), k("AV SIMAO DIAS_200_CENTRO; 1_ARACAJU"), k("RUA NSRA DA GLORIA; 30_ITABAIANA")], ["620", "001", "030"], "nome de município dentro do endereço não conta");
+    igual(k("End:: RUA NSRA DA GLORIA_10_CENTRO; 30_ITABAIANA"), "030", "rua com nome de município não confunde: vale o último trecho");
+  });
+  await teste("Regionais: códigos repetidos em outro estado não classificam errado: o município de outro estado fica FORA DA ÁREA DE SERGIPE", async () => {
+    const L = window.Localidades, st = (loc) => L.classificar(loc).status;
+    igual([st("x; 1_JOAO PESSOA"), st("x; 30_PEDRO REGIS"), st("x; 113_ITABAIANA"), st("x; 179_APARECIDA"), st("x; 181_SAO FRANCISCO"), st("x; 77_ESTANCIA")],
+      ["fora_se", "fora_se", "fora_se", "fora_se", "fora_se", "nao_reconhecido"]);
+    igual([st("x; 10_SAO MIGUEL DE TAIPU"), st("x; 20_ALHANDRA"), st("x; 1_JOAO PESSOA")], ["fora_se", "fora_se", "fora_se"], "Paraíba com os números 1/10/20 não vira Aracaju/Barra/Socorro");
+    igual([st("Dispositivo: APARECIDA"), st("x; 120_APARECIDA")], ["fora_se", "ok"], "APARECIDA solto só existe na Paraíba no ADMS; com o código 120 é Sergipe");
+    igual([st(""), st("Dispositivo: CH 12345"), st("End:: RUA SEM MUNICIPIO_0_X")], ["desconhecida", "desconhecida", "desconhecida"]);
+  });
+  await teste("Regionais: 200_POCO VERDE = Poço Verde (Lagarto); 450_POCO REDONDO = Poço Redondo (Glória); sem confundir os dois", async () => {
+    const L = window.Localidades, c = (loc) => L.classificar(loc), v = (loc) => { const x = c(loc); return [x.status, x.chave, x.nome, x.regional_nome]; };
+    igual(v("End:: R; 200_POCO VERDE"), ["ok", "200", "Poço Verde", "Regional Lagarto"]);
+    igual(v("End:: R; 450_POCO REDONDO"), ["ok", "450", "Poço Redondo", "Regional Glória"]);
+    igual([v("Dispositivo: POCO VERDE")[1], v("Dispositivo: POCO REDONDO")[1]], ["200", "450"], "sem código: nome único em cada regional");
+    igual([c("x; 200_POCO REDONDO").status, c("x; 450_POCO VERDE").status], ["divergente", "divergente"], "código de um com o nome do outro não classifica");
+    verdade(L.confere("x; 200_POCO VERDE", new Set(["200"])) && !L.confere("x; 200_POCO VERDE", new Set(["450"])) && !L.confere("x; 450_POCO REDONDO", new Set(["200"])));
+  });
+  await teste("Regionais: SANTO AMARO = 320 Santo Amaro das Brotas (Maruim); AMPARO DO SAO FRANCISCO = 480 Amparo de São Francisco (Propriá)", async () => {
+    const L = window.Localidades, v = (loc) => { const x = L.classificar(loc); return [x.status, x.chave, x.nome, x.regional_nome, x.original]; };
+    igual(v("Dispositivo: SANTO AMARO"), ["ok", "320", "Santo Amaro das Brotas", "Regional Maruim", "SANTO AMARO"]);
+    igual(v("x; 320_SANTO AMARO DAS BROTAS")[1], "320"); igual(v("x; 320_SANTO AMARO")[1], "320");
+    igual(v("End:: R; AMPARO DO SAO FRANCISCO"), ["ok", "480", "Amparo de São Francisco", "Regional Propriá", "AMPARO DO SAO FRANCISCO"]);
+    igual([v("x; 480_AMPARO DE SAO FRANCISCO")[1], v("x; 480_AMPARO DO SAO FRANCISCO")[1]], ["480", "480"]);
+    igual([L.classificar("x; 999_SANTO AMARO").chave, L.classificar("x; 33_AMPARO DO SAO FRANCISCO").chave], ["320", "480"], "código fora dos mapas não impede o nome");
+    igual([L.classificar("x; 220_SANTO AMARO").status, L.classificar("x; 468_AMPARO DO SAO FRANCISCO").status], ["divergente", "divergente"], "código de OUTRO município de Sergipe = revisão");
+  });
+  await teste("Regionais: código 350 só como Canindé (Glória); nenhum município de Maruim com 350", async () => {
+    const L = window.Localidades;
+    igual(L.MUNICIPIOS.filter((m) => m.codigo === "350").map((m) => [m.regional, m.nome]), [["gloria", "Canindé de São Francisco"]]);
+    verdade(!L.chavesDaRegional("maruim").includes("350"));
+    igual([L.classificar("x; 350_CANINDE DE SAO FRANCISCO").regional, L.classificar("x; 350_MARUIM").status], ["gloria", "divergente"]);
+  });
+  await teste("Regionais: seleção (regional inteira, um, vários, regionais diferentes, desmarcar um, limpar) e texto compacto", async () => {
+    const L = window.Localidades, locs = { aju: "x; 1_ARACAJU", sc: "x; 620_SAO CRISTOVAO", ita: "x; 30_ITABAIANA", ab: "x; 50_AREIA BRANCA", mon: "x; 420_MONTE ALEGRE DE SERGIPE", pr: "x; 450_POCO REDONDO" };
+    const passa = (sel) => Object.entries(locs).filter(([, l]) => L.confere(l, sel)).map(([n]) => n);
+    igual(passa(new Set()), Object.keys(locs), "vazia = todos");
+    const ita = new Set(L.chavesDaRegional("itabaiana")); igual(passa(ita), ["ita", "ab"], "regional inteira");
+    igual(L.descrever(ita), "Regional Itabaiana");
+    ita.delete("050"); igual(passa(ita), ["ita"], "desmarcar um município depois da regional inteira");
+    igual(L.descrever(ita).startsWith("Itabaiana, Campo do Brito, Carira +"), true, L.descrever(ita));
+    igual(passa(new Set(["030"])), ["ita"], "um município"); igual(passa(new Set(["030", "050"])), ["ita", "ab"], "vários da mesma regional");
+    igual(passa(new Set(["001", "620"])), ["aju", "sc"], "regionais diferentes"); igual(L.descrever(new Set(["001", "620"])), "Aracaju, São Cristóvão");
+    igual(passa(new Set(["420", "450"])), ["mon", "pr"]); igual(L.descrever(new Set()), "Todas as regionais");
+  });
+  await teste("Regionais: componente — instâncias independentes, clique na regional, desmarcar, pesquisa por nome/código, limpar", async () => {
+    const F = window.FiltroRegionais, a = document.createElement("div"), b = document.createElement("div"), avisos = [];
+    document.body.append(a, b);
+    try {
+      const fa = F.criar({ id: "t-fa", aoMudar: (s) => avisos.push(["a", s.size]) }).montar(a), fb = F.criar({ id: "t-fb", aoMudar: (s) => avisos.push(["b", s.size]) }).montar(b);
+      const marcar = (el, sel) => { const x = el.querySelector(sel); x.checked = !x.checked; x.dispatchEvent(new Event("change", { bubbles: true })); };
+      marcar(a, '[data-fr-regional="gloria"]'); igual(fa.selecao().size, 13, "regional inteira em um clique"); igual(fb.selecao().size, 0, "a outra instância não muda");
+      marcar(a, '[data-fr-chave="450"]'); igual([fa.selecao().size, fa.selecao().has("450")], [12, false], "só o desmarcado sai");
+      const rg = a.querySelector('[data-fr-regional="gloria"]'); igual([rg.checked, rg.indeterminate], [false, true], "regional parcial");
+      marcar(b, '[data-fr-chave="001"]'); marcar(b, '[data-fr-chave="620"]'); igual([...fb.selecao()].sort(), ["001", "620"]); igual(fa.selecao().size, 12);
+      igual(b.querySelector(".fr-resumo").textContent, "Aracaju, São Cristóvão"); igual(b.querySelector(".fr-badge").textContent, "2");
+      fa.atualizar(new Map([["340", 5], ["350", 2]])); igual(a.querySelector('[data-fr-n="340"]').textContent, "5"); igual(a.querySelector('[data-fr-conta="gloria"]').textContent, "12/13 · 7");
+      const busca = a.querySelector(".fr-busca"), vis = () => [...a.querySelectorAll("li:not(.oculto) [data-fr-chave]")].map((x) => x.dataset.frChave);
+      busca.value = "monte"; busca.dispatchEvent(new Event("input", { bubbles: true })); igual(vis(), ["420"], "busca por nome");
+      busca.value = "30"; busca.dispatchEvent(new Event("input", { bubbles: true })); igual(vis(), ["030", "300"], "busca por código: 30 = 030 (e 300 começa com 30)");
+      busca.value = "461"; busca.dispatchEvent(new Event("input", { bubbles: true })); igual(vis(), ["461"]);
+      busca.value = "sao cristovao"; busca.dispatchEvent(new Event("input", { bubbles: true })); igual(vis(), ["620"], "busca sem acento");
+      busca.value = "1"; busca.dispatchEvent(new Event("input", { bubbles: true })); igual(vis(), ["001", "100", "110", "120", "130", "140", "150", "160", "170", "180", "190"], "código 1 = 001 e prefixo");
+      a.querySelector('[data-fr-acao="limpar"]').click(); igual([fa.selecao().size, fb.selecao().size], [0, 2], "limpar só a própria");
+      b.querySelector('[data-fr-remover="k:001"]').click(); igual([...fb.selecao()], ["620"], "remover pela etiqueta");
+      igual(F.criar({ id: "t-fc", inicial: ["030", "inexistente", "?ambiguo", "?fora_se"] }).selecao().size, 2, "seleção salva inválida (ou categoria antiga) é ignorada");
+      verdade(avisos.some(([q]) => q === "a") && avisos.some(([q]) => q === "b"));
+    } finally { a.remove(); b.remove(); }
+  });
+  await teste("Regionais: formatos observados na tela (nome em qualquer trecho, ESE_Municipio_Pesquisa, ·, -, :) e as quatro categorias", async () => {
+    const L = window.Localidades, c = (loc) => L.classificar(loc), r = (loc) => { const x = c(loc); return x.status === "ok" ? x.regional_nome : L.ESPECIAIS[x.chave]; };
+    igual([r("CENTRO · SAO CRISTOVAO"), r("CENTRO · CARIRA"), r("ESE_Municipio_Pesquisa: ARACAJU"), r("CANHOBA"), r("ESE_Municipio_Pesquisa: NOSSA SENHORA DA GLORIA"),
+      r("MANGABEIRA · JOAO PESSOA"), r(""), r("RUA X; ESTANCIA")],
+      ["Regional São Cristóvão", "Regional Itabaiana", "Regional Aracaju", "Regional Propriá", "Regional Glória", "Fora da área de Sergipe", "Localidade desconhecida", "Localidade não reconhecida"]);
+    igual([c("CENTRO · CARIRA").chave, c("ESE_Municipio_Pesquisa: ARACAJU").chave, c("CANHOBA").chave, c("CENTRO · SAO CRISTOVAO").chave, c("ESE_Municipio_Pesquisa: NOSSA SENHORA DA GLORIA").chave],
+      ["070", "001", "510", "620", "430"], "códigos dos municípios reconhecidos pelo nome");
+    const k = (loc) => c(loc).chave;
+    igual([k("CARIRA"), k("70_CARIRA"), k("070_CARIRA"), k("Carira"), k("carira"), k("  CARIRA  ")], ["070", "070", "070", "070", "070", "070"], "sem código, com código, maiúsculas/minúsculas, espaços");
+    igual([k("São Cristóvão"), k("SAO CRISTOVAO"), k("sao_cristovao"), k("CENTRO - SÃO CRISTÓVÃO"), k("RUA X; SAO CRISTOVAO"), k("Municipio: SAO CRISTOVAO")], ["620", "620", "620", "620", "620", "620"], "acento, sublinhado, hífen, ponto e vírgula, dois-pontos");
+    igual([k("x; 620_ARACAJU"), k("ARACAJU; LAGARTO"), k("CENTRO · ARACAJU · JOAO PESSOA")], ["?divergente", "?divergente", "?divergente"], "código e nome realmente divergentes; dois municípios no mesmo campo");
+    igual([k("x; 30_PEDRO REGIS"), k("x; 113_ITABAIANA")], ["?fora_se", "?fora_se"], "outro estado com código que coincide com código sergipano");
+    igual(k("Dispositivo: LAGARTO; End:: RUA A_380_AP 101_ESPACO TROPICAL; 10_BARRA DOS COQUEIROS"), "010", "Dispositivo (nome do equipamento) não vence a cidade do endereço com código");
+    igual(k("Dispositivo: MOITA BONITA; NOSSA SENHORA DAS DORES; End:: LD GRANDE_S/N_CASA_AREA RURAL; 150_RIBEIROPOLIS"), "150");
+    igual([k("Dispositivo: ITABAIANA"), k("Dispositivo: ARACAJU; ESE_Municipio_Pesquisa: CARIRA")], ["030", "070"], "só Dispositivo: vale o equipamento; campo de município vence o equipamento");
+    igual(Object.keys(L.ESPECIAIS), ["?desconhecida", "?nao_reconhecido", "?divergente", "?fora_se"]);
+  });
+  await teste("Regionais: incidente com várias comunicações é classificado pelo conjunto (comunicação vazia não esconde o município)", async () => {
+    const L = window.Localidades, i = (...ls) => L.classificarIncidente(ls).chave;
+    igual(i("", "RUA A_1_CENTRO; 70_CARIRA"), "070", "principal vazia + Carira");
+    igual(i("RUA A_1_CENTRO; 70_CARIRA", "", "ESE_Municipio_Pesquisa: CARIRA"), "070");
+    igual(i("x; 510_CANHOBA", "x; 541_JAPOATA"), "510", "dois municípios: vale a comunicação principal (a primeira)");
+    igual(L.classificarIncidente(["x; 510_CANHOBA", "x; 541_JAPOATA"]).chaves, ["510", "541"], "e o incidente aparece nos dois municípios");
+    igual(i("x; 180_LAGARTO", "x; 1_JOAO PESSOA"), "180", "principal em Sergipe");
+    const d = L.classificarIncidente(["", "x; 510_CANHOBA", "x; 541_JAPOATA"]);
+    igual([d.chave, d.chaves], ["?divergente", ["510", "541", "?divergente"]], "principal sem município e as outras em municípios diferentes = revisão");
+    const sel = (...k) => new Set(k), r = L.classificarIncidente(["", "RUA A_1_CENTRO; 70_CARIRA"]);
+    igual([L.confereIncidente(r, sel("070")), L.confereIncidente(r, sel("?desconhecida")), L.confereIncidente(r, sel()), L.confereIncidente(d, sel("541"))], [true, false, true, true]);
+    igual([i("", ""), i("x; 1_JOAO PESSOA", ""), i("RUA X; ESTANCIA", "")], ["?desconhecida", "?fora_se", "?nao_reconhecido"]);
+    verdade(Object.isFrozen(L.classificarIncidente(["", "x; 70_CARIRA"])));
+  });
+  await teste("Regionais: classificar não altera o registro nem o texto original da Localização", async () => {
+    const L = window.Localidades, c = { localizacao: "End:: RUA A_1_X; 400_GRACHO CARDOSO", nome: "Teste" }, antes = JSON.stringify(c);
+    const x = L.classificar(c.localizacao); verdade(Object.isFrozen(x), "resultado imutável (cache protegido)");
+    igual(JSON.stringify(c), antes); igual(L.classificar(c.localizacao).original, "400_GRACHO CARDOSO");
+  });
+  await teste("Envio em lote: incidentes trazem localização e data da comunicação principal (base para os filtros); lote intacto", async () => {
+    await abrirDia(S, "Polo Fictício", "OPF1"); const l = await importarLinhas([linha("CALL 0000901", "INC 0000900", "MOBILE: 79991000901")]);
+    const antes = JSON.stringify(S.chamadas()), x = S.incidentesParaDisparo().find((i) => i.incidente === "INC 0000900"), c = S.obterChamada(l[0].id);
+    igual([x.localizacao, x.horario_call], [c.localizacao, c.horario_call]); igual(JSON.stringify(S.chamadas()), antes, "consultar não altera o lote");
+    await S.encerrarLote();
+  });
+
+  /* Datas do ADMS: formatos brasileiro e ISO (exportação automática); nada ambíguo é adivinhado. */
+  await teste("Datas do ADMS: dd/mm/aaaa e aaaa-mm-dd, com segundos, frações e 'T'; mm/dd/aaaa com AM/PM; fuso e datas impossíveis são recusados", async () => {
+    const ok = { "10/03/2026 08:15:32": "2026-03-10T08:15:32", "10/03/2026 08:15": "2026-03-10T08:15:00", "1/3/2026 8:05:09": "2026-03-01T08:05:09",
+      "10/03/2026 08:15:32.123": "2026-03-10T08:15:32", "10-03-2026 08:15:32": "2026-03-10T08:15:32", "2026-03-10 08:15:32": "2026-03-10T08:15:32",
+      "2026-03-10T08:15:32.1234567": "2026-03-10T08:15:32", "2026/03/10 08:15": "2026-03-10T08:15:00", " 10/03/2026   08:15:32 ": "2026-03-10T08:15:32",
+      "03/10/2026 8:15:32 AM": "2026-03-10T08:15:32" }; // com AM/PM: mês/dia (formato do chamadas_incidentes.csv da pasta ADMS)
+    for (const [v, iso] of Object.entries(ok)) igual(N.lerDataHora(v), iso, v);
+    for (const v of ["31/02/2026 10:00:00", "13/25/2026 8:15:32 AM", "2026-03-10T08:15:32Z", "2026-03-10 08:15:32-03:00", "10/03-2026 08:15", "10/03/2026 24:00:00", "", "ontem"]) igual(N.lerDataHora(v), null, v);
+    const [c, avisos] = N.tratar({ valores: { call_id: "1", horario_call: "13/10/2026 8:15:32 PM" } }); // mês 13: impossível
+    igual(c.horario_call, null, "não inventa"); verdade(avisos[0][2].includes("99/99/9999 9:99:99 AA") && !avisos[0][2].includes("13/10/2026"), "aviso mostra só o formato");
+  });
+  await teste("Diagnóstico do CSV: colunas, separador e formato das datas, sem dados de clientes", async () => {
+    const csv = '"ID";"Horário da call";"Recebido ADMS";"Nome do reclamante"\r\n"CALL 1";"2026-03-10 08:15:32.000";"10/03/2026 08:16:00";"Fulano de Tal"\r\n"CALL 2";"13/10/2026 8:15 PM";"";"Beltrano"\r\n';
+    const d = N.diagnosticoCSV(new TextEncoder().encode(csv));
+    igual([d.separador, d.linhas, d.cabecalho], [";", 2, ["ID", "Horário da call", "Recebido ADMS", "Nome do reclamante"]]);
+    igual([d.datas.horario_call.reconhecidas, d.datas.horario_call.formatos_nao_reconhecidos], [1, { "99/99/9999 9:99 AA": 1 }]);
+    igual([d.datas.recebido_adms.reconhecidas, d.datas.recebido_adms.vazias], [1, 1]);
+    verdade(!/Fulano|Beltrano|CALL 1/.test(JSON.stringify(d)), "dado de cliente no diagnóstico");
+  });
+
+  /* Pasta ADMS (js/pasta-adms.js): nova versão do CSV substitui os dados do lote da pasta sem somar de novo. */
+  await teste("Pasta ADMS: versão nova no lote aberto não duplica, preserva registros e mantém métricas por CALL", async () => {
+    await abrirDia(S);
+    const b1 = loteCSV(4); const l = await S.importar("chamadas_incidentes.csv", b1, N.sha256Hex(b1), "pasta_adms");
+    igual(l.origem, "pasta_adms"); verdade(S.arquivoNaBase(N.sha256Hex(b1)), "conteúdo na base");
+    const [c1] = S.chamadas(); await S.registrar(c1.id, "callback_realizado", "whatsapp");
+    const ids = S.chamadas().map((c) => c.id);
+    const b2 = loteCSV(6); const r = await S.atualizarLote("chamadas_incidentes.csv", b2, N.sha256Hex(b2));
+    igual([r.novas, r.atualizadas, r.preservadas, r.fora_do_arquivo], [2, 3, 1, 0]);
+    igual(S.chamadas().length, 6); igual(new Set(S.chamadas().map((c) => c.call_id)).size, 6, "CALL repetida");
+    verdade(ids.every((id) => S.chamadas().some((c) => c.id === id)), "mesmos ids para as CALLs que já estavam");
+    igual(S.obterChamada(c1.id).estado, "callback_realizado"); igual(S.obterChamada(c1.id).tentativas.length, 1);
+    igual(S.estado().lotes.length, 1); igual(S.loteAberto().atualizacoes, 1);
+    verdade(S.arquivoNaBase(N.sha256Hex(b1)) && S.arquivoNaBase(N.sha256Hex(b2)), "as duas versões reconhecidas");
+    const b3 = loteCSV(3, 3); const r3 = await S.atualizarLote("chamadas_incidentes.csv", b3, N.sha256Hex(b3));
+    igual([r3.novas, r3.fora_do_arquivo, S.chamadas().length], [0, 3, 6], "CALL que saiu do arquivo continua no lote");
+    await falhaCom(() => S.atualizarLote("x.csv", b3, "0".repeat(64)), "mudou durante a leitura");
+    await S.encerrarLote();
+    const m = S.metricasDia(); igual([m.chamadas_processadas, m.callbacks_realizados], [6, 1]);
+  });
+  await teste("Pasta ADMS: lote importado à mão não recebe versão da pasta; sem lote, recusa", async () => {
+    await abrirDia(S);
+    await falhaCom(() => S.atualizarLote("c.csv", loteCSV(2), null), "Não há lote aberto");
+    await importar(S, loteCSV(2));
+    await falhaCom(() => S.atualizarLote("c.csv", loteCSV(3), null), "importado manualmente");
+    igual(S.chamadas().length, 2); verdade(!S.loteAberto().origem, "importação manual sem origem");
+  });
+
+  /* ==================================================== data/hora do ADMS (Horario_Call / Recebido_Adms) e filtro por data */
+  const REAL = { "Horário da call": "Horario_Call", "Recebido ADMS": "Recebido_Adms" };
+  function gerarCSVReal(linhas, nomes = REAL) { // cabeçalho como no chamadas_incidentes.csv da pasta ADMS
+    let t = CAB.map((c) => q(nomes[c] || c)).join(";") + "\r\n";
+    for (const l of linhas) t += CAB.map((c) => q(l[c] ?? "")).join(";") + "\r\n";
+    return new TextEncoder().encode(t);
+  }
+  const brData = (iso, hh = "09:30:00") => iso.split("-").reverse().join("/") + " " + hh;
+  const somarDias = (iso, n) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const HOJE = N.hojeLocal(), ONTEM = somarDias(HOJE, -1), ANTIGA = somarDias(HOJE, -10), FUTURA = somarDias(HOJE, 2);
+  const semHora = (l, recebido = "") => Object.assign(l, { "Horário da call": "", "Recebido ADMS": recebido });
+  const cenarioDatas = () => [
+    linha("CALL 0000901", "INC 0000901", "MOBILE: 79991000901", "", { horario: brData(HOJE, "08:00:00") }),
+    linha("CALL 0000902", "INC 0000902", "MOBILE: 79991000902", "", { horario: brData(HOJE, "10:00:00") }),
+    linha("CALL 0000903", "INC 0000903", "MOBILE: 79991000903", "", { horario: brData(ONTEM, "23:59:00") }),
+    linha("CALL 0000904", "INC 0000904", "MOBILE: 79991000904", "", { horario: brData(ANTIGA) }),
+    linha("CALL 0000905", "INC 0000905", "MOBILE: 79991000905", "", { horario: brData(FUTURA) }),
+    semHora(linha("CALL 0000906", "INC 0000906", "MOBILE: 79991000906")), // sem data nenhuma
+    semHora(linha("CALL 0000907", "INC 0000907", "MOBILE: 79991000907"), brData(HOJE, "07:00:00")), // só Recebido ADMS
+  ];
+  await teste("Data ADMS 1: CSV com cabeçalho ANTIGO ('Horário da call' / 'Recebido ADMS') continua reconhecido", () => {
+    const a = N.analisar(gerarCSV([linha("CALL 1", "INC 1", "MOBILE: 79991000001", "", { horario: "12/11/2026 14:35:10" })]));
+    igual([a.resumo.colunas_ausentes, a.validas[0].horario_call, a.validas[0].recebido_adms], [[], "2026-11-12T14:35:10", "2026-11-12T14:35:10"]);
+  });
+  await teste("Data ADMS 2: CSV REAL da pasta ('Horario_Call' / 'Recebido_Adms') reconhece data e hora", () => {
+    const b = gerarCSVReal([linha("CALL 1", "INC 1", "MOBILE: 79991000001", "", { horario: "12/11/2026 14:35:10" })]);
+    const a = N.analisar(b), arq = N.lerCSV(b), d = N.diagnosticoCSV(b);
+    igual([arq.colunas_reconhecidas.horario_call, arq.colunas_reconhecidas.recebido_adms], ["Horario_Call", "Recebido_Adms"]);
+    verdade(!a.resumo.colunas_ausentes.includes("Horário da call") && !a.resumo.colunas_ausentes.includes("Recebido ADMS"), JSON.stringify(a.resumo.colunas_ausentes));
+    igual([a.validas[0].horario_call, a.validas[0].recebido_adms, N.formatarDataHora(a.validas[0].horario_call)], ["2026-11-12T14:35:10", "2026-11-12T14:35:10", "12/11/2026 14:35:10"]);
+    igual([d.datas.horario_call.coluna, d.datas.horario_call.reconhecidas, d.datas.recebido_adms.coluna], ["Horario_Call", 1, "Recebido_Adms"]);
+    igual(a.erros, [], "sem aviso de data");
+  });
+  await teste("Data ADMS 2b: cabeçalho tolera maiúsculas, acentos, espaços e '_' (sem inventar data)", () => {
+    for (const nome of ["HORARIO_CALL", "horario_call", "Horário_Call", " Horario  Call ", "Horario_Call:"]) {
+      const a = N.analisar(gerarCSVReal([linha("CALL 1", "INC 1", "", "", { horario: "01/11/2026 05:02:29" })], { "Horário da call": nome, "Recebido ADMS": "RECEBIDO_ADMS" }));
+      igual([a.validas[0].horario_call, a.validas[0].recebido_adms], ["2026-11-01T05:02:29", "2026-11-01T05:02:29"], nome);
+    }
+    const vazio = N.analisar(gerarCSVReal([semHora(linha("CALL 1", "INC 1"))])).validas[0];
+    igual([vazio.horario_call, vazio.recebido_adms], [null, null], "vazio continua vazio (nunca a data da importação)");
+  });
+  await teste("Filtro por data 3-6: hoje, ontem, outras datas e sem data (data real do incidente)", () => {
+    const g = N.agruparIncidentes(N.analisar(gerarCSVReal(cenarioDatas())).validas), dias = new Map(g.map((x) => [x.incidente, N.dataDoIncidente(x)]));
+    igual(dias.get("INC 0000903"), { dia: ONTEM, iso: ONTEM + "T23:59:00", origem: "horario_call" });
+    igual(dias.get("INC 0000906"), { dia: null, iso: null, origem: null }, "sem data não vira hoje");
+    igual(dias.get("INC 0000907"), { dia: HOJE, iso: HOJE + "T07:00:00", origem: "recebido_adms" }, "Recebido ADMS marcado como recebimento");
+    const em = (f) => g.filter((x) => N.conferirFiltroData(dias.get(x.incidente).dia, f, HOJE)).map((x) => x.incidente).sort();
+    igual(em(N.filtroDataPadrao()), ["INC 0000901", "INC 0000902", "INC 0000907"], "padrão = hoje");
+    igual(em({ modo: "periodo", de: ONTEM, ate: ONTEM }), ["INC 0000903"], "ontem");
+    igual(em({ modo: "periodo", de: ANTIGA, ate: ANTIGA }), ["INC 0000904"], "data antiga");
+    igual(em({ modo: "periodo", de: FUTURA, ate: "" }), ["INC 0000905"], "data futura");
+    igual(em({ modo: "sem_data" }), ["INC 0000906"], "sem data, à parte");
+    igual(em({ modo: "todas" }).length, 7, "todas as datas");
+    igual(N.resumoFiltroData([...dias.values()].map((d) => d.dia), N.filtroDataPadrao(), HOJE), { total: 7, no_filtro: 3, outras_datas: 3, sem_data: 1, hoje: 3 });
+  });
+  await teste("Filtro por data 7-8: intervalo (inclusive, invertido, só início/fim) e botão Hoje", () => {
+    const f = N.normalizarFiltroData;
+    igual(f({ modo: "periodo", de: HOJE, ate: ONTEM }), { modo: "periodo", de: HOJE, ate: ONTEM }, "datas do operador não são trocadas");
+    verdade(!N.conferirFiltroData(HOJE, { modo: "periodo", de: HOJE, ate: ONTEM }, HOJE), "início depois do fim = período vazio");
+    verdade(N.conferirFiltroData(HOJE, { modo: "periodo", de: ONTEM, ate: "" }, HOJE) && !N.conferirFiltroData(ANTIGA, { modo: "periodo", de: ONTEM, ate: "" }, HOJE), "só data inicial");
+    verdade(N.conferirFiltroData(ANTIGA, { modo: "periodo", de: "", ate: ONTEM }, HOJE) && !N.conferirFiltroData(HOJE, { modo: "periodo", de: "", ate: ONTEM }, HOJE), "só data final");
+    igual(f({ modo: "periodo", de: "", ate: "" }), { modo: "todas", de: "", ate: "" }, "período vazio = todas");
+    igual(f({ modo: "xyz" }), { modo: "hoje", de: "", ate: "" }, "inválido = hoje");
+    verdade(N.conferirFiltroData(ONTEM, { modo: "periodo", de: ONTEM, ate: HOJE }, HOJE) && N.conferirFiltroData(HOJE, { modo: "periodo", de: ONTEM, ate: HOJE }, HOJE), "limites inclusivos");
+    verdade(!N.conferirFiltroData(ANTIGA, { modo: "periodo", de: ONTEM, ate: HOJE }, HOJE) && !N.conferirFiltroData(null, { modo: "periodo", de: ONTEM, ate: HOJE }, HOJE), "fora do intervalo / sem data");
+    verdade(N.conferirFiltroData(HOJE, { modo: "hoje" }, HOJE) && !N.conferirFiltroData(ONTEM, { modo: "hoje" }, HOJE), "Hoje");
+    igual(N.descreverFiltroData({ modo: "hoje" }, "2026-11-12"), "Hoje (12/11/2026)");
+    igual(N.descreverFiltroData({ modo: "periodo", de: "2026-11-10", ate: "2026-11-12" }), "10/11/2026 a 12/11/2026");
+  });
+  await teste("Filtro por data 9: envio em lote recebe a data do incidente; só o filtrado entra na fila; confirmado não volta", async () => {
+    await abrirDia(S); await importar(S, gerarCSVReal(cenarioDatas()), "chamadas_incidentes.csv");
+    const lista = S.incidentesParaDisparo(), hoje = lista.filter((x) => N.conferirFiltroData(x.data_incidente.dia, N.filtroDataPadrao(), HOJE));
+    igual(hoje.map((x) => x.incidente).sort(), ["INC 0000901", "INC 0000902", "INC 0000907"]);
+    const feito = hoje[0]; await S.registrar(feito.id, "callback_realizado", "whatsapp");
+    const elegiveis = S.incidentesParaDisparo().filter((x) => x.elegivel && N.conferirFiltroData(x.data_incidente.dia, N.filtroDataPadrao(), HOJE));
+    verdade(!elegiveis.some((x) => x.chave === feito.chave), "callback confirmado não fica elegível");
+    const f = await S.iniciarAtendimento(elegiveis.map((x) => x.chave));
+    igual(f.itens.map((i) => i.incidente).sort(), elegiveis.map((x) => x.incidente).sort(), "fila = só os de hoje");
+    verdade(f.itens.every((i) => ![ "INC 0000903", "INC 0000904", "INC 0000905", "INC 0000906"].includes(i.incidente)), "nenhuma outra data na fila");
+    await S.cancelarAtendimento(f.id);
+    const recusa = await S.iniciarAtendimento([feito.chave]).then(() => "aceitou", (e) => e.message);
+    verdade(recusa.includes("Nenhum incidente"), "confirmado não é reenviado: " + recusa);
+  });
+  await teste("Filtro por data 10: callbacks, tentativas e histórico preservados; nova versão (Horario_Call) não altera registros", async () => {
+    await abrirDia(S); const b1 = gerarCSV(cenarioDatas()); // lote com cabeçalho antigo, vindo da pasta
+    await S.importar("chamadas_incidentes.csv", b1, N.sha256Hex(b1), "pasta_adms");
+    const [c1, c2] = S.chamadas();
+    await S.registrar(c1.id, "callback_realizado", "whatsapp"); await S.registrar(c2.id, "sem_sucesso", "ligacao");
+    const antes = JSON.stringify([S.obterChamada(c1.id), S.obterChamada(c2.id)]), hist = JSON.stringify(S.E.historico_atendimento);
+    const b2 = gerarCSVReal(cenarioDatas()); const r = await S.atualizarLote("chamadas_incidentes.csv", b2, N.sha256Hex(b2));
+    igual([r.novas, r.preservadas], [0, 2]);
+    igual(JSON.stringify([S.obterChamada(c1.id), S.obterChamada(c2.id)]), antes, "registros do operador intactos");
+    igual(JSON.stringify(S.E.historico_atendimento), hist, "histórico intacto");
+    igual(S.chamadas().length, 7, "nada removido pelo filtro");
+    verdade(S.chamadas().filter((c) => c.id !== c1.id && c.id !== c2.id && c.call_id !== "CALL 0000906").every((c) => c.horario_call || c.recebido_adms), "datas lidas na versão nova");
+  });
+
+  /* ==================================================== Preencher datas ausentes (lote gravado pelo parser antigo) */
+  const LEGADO = { "Horário da call": "HC_LEGADO", "Recebido ADMS": "RA_LEGADO" }; // colunas não reconhecidas = datas vazias, como no parser antigo
+  const linhasDatas = () => [1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => linha(`CALL 00008${i}0`, `INC 00008${i}0`, `MOBILE: 79 9910-08${i}0`, "", { horario: brData(HOJE, `0${i}:00:00`) }));
+  const clonarJ = (x) => JSON.parse(JSON.stringify(x));
+  const semCampos = (c) => { const x = { ...c }; delete x.horario_call; delete x.recebido_adms; return x; };
+  async function loteLegado() { // lote aberto com 9 chamadas sem data; algumas com registro do operador
+    await abrirDia(S); await importar(S, gerarCSVReal(linhasDatas(), LEGADO), "legado.csv");
+    const cs = S.chamadas(), id = (n) => cs.find((c) => c.call_id === `CALL 00008${n}0`).id;
+    verdade(cs.every((c) => !c.horario_call && !c.recebido_adms), "lote legado sem datas");
+    await S.registrar(id(1), "callback_realizado", "whatsapp", "obs fictícia"); await S.registrar(id(2), "sem_sucesso", "ligacao");
+    await S.registrarResultado(id(1), "servico_executado");
+    // CALL 9: já tem horario_call (não pode ser sobrescrito); falta só recebido_adms (registro de versão anterior, sem o campo)
+    await S._alterar((E) => { const c = E.chamadas.find((x) => x.id === id(9)); c.horario_call = HOJE + "T23:00:00"; delete c.recebido_adms; });
+    return id;
+  }
+  function csvAtualDatas() { // CSV ATUAL da pasta (cabeçalho real)
+    const ls = linhasDatas();
+    const sem3 = ls.filter((l) => l.ID !== "CALL 0000830"); // CALL 3: sem correspondência
+    const dup4 = { ...ls[3], "Horário da call": brData(ONTEM, "04:00:00") }; // CALL 4 com datas diferentes: ambígua
+    sem3.find((l) => l.ID === "CALL 0000850").Incidente = "INC 9999999"; // CALL 5: incidente divergente: ambígua
+    semHora(sem3.find((l) => l.ID === "CALL 0000860")); // CALL 6: sem data válida no CSV
+    semHora(sem3.find((l) => l.ID === "CALL 0000870"), brData(HOJE, "06:30:00")); // CALL 7: só Recebido ADMS
+    sem3.find((l) => l.ID === "CALL 0000890")["Horário da call"] = brData(ONTEM, "11:11:11"); // CALL 9: data diferente da gravada
+    return gerarCSVReal(sem3.concat([dup4, { ...ls[0] }])); // CALL 1 repetida com valores idênticos: não é ambígua
+  }
+  await teste("Preencher datas: prévia conta ausentes, horário, recebido, sem correspondência e ambíguos — sem gravar nada", async () => {
+    await loteLegado(); const rev = S.arm.revisao, antes = JSON.stringify(S.E);
+    const p = S.previaDatas(csvAtualDatas());
+    igual([p.chamadas_no_lote, p.com_datas_ausentes, p.sem_horario_call, p.sem_recebido_adms], [9, 9, 8, 9]);
+    igual([p.recebem_horario_call, p.recebem_recebido_adms, p.registros_a_atualizar, p.sem_correspondencia, p.ambiguas, p.sem_data_no_csv], [3, 5, 5, 1, 2, 1]);
+    igual(p.colunas_de_data, { horario_call: "Horario_Call", recebido_adms: "Recebido_Adms" });
+    igual([S.arm.revisao, JSON.stringify(S.E)], [rev, antes], "prévia não grava");
+  });
+  await teste("Preencher datas: só os 2 campos vazios; nada inserido/removido; data existente nunca sobrescrita; operador e histórico idênticos", async () => {
+    const id = await loteLegado(), b = csvAtualDatas(), p = S.previaDatas(b);
+    const antes = clonarJ(S.E), r = await S.preencherDatas(b, p.sha256, p.lote_id);
+    igual([r.gravados, r.recebem_horario_call, r.recebem_recebido_adms, r.sem_correspondencia, r.ambiguas, r.sem_data_no_csv], [5, 3, 5, 1, 2, 1]);
+    const c = (n) => S.obterChamada(id(n));
+    igual([c(1).horario_call, c(1).recebido_adms], [HOJE + "T01:00:00", HOJE + "T01:00:00"], "CALL 1 (com callback) recebeu as datas");
+    igual([c(2).horario_call, c(8).horario_call], [HOJE + "T02:00:00", HOJE + "T08:00:00"]);
+    igual([c(3).horario_call, c(4).horario_call, c(5).horario_call, c(6).horario_call, c(6).recebido_adms], [null, null, null, null, null], "não identificados/ambíguos/sem data continuam vazios");
+    igual([c(7).horario_call, c(7).recebido_adms], [null, HOJE + "T06:30:00"], "só recebimento");
+    igual([c(9).horario_call, c(9).recebido_adms], [HOJE + "T23:00:00", HOJE + "T09:00:00"], "horário existente NÃO sobrescrito (CSV traz outro); recebido vazio preenchido");
+    igual(S.E.chamadas.length, antes.chamadas.length, "nada inserido nem removido");
+    igual(S.E.chamadas.map((x) => x.id), antes.chamadas.map((x) => x.id), "mesmos registros, mesma ordem");
+    igual(S.E.chamadas.map(semCampos), antes.chamadas.map(semCampos), "nenhum outro campo das chamadas mudou (estado, tentativas, callbacks, WhatsApp, observações, grupo)");
+    for (const k of ["historico_atendimento", "marcas", "disparos", "callbacks_manuais", "sessao", "exportacoes", "dias_encerrados"]) igual(S.E[k], antes[k], k + " intacto");
+    igual([c(1).estado, c(1).tentativas.length, !!c(1).servico_executado_em, c(1).observacao, c(2).tentativas.length], ["callback_realizado", 1, true, "obs fictícia", 1]);
+    const auditoria = S.loteAberto().preenchimento_datas; igual([auditoria.length, auditoria[0].registros], [1, 5], "registro de auditoria no lote");
+    const r2 = await S.preencherDatas(b, p.sha256, p.lote_id); igual(r2.gravados, 0, "segunda execução não muda nada");
+  });
+  await teste("Preencher datas: tudo ou nada (falha na gravação não deixa nada alterado) e recusa arquivo/lote diferente da prévia", async () => {
+    await loteLegado(); const b = csvAtualDatas(), p = S.previaDatas(b), antes = JSON.stringify(S.E), gravar = S.arm.gravar;
+    S.arm.gravar = () => Promise.reject(new Error("falha simulada do disco"));
+    try { await falhaCom(() => S.preencherDatas(b, p.sha256, p.lote_id), "falha simulada"); } finally { S.arm.gravar = gravar; }
+    igual(JSON.stringify(S.E), antes, "nada alterado em memória");
+    await S.carregar(); igual(S.chamadas().filter((c) => c.horario_call).length, 1, "nada gravado no armazenamento (só a CALL 9 já tinha)");
+    await falhaCom(() => S.preencherDatas(b, "0".repeat(64), p.lote_id), "arquivo mudou");
+    await falhaCom(() => S.preencherDatas(b, p.sha256, "outro-lote"), "lote mudou");
+  });
+
+  /* ==================================================== chamadas_incidentes.csv REAL da pasta ADMS (12/11/2026)
+     Estrutura conferida no arquivo da rede: UTF-8 com BOM, separador ",", sem aspas, CRLF, 26 colunas nesta ordem, datas
+     mm/dd/aaaa h:mm:ss AM|PM e contato só com dígitos. Valores FICTÍCIOS (nenhum dado de cliente real). */
+  const CAB_PASTA = ["ID", "Incidente", "Prioridade_Chamada", "Motivo", "submotivo", "Comentario", "Emergencia", "Nome_do_Consumidor",
+    "Protocolo", "Contato_Do_Consumidor", "Localizacao", "UC", "Tipo_UC", "Prioridade_Consumidor", "Nome", "Roteiro", "Horario_Call",
+    "Horario_agendado", "Recebido_Adms", "RecUser", "Callback", "Medidor_ID", "tipo_medidor", "Anexos", "Notas_endereco", "codigo_localidade"];
+  const DE_PARA_PASTA = { ID: "ID", Incidente: "Incidente", Motivo: "Motivo", submotivo: "Submotivos", Comentario: "Comentário",
+    Nome_do_Consumidor: "Nome do reclamante", Protocolo: "Protocolo", Contato_Do_Consumidor: "Contato do reclamante", Localizacao: "Localização",
+    UC: "UC", Tipo_UC: "Tipo UC:", Horario_Call: "Horário da call", Recebido_Adms: "Recebido ADMS", Medidor_ID: "Medidor ID", Notas_endereco: "Nota do endereço" };
+  const FIXOS_PASTA = { Prioridade_Chamada: "1", Prioridade_Consumidor: "Normal", Nome: "Operador Ficticio", Roteiro: "R1", RecUser: "usuario_ficticio", Callback: "Sim", codigo_localidade: "1" };
+  const campoCSV = (v) => (/[",\r\n]/.test(String(v)) ? q(v) : String(v));
+  // "dd/mm/aaaa hh:mm:ss" (24 h) -> "m/d/aaaa h:mm:ss AM|PM", como o ADMS grava na pasta
+  function paraAMPM(br) {
+    if (!br) return "";
+    const [, d, m, a, h, mi, s] = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})$/.exec(br), hh = +h;
+    return `${+m}/${+d}/${a} ${hh % 12 === 0 ? 12 : hh % 12}:${mi}:${s} ${hh < 12 ? "AM" : "PM"}`;
+  }
+  function gerarCSVPasta(linhas) {
+    let t = "﻿" + CAB_PASTA.join(",") + "\r\n";
+    for (const l of linhas) t += CAB_PASTA.map((c) => {
+      const v = DE_PARA_PASTA[c] ? l[DE_PARA_PASTA[c]] ?? "" : FIXOS_PASTA[c] ?? "";
+      return campoCSV(c === "Horario_Call" || c === "Recebido_Adms" ? paraAMPM(v) : c === "Contato_Do_Consumidor" ? String(v).replace(/\D/g, "") : v);
+    }).join(",") + "\r\n";
+    return new TextEncoder().encode(t);
+  }
+
+  await teste("AM/PM 1: equivalência obrigatória — '12/11/2026 18:13:51' (Navegador) = '11/12/2026 6:13:51 PM' (pasta ADMS)", () => {
+    igual(N.lerDataHora("12/11/2026 18:13:51"), "2026-11-12T18:13:51");
+    igual(N.lerDataHora("11/12/2026 6:13:51 PM"), "2026-11-12T18:13:51");
+    igual(N.formatarDataHora(N.lerDataHora("11/12/2026 6:13:51 PM")), "12/11/2026 18:13:51");
+    // pares reais (só datas) da comparação Navegador x pasta ADMS de 12/11/2026
+    for (const [br, us] of [["12/11/2026 18:11:03", "11/12/2026 6:11:03 PM"], ["12/11/2026 17:42:58", "11/12/2026 5:42:58 PM"], ["12/11/2026 18:13:53", "11/12/2026 6:13:53 PM"]])
+      igual(N.lerDataHora(us), N.lerDataHora(br), us);
+  });
+  await teste("AM/PM 2: AM, PM, meia-noite, meio-dia, mês e dia com um dígito", () => {
+    const ok = {
+      "10/7/2026 11:31:20 AM": "2026-10-07T11:31:20", "10/7/2026 4:36:59 PM": "2026-10-07T16:36:59", "11/9/2026 9:05:00 AM": "2026-11-09T09:05:00",
+      "11/12/2026 12:00:00 AM": "2026-11-12T00:00:00", "11/12/2026 12:59:59 AM": "2026-11-12T00:59:59", "11/12/2026 1:00:00 AM": "2026-11-12T01:00:00",
+      "11/12/2026 12:00:00 PM": "2026-11-12T12:00:00", "11/12/2026 12:30:15 PM": "2026-11-12T12:30:15", "11/12/2026 1:00:00 PM": "2026-11-12T13:00:00",
+      "11/12/2026 11:59:59 PM": "2026-11-12T23:59:59", "1/2/2026 3:04:05 AM": "2026-01-02T03:04:05", "01/02/2026 03:04:05 PM": "2026-01-02T15:04:05",
+      "2/28/2026 8:00 PM": "2026-02-28T20:00:00", "11/12/2026 6:13:51 pm": "2026-11-12T18:13:51", " 11/12/2026  6:13:51  PM ": "2026-11-12T18:13:51",
+    };
+    for (const [v, iso] of Object.entries(ok)) igual(N.lerDataHora(v), iso, v);
+  });
+  await teste("AM/PM 3: datas/horas impossíveis e valores vazios são recusados; sem AM/PM nada é adivinhado", () => {
+    for (const v of ["11/12/2026 0:10:00 AM", "11/12/2026 13:00:00 PM", "11/12/2026 6:60:00 PM", "11/12/2026 6:13:61 PM", "2/30/2026 6:13:51 PM",
+      "13/12/2026 6:13:51 PM", "0/12/2026 6:13:51 PM", "11/0/2026 6:13:51 PM", "11/12/2026 6:13:51PM", "11/12/2026 6:13:51 XM", "11-12-2026 6:13:51 PM",
+      "11/12/26 6:13:51 PM", "11/12/2026 PM", "11/12/2026 6:13:51 PM -03:00"]) igual(N.lerDataHora(v), null, v);
+    for (const v of ["", "   ", null, undefined]) igual(N.lerDataHora(v), null, String(v));
+    igual(N.tratar({ valores: { call_id: "1", horario_call: "", recebido_adms: " " } })[1], [], "vazio não gera aviso");
+    igual(N.lerDataHora("11/12/2026 18:13:51"), "2026-12-11T18:13:51", "sem AM/PM continua dia/mês (inalterado)");
+    igual(N.lerDataHora("11/30/2026 18:13:51"), null, "sem AM/PM, mês 30 não é reinterpretado como mm/dd");
+  });
+  await teste("Pasta ADMS real: cabeçalho, separador ',', BOM e aliases (contato, nome, submotivo, nota do endereço)", () => {
+    const b = gerarCSVPasta([linha("CALL 0000701", "INC 0000701", "79991000701", "Sem energia", { horario: "12/11/2026 18:13:51", submotivos: "FE" })]);
+    const arq = N.lerCSV(b), a = N.analisar(b), v = a.validas[0];
+    igual([arq.codificacao, arq.separador, arq.tinha_linha_sep, arq.cabecalho.length], ["utf-8", ",", false, 26]);
+    igual([arq.colunas_reconhecidas.contato, arq.colunas_reconhecidas.nome_reclamante, arq.colunas_reconhecidas.submotivos, arq.colunas_reconhecidas.nota_endereco,
+      arq.colunas_reconhecidas.horario_call, arq.colunas_reconhecidas.recebido_adms], ["Contato_Do_Consumidor", "Nome_do_Consumidor", "submotivo", "Notas_endereco", "Horario_Call", "Recebido_Adms"]);
+    verdade(!arq.colunas_desconhecidas.some((c) => ["Contato_Do_Consumidor", "Nome_do_Consumidor", "submotivo", "Notas_endereco"].includes(c)), JSON.stringify(arq.colunas_desconhecidas));
+    // aliases antigos continuam valendo
+    const antigo = N.lerCSV(gerarCSV([linha("CALL 1", "INC 1", "MOBILE: 79991000001")])).colunas_reconhecidas;
+    igual([antigo.contato, antigo.nome_reclamante, antigo.submotivos, antigo.nota_endereco, antigo.horario_call], ["Contato do reclamante", "Nome do reclamante", "Submotivos", "Nota do endereço", "Horário da call"]);
+    igual([v.horario_call, v.recebido_adms, v.nome, v.submotivos], ["2026-11-12T18:13:51", "2026-11-12T18:13:51", "Cliente Fictício 0000701", "FE"]);
+    igual(a.erros, [], "sem aviso de data");
+  });
+  await teste("Pasta ADMS real: telefone extraído de 'Contato_Do_Consumidor' (celular, fixo, inválido e vazio)", () => {
+    const ls = [linha("CALL 0000711", "INC 0000711", "79991000711"), linha("CALL 0000712", "INC 0000712", "7932000712"),
+      linha("CALL 0000713", "INC 0000713", "0000000000"), linha("CALL 0000714", "INC 0000714", "")];
+    const a = N.analisar(gerarCSVPasta(ls)), t = (call) => a.validas.find((x) => x.call_id === call).telefones;
+    igual(t("CALL 0000711").map((x) => [x.numero, x.tipo, x.origem]), [["79991000711", "celular", "contato_reclamante"]]);
+    igual(t("CALL 0000712").map((x) => [x.numero, x.tipo]), [["7932000712", "fixo"]]);
+    igual(t("CALL 0000713").map((x) => x.tipo), ["invalido"]); igual(t("CALL 0000714"), []);
+    // mesma regra do cabeçalho antigo: o resultado é idêntico ao da exportação do Navegador
+    const antigo = N.analisar(gerarCSV(ls)).validas.map((x) => x.telefones.map((y) => [y.numero, y.tipo]));
+    igual(a.validas.map((x) => x.telefones.map((y) => [y.numero, y.tipo])), antigo, "mesmas regras de telefone");
+  });
+  const cenarioPasta = () => [
+    linha("CALL 0000721", "INC 0000721", "79991000721", "", { horario: brData(HOJE, "00:05:00") }),
+    linha("CALL 0000722", "INC 0000722", "79991000722", "", { horario: brData(HOJE, "12:00:00") }),
+    linha("CALL 0000723", "INC 0000723", "79991000723", "", { horario: brData(ONTEM, "18:13:51") }),
+    semHora(linha("CALL 0000724", "INC 0000724", "79991000724")),
+  ];
+  await teste("Pasta ADMS real: importação MANUAL grava data/hora AM/PM convertida e telefones", async () => {
+    await abrirDia(S); const cs = await importar(S, gerarCSVPasta(cenarioPasta()), "chamadas_incidentes.csv");
+    const c = (n) => cs.find((x) => x.call_id === `CALL 000072${n}`);
+    igual([c(1).horario_call, c(2).horario_call, c(3).horario_call, c(3).recebido_adms], [HOJE + "T00:05:00", HOJE + "T12:00:00", ONTEM + "T18:13:51", ONTEM + "T18:13:51"]);
+    igual([c(4).horario_call, c(4).recebido_adms], [null, null], "vazio continua vazio (nunca a data da importação)");
+    igual(c(1).telefones.map((t) => [t.numero, t.tipo]), [["79991000721", "celular"]]);
+    verdade(!S.loteAberto().origem, "importação manual"); await S.encerrarLote();
+  });
+  await teste("Pasta ADMS real: importação AUTOMÁTICA e nova versão AM/PM preservam registros, callbacks e histórico", async () => {
+    await abrirDia(S); const b1 = gerarCSVPasta(cenarioPasta());
+    await S.importar("chamadas_incidentes.csv", b1, N.sha256Hex(b1), "pasta_adms");
+    igual(S.loteAberto().origem, "pasta_adms");
+    const c1 = S.chamadas().find((x) => x.call_id === "CALL 0000721"), c2 = S.chamadas().find((x) => x.call_id === "CALL 0000722");
+    igual(c1.horario_call, HOJE + "T00:05:00");
+    await S.registrar(c1.id, "callback_realizado", "whatsapp", "obs fictícia"); await S.registrar(c2.id, "sem_sucesso", "ligacao");
+    const antes = JSON.stringify([S.obterChamada(c1.id), S.obterChamada(c2.id)]), hist = JSON.stringify(S.E.historico_atendimento), ids = S.chamadas().map((x) => x.id);
+    const b2 = gerarCSVPasta(cenarioPasta().concat([linha("CALL 0000725", "INC 0000725", "79991000725", "", { horario: brData(HOJE, "23:59:59") })]));
+    const r = await S.atualizarLote("chamadas_incidentes.csv", b2, N.sha256Hex(b2));
+    igual([r.novas, r.preservadas], [1, 2]);
+    igual(JSON.stringify([S.obterChamada(c1.id), S.obterChamada(c2.id)]), antes, "registros do operador intactos");
+    igual(JSON.stringify(S.E.historico_atendimento), hist, "histórico intacto");
+    verdade(ids.every((id) => S.chamadas().some((x) => x.id === id)), "nada removido");
+    igual(S.chamadas().find((x) => x.call_id === "CALL 0000725").horario_call, HOJE + "T23:59:59");
+    await S.encerrarLote();
+  });
+  await teste("Preencher datas com o CSV REAL (AM/PM): prévia e gravação recuperam as datas; ambíguos bloqueados; nada mais muda", async () => {
+    const id = await loteLegado();
+    // mesmo cenário de csvAtualDatas(), no formato real da pasta (CALL 3 ausente, 4 e 5 ambíguas, 6 sem data, 7 só recebido, 9 com data gravada)
+    const ls = linhasDatas(), sem3 = ls.filter((l) => l.ID !== "CALL 0000830"), dup4 = { ...ls[3], "Horário da call": brData(ONTEM, "04:00:00") };
+    sem3.find((l) => l.ID === "CALL 0000850").Incidente = "INC 9999999";
+    semHora(sem3.find((l) => l.ID === "CALL 0000860")); semHora(sem3.find((l) => l.ID === "CALL 0000870"), brData(HOJE, "18:30:00"));
+    sem3.find((l) => l.ID === "CALL 0000890")["Horário da call"] = brData(ONTEM, "11:11:11");
+    const b = gerarCSVPasta(sem3.concat([dup4, { ...ls[0] }]));
+    verdade(new TextDecoder().decode(b).includes(" AM,") && new TextDecoder().decode(b).includes(" PM,"), "CSV de teste usa AM/PM");
+    const rev = S.arm.revisao, antesPrevia = JSON.stringify(S.E), p = S.previaDatas(b);
+    igual([S.arm.revisao, JSON.stringify(S.E)], [rev, antesPrevia], "prévia não grava");
+    igual([p.recebem_horario_call, p.recebem_recebido_adms, p.registros_a_atualizar, p.sem_correspondencia, p.ambiguas, p.sem_data_no_csv], [3, 5, 5, 1, 2, 1]);
+    igual(p.colunas_de_data, { horario_call: "Horario_Call", recebido_adms: "Recebido_Adms" });
+    const antes = clonarJ(S.E), r = await S.preencherDatas(b, p.sha256, p.lote_id), c = (n) => S.obterChamada(id(n));
+    igual([r.gravados, r.ambiguas, r.sem_correspondencia], [5, 2, 1]);
+    igual([c(1).horario_call, c(1).recebido_adms, c(2).horario_call, c(8).horario_call], [HOJE + "T01:00:00", HOJE + "T01:00:00", HOJE + "T02:00:00", HOJE + "T08:00:00"]);
+    igual([c(7).horario_call, c(7).recebido_adms], [null, HOJE + "T18:30:00"], "PM convertido no recebimento");
+    igual([c(3).horario_call, c(4).horario_call, c(5).horario_call, c(6).horario_call], [null, null, null, null], "sem correspondência/ambíguos/sem data continuam vazios");
+    igual([c(9).horario_call, c(9).recebido_adms], [HOJE + "T23:00:00", HOJE + "T09:00:00"], "data existente NÃO sobrescrita");
+    igual(S.E.chamadas.map((x) => x.id), antes.chamadas.map((x) => x.id), "nada inserido nem removido");
+    igual(S.E.chamadas.map(semCampos), antes.chamadas.map(semCampos), "nenhum outro campo mudou");
+    for (const k of ["historico_atendimento", "marcas", "disparos", "callbacks_manuais", "sessao", "exportacoes", "dias_encerrados"]) igual(S.E[k], antes[k], k + " intacto");
+    igual([c(1).estado, c(1).tentativas.length, c(1).observacao], ["callback_realizado", 1, "obs fictícia"]);
   });
 
   S.arm.fechar();

@@ -1,0 +1,77 @@
+CENTRAL DE CALLBACK COI - EXPORTACAO DO FECHAMENTO PARA A PASTA DE REDE
+=======================================================================
+Destino: a pasta definida em js\config-local.js (pasta_rede). Esse arquivo NAO e versionado; modelo em js\config-local.exemplo.js.
+Exemplo neste documento: W:\PASTA-DA-EQUIPE\central-callback (troque pelo caminho real da empresa no config-local.js).
+Modulo: js/exportacao-rede.js. DESTINO PRINCIPAL do fechamento diario (botao ENCERRAR O DIA). Nao usa o Google Drive.
+
+ENCERRAR O DIA ("Encerrar e exportar para a pasta de rede")
+1. Gera o fechamento normalmente e o guarda no IndexedDB (o registro nunca e apagado).
+2. Exporta para a pasta autorizada o fechamento do dia (e versoes anteriores do mesmo dia ainda nao exportadas).
+3. So mostra "Fechamento concluido" depois da gravacao conferida (leitura do arquivo na pasta + SHA-256), com o nome do arquivo.
+4. Sem sucesso, mostra "Fechamento realizado, mas NAO exportado" e registra a exportacao como PENDENTE:
+   - pasta nao configurada: botao Configurar pasta agora (abre o seletor) ou Depois;
+   - permissao a renovar: botao Autorizar e exportar (o pedido do Edge so aparece com o clique);
+   - W: indisponivel / falha de gravacao: motivo exibido, botao Tentar novamente.
+   Nada e apagado; a exportacao pode ser repetida depois em Fechamento > EXPORTAR FECHAMENTO.
+
+GOOGLE DRIVE (agora opcional)
+- O encerramento e a abertura da Central NAO chamam mais o Drive. O codigo, o gateway e o historico do Drive foram mantidos.
+- Envio manual: Fechamento > "Enviar ao Google Drive (opcional)" (mesmas garantias de antes: so "Salvo no Drive" com confirmacao).
+- Fechamentos antigos ja salvos no Drive continuam na lista com "Salvo no Drive" e a pasta do Drive; na coluna Pasta de rede
+  aparecem como "Nao exportado - fechamento anterior, ja salvo no Google Drive": nao contam como pendentes e nao entram no
+  EXPORTAR FECHAMENTO. Se quiser, exporte um deles pelo botao Exportar da propria linha.
+
+ONDE FICA
+- Botao "Fechamento" no topo > bloco "Pasta de rede" (estado, EXPORTAR FECHAMENTO, CONFIGURAR PASTA DE EXPORTACAO / Trocar pasta,
+  Autorizar acesso) e coluna "Pasta de rede" em cada fechamento (Exportar / Exportar novamente).
+
+CONFIGURACAO (uma vez por navegador/perfil/computador)
+1. Fechamento > CONFIGURAR PASTA DE EXPORTACAO.
+2. No seletor do Edge, navegue ate W:\PASTA-DA-EQUIPE, entre em central-callback e clique em "Selecionar pasta".
+3. Confirme no Edge a permissao para "ver e editar" (leitura e gravacao).
+4. A Central so aceita uma pasta chamada central-callback, grava e apaga um arquivo de teste (.teste-gravacao-central-*.tmp)
+   e guarda o identificador da pasta no IndexedDB. Se o teste falhar, nada muda.
+O navegador NAO informa a letra nem o caminho completo da pasta escolhida (so o nome). A Central confere o nome; o caminho
+W:\PASTA-DA-EQUIPE e responsabilidade de quem seleciona.
+
+PROXIMAS VEZES
+- O identificador e lido do IndexedDB; a permissao e consultada (queryPermission). O seletor nao abre de novo.
+- Se o Edge pedir autorizacao de novo (normal depois de fechar o navegador, conforme a politica do Edge), o estado fica
+  "Permissao necessaria" e o pedido so aparece quando o operador clica em Autorizar acesso ou EXPORTAR FECHAMENTO.
+
+ESTADOS
+- Pasta nao configurada / Pasta configurada / Permissao necessaria / Pasta indisponivel (W: desconectada, VPN/Citrix, pasta
+  removida ou renomeada) / Navegador sem suporte (ex.: Firefox).
+- Resumo: "Exportacao concluida" (todos na pasta) ou "N fechamento(s) com exportacao pendente ou com erro".
+
+EXPORTAR FECHAMENTO
+- Exporta todos os fechamentos pendentes (cada versao e um arquivo). Grava direto, sem "Salvar como".
+- Arquivo: fechamento_callbacks_<AAAA-MM-DD>_<POLO>_PC<instalacao>_OP-<operador que fechou>[_vN].csv
+  O codigo PC identifica o navegador/computador; dois computadores nunca geram o mesmo nome.
+- Conteudo: o mesmo CSV do fechamento (so totais por polo e operador, sem nenhum dado de cliente), UTF-8 com BOM e ";" (Excel).
+- So vira "Exportado" depois de ler o arquivo de volta na pasta e conferir o SHA-256. Falha no meio: o arquivo incompleto que a
+  propria tentativa criou e removido; nada e marcado como exportado; o fechamento continua guardado na Central.
+- Registro em cada fechamento (historico_rede, ultimas 30 tentativas): data/hora, operador, arquivo, resultado e detalhe.
+  Resultados: exportado, ja_estava_na_pasta, conflito, falha.
+
+REEXPORTAR (controlado, "Exportar novamente" pede confirmacao)
+- Arquivo identico na pasta: so conferido, nada e regravado.
+- Arquivo apagado da pasta: e gravado de novo.
+- Arquivo com o mesmo nome e conteudo DIFERENTE: NAO e sobrescrito; o conflito fica registrado e a exportacao anterior confirmada
+  continua valendo.
+
+TESTES AUTOMATICOS: node testes\ponta-a-ponta\e2e-exportacao-rede.mjs [navegador]
+O seletor nativo nao pode ser automatizado: o teste devolve uma pasta REAL da area privada do navegador (OPFS). Gravacao, leitura,
+IndexedDB, F5 e reabertura do navegador sao reais; a unidade W: e dois computadores NAO sao cobertos pelo teste automatico.
+
+ROTEIRO DE CONFERENCIA MANUAL NA REDE (fazer no computador do COI, com a W: mapeada)
+1. Fechamento > CONFIGURAR PASTA DE EXPORTACAO > selecionar W:\PASTA-DA-EQUIPE\central-callback. Esperado: "configurada e testada".
+2. No Explorer, conferir que nenhum .teste-gravacao-central-*.tmp ficou na pasta.
+3. EXPORTAR FECHAMENTO. Abrir o arquivo no Explorer/Excel a partir da W:.
+4. F5 e exportar de novo (novo fechamento): o seletor nao deve abrir.
+5. Fechar o Edge, reabrir, Fechamento: pode aparecer "Permissao necessaria"; Autorizar acesso; exportar.
+6. Edge > Configuracoes > Cookies e permissoes > Arquivos/pastas: remover a permissao; esperado "Permissao necessaria".
+7. Desconectar a W: (ou a VPN): esperado "Pasta indisponivel" e fechamento "Erro"; reconectar e exportar.
+8. Repetir 1-3 em OUTRO computador, com outro operador: conferir dois arquivos distintos na pasta, sem sobrescrita.
+9. De um terceiro computador, abrir a pasta da rede e conferir os arquivos e o conteudo.
+Observacao: o Edge executado "como administrador" pode nao enxergar unidades mapeadas pelo usuario; abra o Edge normalmente.

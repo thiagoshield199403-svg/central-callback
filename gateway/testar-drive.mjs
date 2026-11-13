@@ -1,4 +1,4 @@
-/* Teste real e descartável do Google Drive: cria um fechamento FICTÍCIO, envia, lê de volta, confere a leitura pelo BI e manda para a lixeira.
+/* Teste real e descartável do Google Drive: cria um fechamento FICTÍCIO, envia, lê de volta, confere a leitura pela sincronização dos fechamentos e manda para a lixeira.
    Usa uma base temporária: gateway\dados\bi-base.json e os fechamentos reais não são tocados. Nada de token aparece na saída.
    Uso: node --env-file=gateway\.env gateway\testar-drive.mjs */
 import { createHash } from "node:crypto";
@@ -20,13 +20,13 @@ const conteudo = `${CABECALHO}\r\n${data};TESTE;TESTE;2;1;0;1\r\n${data};TOTAL;T
 const temp = mkdtempSync(join(tmpdir(), "central-teste-drive-")), antes = resumoBase(), passo = (m) => console.log("OK  " + m);
 let id = null, falhou = false;
 try {
-  await drive.garantirEstrutura(); passo("estrutura de pastas confirmada (BI, HISTORICO, FECHAMENTOS)");
+  await drive.garantirEstrutura(); passo("estrutura de pastas confirmada (HISTORICO, FECHAMENTOS)");
   const envio = await drive.publicar({ nome, data, conteudo, sha256, versao: 1 }); id = envio.arquivo_id; passo(`upload concluído${envio.reaproveitado ? " (arquivo já existia, reaproveitado)" : ""}`);
   const repetido = await drive.publicar({ nome, data, conteudo, sha256, versao: 1 }); if (repetido.arquivo_id !== id || !repetido.reaproveitado) throw new Error("reenvio criou arquivo duplicado"); passo("reenvio não duplicou o arquivo");
   if (await drive.baixar(id) !== conteudo) throw new Error("conteúdo lido difere do enviado"); passo("leitura de volta idêntica ao enviado");
   const sync = criarSync({ drive, dados: temp }); await sync.sincronizar();
   const linha = sync.linhas().find((l) => l.polo === "TESTE" && l.data === data);
-  if (sync.estado().situacao !== "ok" || !linha || linha.callbacks !== 2 || linha.resolvidos !== 1) throw new Error("o BI não leu o arquivo de teste"); passo("BI leu o arquivo: 2 executados, 1 resolvido");
+  if (sync.estado().situacao !== "ok" || !linha || linha.callbacks !== 2 || linha.resolvidos !== 1) throw new Error("a sincronização não leu o arquivo de teste"); passo("sincronização leu o arquivo: 2 executados, 1 resolvido");
 } catch (e) { falhou = true; console.error("FALHA: " + e.message); }
 finally {
   if (id) { try { await drive.moverParaLixeira(id); const r = criarSync({ drive, dados: mkdtempSync(join(tmpdir(), "central-teste-drive-")) }); await r.sincronizar(); if (r.linhas().some((l) => l.polo === "TESTE")) throw new Error("arquivo ainda listado"); passo("arquivo de teste removido (lixeira do Drive) e fora do BI"); }

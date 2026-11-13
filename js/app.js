@@ -73,6 +73,7 @@
     metricas(); historico();
     if (estado.lote_aberto) carregarChamadas(); else { chamadas = []; fecharPainel(); }
     window.CentralDisparos.atualizar(); window.CentralManual.atualizar();
+    if (window.CentralPastaADMS) window.CentralPastaADMS.aoCarregar(estado); // pasta ADMS: turno recém-aberto carrega o CSV
   }
   function avisarOutrasAbas() { if (canal) canal.postMessage("mudou"); }
   function atualizarTudo() { avisarOutrasAbas(); estado = srv.estado(); metricas(); historico(); if (estado.lote_aberto) carregarChamadas(); window.CentralDisparos.atualizar(); }
@@ -122,9 +123,9 @@
     $("#lista-exportacoes").innerHTML = (ex.length ? "<h3>Exportações</h3><ul class='lista'>" + ex.map((e) =>
       `<li>${esc(e.nome)} · v${e.versao}${e.definitiva ? " (definitiva)" : ""} · ${horaBR(e.exportado_em)}
         <button class="mini-botao" data-baixar="${esc(e.id)}">salvar</button>
-       <div class="mini">${e.salvo ? esc(e.salvo.onde) + " em " + horaBR(e.salvo.em) : e.definitiva ? "cópia local opcional: o fechamento do dia vai para o Google Drive" : "<b>ainda não salvo no destino</b>"}${e.contingencia && !e.salvo ? ` · cópia de contingência baixada para Downloads em ${horaBR(e.contingencia.em)} (não está no destino)` : ""}</div></li>`).join("") + "</ul>" : "")
+       <div class="mini">${e.salvo ? esc(e.salvo.onde) + " em " + horaBR(e.salvo.em) : e.definitiva ? "cópia local opcional: o fechamento do dia vai para a pasta de rede" : "<b>ainda não salvo no destino</b>"}${e.contingencia && !e.salvo ? ` · cópia de contingência baixada para Downloads em ${horaBR(e.contingencia.em)} (não está no destino)` : ""}</div></li>`).join("") + "</ul>" : "")
       + window.CentralFechamento.historicoHtml()
-      + `<p class="mini">Exportação manual (botão Exportar do dia): pasta <span class="caminho">${esc(N.PASTA_EXPORTACAO_SUGERIDA)}</span>. O botão Encerrar o dia envia o fechamento direto ao Google Drive.</p>`;
+      + `<p class="mini">Exportação manual (botão Exportar do dia): pasta <span class="caminho">${esc(N.PASTA_EXPORTACAO_SUGERIDA)}</span>. O botão Encerrar o dia grava o fechamento na pasta de rede <span class="caminho">${esc(window.CentralExportacaoRede ? window.CentralExportacaoRede.CAMINHO : "")}</span>.</p>`;
     document.querySelectorAll("[data-baixar]").forEach((b) => b.onclick = () => salvarArquivo(srv.exportacao(b.dataset.baixar)));
   }
 
@@ -267,8 +268,8 @@
   $("#btn-encerrar-dia").onclick = async () => {
     if (estado.lote_aberto) { toast("Encerre e limpe o lote aberto antes de encerrar o dia.", true); return; }
     const m = estado.metricas_dia;
-    if (!await confirmar("Encerrar o dia", `<p>Será gerado o fechamento do dia (${m.chamadas_processadas} chamadas e ${m.callbacks_realizados} callbacks) e enviado ao <b>Google Drive</b>.
-        Depois disso o turno não recebe mais lotes.</p>`, "Encerrar e enviar ao Drive")) return;
+    if (!await confirmar("Encerrar o dia", `<p>Será gerado o fechamento do dia (${m.chamadas_processadas} chamadas e ${m.callbacks_realizados} callbacks) e exportado para a <b>pasta de rede</b>.
+        Depois disso o turno não recebe mais lotes.</p>`, "Encerrar e exportar para a pasta de rede")) return;
     const operadorDia = estado.sessao.operador, dataDia = estado.sessao.data_operacional;
     const r = await executar(() => srv.encerrarDia());
     if (!r) return;
@@ -323,6 +324,7 @@
     const l = estado.lote_aberto, a = estado.lote_em_andamento, multi = grupos.filter((g) => g.qtd > 1).length;
     $("#lote-titulo").textContent = `Lote ${l.numero} · ${l.arquivo_nome}`;
     $("#resumo-lote").textContent = `${a.chamadas} chamadas em ${grupos.length} linha(s)${multi ? ` (${multi} incidente(s) com várias comunicações)` : ""} · ${a.pendente} pendentes · ${a.callback_realizado} callbacks · ${a.servico_executado} serviços executados · ${a.resolvida} resolvidas · ${a.contato_invalido} contatos inválidos · ${a.sem_telefone} sem telefone · ${a.tentativas} tentativas`;
+    montarFiltroOcorrencia();
     desenharTabela();
     if (selecionada) abrirChamada(selecionada, painelEstado.id === selecionada ? painelEstado.modelo : null);
   }
@@ -368,17 +370,135 @@
     if (f === "risco") return N.indicacaoRisco(c).nivel >= 1;
     return c.estado === f;
   }
+  /* REGIONAIS E MUNICÍPIOS (js/localidades.js + js/filtro-regionais.js): seleção múltipla que filtra SÓ a exibição das
+     chamadas já carregadas do lote aberto. Não relê o CSV, não remove nada da base e não muda métricas: o resumo do lote
+     continua com a base completa; o resumo do filtro usa a mesma conta do lote (srv.metricasLote) sobre as chamadas da
+     seleção. Instância PRÓPRIA do envio individual (o envio em lote tem a sua). Escolha lembrada só neste navegador. */
+  /* FILTRO POR DATA DO INCIDENTE (N.dataDoIncidente / N.conferirFiltroData). Só visualização e seleção: não relê o CSV, não
+     altera nem remove registros e não muda métricas. Fica SÓ em memória: ao abrir a Central (ou F5) volta sempre para HOJE.
+     É o MESMO filtro do envio em lote (js/central-disparos.js): mudar lá ou aqui vale para os dois. */
+  let filtroData = N.filtroDataPadrao();
+  const camposFiltroData = (f = filtroData) => (f.modo === "hoje" ? { de: N.hojeLocal(), ate: N.hojeLocal() } : f.modo === "periodo" ? { de: f.de, ate: f.ate } : { de: "", ate: "" });
+  function definirFiltroData(f) {
+    filtroData = N.normalizarFiltroData(f);
+    desenharFiltroData();
+    if (estado && estado.lote_aberto) desenharTabela();
+    if (window.CentralDisparos && window.CentralDisparos.aoMudarFiltroData) window.CentralDisparos.aoMudarFiltroData();
+  }
+  window.CentralUI.filtroData = { obter: () => ({ ...filtroData }), definir: definirFiltroData, campos: () => camposFiltroData(),
+    descrever: () => N.descreverFiltroData(filtroData), confere: (dia) => N.conferirFiltroData(dia, filtroData) };
+  function desenharFiltroData() {
+    const v = camposFiltroData();
+    $("#fd-de").value = v.de; $("#fd-ate").value = v.ate;
+    for (const [id, modo] of [["#fd-hoje", "hoje"], ["#fd-todas", "todas"], ["#fd-sem-data", "sem_data"], ["#fd-aplicar", "periodo"]]) {
+      const b = $(id); b.classList.toggle("ativo", filtroData.modo === modo); b.setAttribute("aria-pressed", String(filtroData.modo === modo));
+    }
+  }
+  $("#fd-aplicar").onclick = () => {
+    const de = $("#fd-de").value, ate = $("#fd-ate").value;
+    if (de && ate && de > ate) { toast("A data inicial é posterior à data final. Corrija o período e aplique de novo.", true); return; }
+    definirFiltroData({ modo: "periodo", de, ate });
+  };
+  $("#fd-hoje").onclick = () => definirFiltroData({ modo: "hoje" });
+  $("#fd-todas").onclick = () => definirFiltroData({ modo: "todas" });
+  $("#fd-sem-data").onclick = () => definirFiltroData({ modo: "sem_data" });
+  for (const id of ["#fd-de", "#fd-ate"]) $(id).addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); $("#fd-aplicar").click(); } });
+  desenharFiltroData();
+  /* PREENCHER DATAS AUSENTES: lê o CSV atual da pasta ADMS, mostra a prévia (nada gravado) e só grava após a confirmação.
+     Grava SOMENTE horario_call e recebido_adms vazios (srv.preencherDatas, uma transação). */
+  let preenchendo = false;
+  $("#fd-preencher").onclick = async () => {
+    if (preenchendo) return;
+    preenchendo = true; $("#fd-preencher").disabled = true;
+    try {
+      let lido;
+      try { lido = await window.CentralPastaADMS.lerArquivoAtual(); } catch (e) { toast("Não foi possível ler o CSV da pasta ADMS: " + e.message, true); return; }
+      let p;
+      try { p = srv.previaDatas(lido.bytes); } catch (e) { toast("Não foi possível analisar o CSV: " + e.message, true); return; }
+      const li = (k, v, t) => `<li data-conta="${k}"><b>${v}</b> ${esc(t)}</li>`;
+      const tabela = `<ul class="lista">${li("ausentes", p.com_datas_ausentes, `registro(s) com data ausente no lote ${p.lote_numero} (de ${p.chamadas_no_lote}): ${p.sem_horario_call} sem Horário da call, ${p.sem_recebido_adms} sem Recebido ADMS`)}
+        ${li("horario", p.recebem_horario_call, "poderão receber Horário da call")}${li("recebido", p.recebem_recebido_adms, "poderão receber Recebido ADMS")}
+        ${li("atualizar", p.registros_a_atualizar, "registro(s) serão atualizados")}${li("sem_correspondencia", p.sem_correspondencia, "sem correspondência no CSV (CALL não encontrada): não alterados")}
+        ${li("ambiguas", p.ambiguas, "correspondência ambígua (datas diferentes para a mesma CALL ou incidente divergente): não alterados")}
+        ${li("sem_data_no_csv", p.sem_data_no_csv, "encontrados, mas sem data válida no CSV: continuam vazios")}</ul>
+        <p class="mini">Arquivo: ${esc(lido.nome)} · ${p.linhas_no_csv} linha(s) · colunas de data: ${esc(p.colunas_de_data.horario_call || "Horário da call AUSENTE")} / ${esc(p.colunas_de_data.recebido_adms || "Recebido ADMS AUSENTE")}.
+        Nada é inserido, removido ou sobrescrito. Estado, tentativas, callbacks, WhatsApp, observações e histórico não mudam. A data da importação nunca é usada.</p>`;
+      if (!p.registros_a_atualizar) { await escolher("Preencher datas ausentes — prévia", tabela + "<p><b>Nada a preencher com este arquivo.</b> Nenhum registro foi alterado.</p>", [{ valor: 1, rotulo: "Fechar", classe: "acao" }]); return; }
+      if (!await confirmar("Preencher datas ausentes — prévia", tabela, `Gravar datas em ${p.registros_a_atualizar} registro(s)`)) { toast("Cancelado: nenhum registro foi alterado."); return; }
+      const r = await executar(() => srv.preencherDatas(lido.bytes, p.sha256, p.lote_id));
+      if (!r) return;
+      avisarOutrasAbas(); carregar();
+      await escolher("Datas preenchidas", `<ul class="lista">${li("gravados", r.gravados, "registro(s) atualizados")}${li("horario", r.recebem_horario_call, "receberam Horário da call")}
+        ${li("recebido", r.recebem_recebido_adms, "receberam Recebido ADMS")}${li("sem_correspondencia", r.sem_correspondencia, "sem correspondência (não alterados)")}
+        ${li("ambiguas", r.ambiguas, "ambíguos (não alterados)")}${li("sem_data_no_csv", r.sem_data_no_csv, "sem data válida no CSV (continuam vazios)")}
+        ${li("ainda_sem_horario", r.ainda_sem_horario_call, "registro(s) do lote ainda sem Horário da call")}${li("ainda_sem_recebido", r.ainda_sem_recebido_adms, "registro(s) do lote ainda sem Recebido ADMS")}</ul>`,
+        [{ valor: 1, rotulo: "Fechar", classe: "acao" }]);
+    } finally { preenchendo = false; $("#fd-preencher").disabled = false; }
+  };
+  /* Célula "Data e hora": horário da call; sem ele, a data de RECEBIMENTO no ADMS, marcada como tal. */
+  const DICA_RECEBIDO = "Horário da call vazio no ADMS: esta é a data de RECEBIMENTO no ADMS (Recebido_Adms), não necessariamente a da ocorrência.";
+  function celulaData(c, di) {
+    if (di.origem === "recebido_adms") return `<td class="data-hora" title="${esc(DICA_RECEBIDO)}">${esc(N.formatarDataHora(di.iso))} <span class="etq e-recebido">receb.</span></td>`;
+    return `<td class="data-hora"${di.dia ? "" : ' title="Sem data identificada no ADMS (Horário da call e Recebido ADMS vazios ou em formato não reconhecido)"'}>${esc(N.formatarDataHora(c.horario_call || di.iso))}</td>`;
+  }
+
+  const L = window.Localidades, CHAVE_REGIONAIS = "central-filtro-regionais";
+  let regionaisSalvas = [];
+  try { regionaisSalvas = JSON.parse(localStorage.getItem(CHAVE_REGIONAIS) || "[]"); } catch (e) { regionaisSalvas = []; }
+  const filtroRegionais = window.FiltroRegionais.criar({ id: "fr-individual", rotulo: "Regionais e municípios do envio individual", inicial: regionaisSalvas,
+    aoMudar: (s) => { try { localStorage.setItem(CHAVE_REGIONAIS, JSON.stringify([...s])); } catch (e) { /* só não lembra */ } if (estado && estado.lote_aberto) desenharTabela(); } });
+  filtroRegionais.montar($("#filtro-regionais"));
+  window.CentralUI.filtroRegionais = filtroRegionais;
+  /* TIPO DE OCORRÊNCIA (envio individual): mesmas opções e mesmo critério do envio em lote — o nome do modelo sugerido para a
+     comunicação principal do incidente (srv.incidentesParaDisparo / CentralDisparos.opcoesOcorrencia). Só filtra a exibição:
+     não reclassifica, não grava e não altera o lote. A escolha fica só em memória. */
+  const ocorrenciaPorGrupo = () => new Map(srv.incidentesParaDisparo().map((x) => [x.chave, x.ocorrencia]));
+  function montarFiltroOcorrencia() {
+    const sel = $("#filtro-ocorrencia"), atual = sel.value, ops = window.CentralDisparos.opcoesOcorrencia(srv.incidentesParaDisparo());
+    sel.innerHTML = `<option value="">Todas as ocorrências</option>` + ops.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
+    sel.value = ops.includes(atual) ? atual : "";
+  }
+  /* Localidade de cada INCIDENTE (todas as comunicações juntas, a principal primeiro): uma comunicação vazia ou sem nome não
+     tira o incidente da regional (js/localidades.js, classificarIncidente). Só leitura: nada é gravado. */
+  const localDoGrupo = (g) => L.classificarIncidente(g.membros.map((c) => c.localizacao));
+  /* Linha azul: totais das chamadas da seleção (mesma conta do lote) + aviso dos incidentes que não entram em nenhuma regional. */
+  function resumoFiltro(sel, locais) {
+    const el = $("#resumo-filtro"), fora = grupos.filter((g) => locais.get(g.chave).status !== "ok").length;
+    const nota = fora ? ` · ${fora} incidente(s) fora das regionais (desconhecida, não reconhecida, divergência ou fora de Sergipe): veja "Fora das regionais" no filtro` : "";
+    if (!sel.size) { el.textContent = nota ? nota.slice(3) : ""; el.classList.toggle("oculto", !nota); return; }
+    const lista = grupos.filter((g) => L.confereIncidente(locais.get(g.chave), sel)).flatMap((g) => g.membros), m = srv.metricasLote(lista);
+    el.textContent = `Filtro ${L.descrever(sel)}: ${m.chamadas} chamadas · ${m.pendente} pendentes · ${m.callback_realizado} callbacks · ${m.servico_executado} serviços executados · ${m.resolvida} resolvidas · ${m.contato_invalido} contatos inválidos · ${m.sem_telefone} sem telefone · ${m.tentativas} tentativas${nota}`;
+    el.classList.remove("oculto");
+  }
   function desenharTabela() {
-    const f = $("#filtro-estado").value, b = $("#busca").value.trim().toUpperCase();
-    const casa = (c) => confere(c, f) && (!b || [c.call_id, c.incidente, c.nome, c.localizacao].some((x) => (x || "").toUpperCase().includes(b)));
-    const lista = grupos.filter((g) => g.membros.some(casa));
+    const f = $("#filtro-estado").value, b = $("#busca").value.trim().toUpperCase(), sel = filtroRegionais.selecao();
+    const casaOutros = (c) => confere(c, f) && (!b || [c.call_id, c.incidente, c.nome, c.localizacao].some((x) => (x || "").toUpperCase().includes(b)));
+    const locais = new Map(grupos.map((g) => [g.chave, localDoGrupo(g)]));
+    resumoFiltro(sel, locais);
+    const datas = new Map(grupos.map((g) => [g.chave, N.dataDoIncidente(g)])), hoje = N.hojeLocal();
+    const naData = (g) => N.conferirFiltroData(datas.get(g.chave).dia, filtroData, hoje);
+    const oc = $("#filtro-ocorrencia").value, ocs = oc ? ocorrenciaPorGrupo() : null;
+    const lista = grupos.filter((g) => naData(g) && (!ocs || ocs.get(g.chave) === oc) && L.confereIncidente(locais.get(g.chave), sel) && g.membros.some(casaOutros));
+    // Contagens do filtro de regionais: incidentes por município com TODOS os outros filtros aplicados (data, ocorrência, situação, pesquisa).
+    const cont = new Map();
+    for (const g of grupos) {
+      if (!naData(g) || (ocs && ocs.get(g.chave) !== oc)) continue;
+      if (!g.membros.some(casaOutros)) continue;
+      for (const k of locais.get(g.chave).chaves) cont.set(k, (cont.get(k) || 0) + 1);
+    }
+    filtroRegionais.atualizar(cont);
+    infoFiltroData(datas, hoje, lista);
     const idsSel = selecionada ? (grupos.find((g) => g.membros.some((m) => m.id === selecionada)) || { membros: [] }).membros.map((m) => m.id) : [];
+    const rd = N.resumoFiltroData([...datas.values()].map((d) => d.dia), filtroData, hoje);
+    const vazio = rd.no_filtro === 0 && rd.total
+      ? `Nenhum incidente em ${esc(N.descreverFiltroData(filtroData, hoje))}.${rd.outras_datas ? ` ${rd.outras_datas} em outras datas.` : ""}${rd.sem_data && filtroData.modo !== "sem_data" ? ` ${rd.sem_data} sem data identificada.` : ""} Use <b>Todas as datas</b> ou escolha outro período.`
+      : "Nenhuma ocorrência neste filtro.";
     $("#linhas").innerHTML = lista.map((g) => {
-      const c = g.principal, tel = c.telefones.find((t) => t.numero);
+      const c = g.principal, tel = c.telefones.find((t) => t.numero), di = datas.get(g.chave);
       const feitos = g.membros.filter((m) => m.estado === "callback_realizado").length, at = srv.atendimentoDoIncidente(g.chave);
       return `<tr data-id="${c.id}" data-call="${esc(c.call_id)}" data-grupo="${esc(g.chave)}" class="${idsSel.includes(c.id) ? "selecionada" : ""}${at || c.estado === "callback_realizado" ? " linha-callback" : ""}${g.risco >= 1 ? " linha-risco" : ""}">
         <td class="c-inc">${celulaIncidente(g, c)}${c.ja_vista_no_dia ? ' <span class="mini" title="Apareceu em lote anterior do dia">↺</span>' : ""}</td>
-        <td class="data-hora">${esc(N.formatarDataHora(c.horario_call))}</td>
+        ${celulaData(c, di)}
         <td class="c-motivo" title="${esc(c.motivo || "")}">${esc(c.motivo || "—")}${etiquetaSugestao(c)}</td>
         <td class="c-cliente" title="${esc(c.nome || "")}">${esc(c.nome || "—")}</td>
         <td class="c-tel">${tel ? esc(N.formatarTelefone(tel.numero)) + (tel.requer_confirmacao ? ' <span class="mini" title="Telefone achado no comentário: confirmar antes de usar">*</span>' : "") : "—"}</td>
@@ -386,9 +506,22 @@
         <td class="c-num">${g.qtd > 1 ? g.membros.reduce((s, x) => s + x.tentativas.length, 0) : c.tentativas.length}</td>
         <td class="c-sit">${at && c.estado !== "callback_realizado" ? `<span class="etq e-callback_realizado" title="Callback realizado por ${esc(at.operador)} em ${esc(horaBR(at.em))}">Já atendido · ${esc(at.operador)}</span>` : situacao(c)}${c.whatsapp_aberto_em && c.estado === "pendente" ? ` <span class="mini" title="WhatsApp aberto${c.whatsapp_manual ? " (envio manual)" : ""}">WA</span>` : ""}${g.qtd > 1 ? ` <span class="mini" title="comunicações deste incidente com callback">${feitos}/${g.qtd}</span>` : ""}</td>
         <td class="c-acoes">${bolinha(c, g)}<button class="mini-botao" data-abrir-linha="${c.id}">Abrir</button></td></tr>`;
-    }).join("") || `<tr><td colspan="9" class="mini">Nenhuma ocorrência neste filtro.</td></tr>`;
+    }).join("") || `<tr><td colspan="9" class="mini">${vazio}</td></tr>`;
   }
-  $("#filtro-estado").onchange = desenharTabela; $("#busca").oninput = desenharTabela;
+  /* Linha de informação do filtro por data: o que está na tela e o que ficou de fora (nada é escondido sem aviso). */
+  function infoFiltroData(datas, hoje, lista) {
+    const dias = [...datas.values()], r = N.resumoFiltroData(dias.map((d) => d.dia), filtroData, hoje);
+    const semData = srv.chamadasSemData(), bp = $("#fd-preencher");
+    bp.classList.toggle("oculto", !semData || !window.CentralPastaADMS);
+    bp.textContent = `Preencher datas ausentes (${semData})`;
+    const soRecebido = lista.filter((g) => datas.get(g.chave).origem === "recebido_adms").length;
+    $("#fd-sem-data").textContent = `Sem data (${r.sem_data})`;
+    $("#fd-info").textContent = `Exibindo: ${N.descreverFiltroData(filtroData, hoje)} · ${lista.length} incidente(s)`
+      + (filtroData.modo !== "todas" && r.outras_datas ? ` · ${r.outras_datas} em outras datas` : "")
+      + (filtroData.modo !== "todas" && filtroData.modo !== "sem_data" && r.sem_data ? ` · ${r.sem_data} sem data (fora do filtro)` : "")
+      + (soRecebido ? ` · ${soRecebido} com data de recebimento no ADMS (sem Horário da call)` : "");
+  }
+  $("#filtro-estado").onchange = desenharTabela; $("#busca").oninput = desenharTabela; $("#filtro-ocorrencia").onchange = desenharTabela;
   $("#linhas").addEventListener("click", (ev) => {
     const bol = ev.target.closest("[data-bolinha]");
     if (bol) { ev.stopPropagation(); clicarBolinha(Number(bol.dataset.bolinha), bol); return; }
@@ -435,7 +568,8 @@
         <dt>Subtipo</dt><dd>${esc(sub || "não identificado")}</dd>
         <dt>Cliente</dt><dd>${esc(d.nome || "—")}</dd><dt>UC</dt><dd>${esc(d.uc || "—")}</dd>
         <dt>Localização</dt><dd>${esc(d.localizacao || "—")}</dd><dt>Comentário</dt><dd>${esc(d.comentario || "—")}</dd>
-        <dt>Data e hora</dt><dd>${esc(N.formatarDataHora(d.horario_call))} <span class="mini">(horário da call no ADMS)</span></dd>
+        <dt>Data e hora</dt><dd>${esc(N.formatarDataHora(d.horario_call))} <span class="mini">(horário da call no ADMS${d.horario_call ? "" : ": vazio ou não reconhecido"})</span></dd>
+        ${!d.horario_call && d.recebido_adms ? `<dt>Recebido ADMS</dt><dd>${esc(N.formatarDataHora(d.recebido_adms))} <span class="mini">(data de recebimento no ADMS, não necessariamente a da ocorrência)</span></dd>` : ""}
         ${d.incidente_pai ? `<dt>Incidente pai</dt><dd>${esc(d.incidente_pai)}</dd>` : ""}</dl>
       ${d.grupo.qtd > 1 ? `<h3>Comunicações do incidente (${d.grupo.qtd})</h3>
         <div class="tabela-rolagem rolagem-curta"><table class="comunicacoes"><thead><tr><th>Data e hora</th><th>CALL</th><th>Motivo / submotivo</th><th>Situação</th><th></th></tr></thead><tbody>
@@ -639,6 +773,7 @@
     window.CentralUI.servico = srv;
     carregar();
     window.CentralFechamento.automatico();
+    if (window.CentralPastaADMS) window.CentralPastaADMS.iniciar(); // pasta ADMS: confere chamadas_incidentes.csv (abertura/F5)
     document.body.dataset.pronto = "1";
   }
   // Espera todos os scripts: servida por HTTP, o armazenamento pode responder antes de os módulos seguintes carregarem.

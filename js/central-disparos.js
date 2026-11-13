@@ -1,18 +1,27 @@
 /* Central de Disparos — interface das três opções. Usa o Servico e as regras existentes; não tem estado próprio além dos
-   filtros, da seleção e do retorno de foco. Todo texto é inserido com esc() (sem HTML vindo do CSV).
-   Envio em lote: atendimento guiado pelo WhatsApp Web. O operador envia; a Central só apresenta o próximo quando ele volta. */
+   filtros, da seleção e da opção de avanço automático. Todo texto é inserido com esc() (sem HTML vindo do CSV).
+   Envio em lote: atendimento guiado pelo WhatsApp Web, controlado inteiramente na janela do incidente.
+   Abrir o WhatsApp, voltar dele e confirmar o callback são acontecimentos separados: só o clique em CALLBACK REALIZADO
+   registra o callback, e a fila só avança por PRÓXIMO INC, PULAR ou (se o operador ativar) logo após essa confirmação.
+   Não há detecção de foco nem temporizador: voltar do WhatsApp não muda nada. */
 "use strict";
 (function () {
   const N = window.Nucleo, D = window.Disparos, $ = (s) => document.querySelector(s);
   const UI = () => window.CentralUI, srv = () => UI().servico, esc = (v) => UI().esc(v), toast = (m, e) => UI().toastErro(m, !!e);
   const MODOS = { individual: ["1", "Envio individual", "Abra um incidente na lista e envie pelo WhatsApp Web, como sempre."],
-    lote: ["2", "Envio em lote", "Selecione os incidentes e atenda um a um pelo WhatsApp Web. Ao voltar para a Central, o próximo aparece sozinho."],
+    lote: ["2", "Envio em lote", "Selecione os incidentes e atenda um a um pelo WhatsApp Web. Você confirma cada callback e decide quando avançar."],
     manual: ["3", "CALLBACK MANUAL", "Acesse a ferramenta para informar manualmente o incidente, telefone e escolher a mensagem que deseja enviar."] };
   /* "selecao" fica só para exibir filas antigas. */
   const MODALIDADE = { selecao: "Seleção manual", lote: "Envio em lote" };
   const SITUACAO = { revisao: "Em revisão", autorizada: "Em execução", atendimento: "Em atendimento", pausada: "Pausada", concluida: "Concluída", cancelada: "Cancelada" };
   const JANELA_WA = "central_whatsapp_web"; // a mesma aba é reaproveitada a cada incidente
-  let modo = "individual", filaVista = null, vista = "", retorno = null, timerRetorno = null, recuperou = false, cartaoVisto = null;
+  /* Indicador discreto da janela: reflete só o que aconteceu de fato com o incidente. */
+  const INDICADOR = { aguardando: ["pendente", "Pendente"], preparado: ["pendente", "Pendente"], aberto: ["aberto", "WhatsApp aberto"], enviado: ["realizado", "Callback realizado"],
+    pulado: ["ignorado", "Ignorado"], nao_confirmado: ["nao-realizado", "Não realizado"], falha: ["nao-realizado", "Não realizado"], cancelado: ["ignorado", "Cancelado"] };
+  const indicador = (s) => { const [c, t] = INDICADOR[s] || ["pendente", D.STATUS[s] || s]; return `<span class="ind-situacao ind-${c}" data-situacao="${esc(s)}">${esc(t)}</span>`; };
+  /* Avanço automático após CALLBACK REALIZADO: DESATIVADO sempre que a Central abre; só o operador o liga, e vale até recarregar. */
+  let avancoAuto = false;
+  let modo = "individual", filaVista = null, vista = "", cartaoVisto = null, ocupado = false;
   const selecao = new Set(), filtros = { busca: "", ocorrencia: "", envio: "" };
   const horaBR = (iso) => (iso ? new Date(iso).toLocaleString("pt-BR") : "—");
   const etiqueta = (s, extra = "") => `<span class="etq st-${s}">${esc(D.STATUS[s] || s)}${extra}</span>`;
@@ -29,13 +38,13 @@
     const s = srv(); if (!s || !s.E) return;
     const lote = s.loteAberto(), sec = $("#central-disparos");
     sec.classList.toggle("oculto", !lote);
-    if (!lote) { $("#lote").classList.remove("disparo-oculto"); filaVista = null; selecao.clear(); vista = ""; retorno = null; return; }
-    if (recuperarRetorno(s)) return;
+    if (!lote) { $("#lote").classList.remove("disparo-oculto"); filaVista = null; selecao.clear(); vista = ""; return; }
     abas();
     $("#lote").classList.toggle("disparo-oculto", modo !== "individual");
-    const ativa = s.filaAtiva(), fila = ativa || (filaVista && s.fila(filaVista));
+    const ativa = s.filaAtiva(); if (ativa && ativa.assistido) filaVista = ativa.id; // mesmo depois de recarregar, o fim da fila mostra o resumo
+    const fila = ativa || (filaVista && s.fila(filaVista));
     const alvo = modo === "individual" ? "individual" : !fila ? "selecao" : !fila.assistido ? "antiga" : ativa ? "atendimento" : "conclusao";
-    if (alvo === "selecao" && vista === "selecao") { desenharLinhasSelecao(); $("#ds-confirmacoes").innerHTML = htmlConfirmacoes(); }
+    if (alvo === "selecao" && vista === "selecao") desenharLinhasSelecao();
     else if (alvo === "individual") desenharIndividual(ativa);
     else if (alvo === "selecao") desenharSelecao();
     else if (alvo === "atendimento") desenharAtendimento(fila);
@@ -53,8 +62,73 @@
       <div class="botoes"><button type="button" class="perigo" data-acao="encerrar-antiga">Encerrar fila antiga</button></div>`);
   }
 
+  /* ------------------------------------------------------------ filtros operacionais (Regionais e municípios, Período, Situação)
+     Aplicados ANTES de criar a fila, sobre a base do lote em memória (srv.incidentesParaDisparo): não relê o CSV, não altera o
+     lote. Regionais e municípios: seleção múltipla (js/filtro-regionais.js) com as sete regionais completas de js/localidades.js,
+     mesmo sem incidentes no arquivo (contagem zero). Instância PRÓPRIA do envio em lote: independe da escolha do envio
+     individual e não é lembrada (cada abertura começa em "Todas as regionais"). Cada incidente usa a comunicação PRINCIPAL (a que
+     recebe a mensagem): um município e uma data por incidente, sem duplicar. Período = data real do incidente, nunca a importação. */
+  const L = window.Localidades;
+  const oper = { situacao: "pendentes" };
+  // Ao marcar/desmarcar: tira da seleção o que saiu do filtro e redesenha SÓ as linhas e os totais (o painel continua aberto).
+  const filtroLote = window.FiltroRegionais.criar({ id: "fr-lote", rotulo: "Regionais e municípios do envio em lote",
+    aoMudar: () => { podarSelecao(); if ($("#ds-linhas")) desenharLinhasSelecao(); } });
+  const SITUACOES = { pendentes: ["Pendentes (podem entrar na fila)", (x) => x.elegivel], sem_telefone: ["Sem telefone", (x) => !x.telefone],
+    realizados: ["Callback já realizado", (x) => x.atendido], todas: ["Todas as situações", () => true] };
+  /* Período = o MESMO filtro por data da lista (window.CentralUI.filtroData; padrão HOJE ao abrir a Central). Data do incidente
+     calculada por N.dataDoIncidente (Horário da call; sem ele, Recebido ADMS). Sem data: fora de hoje e de qualquer período. */
+  const diaDe = (x) => (x.data_incidente ? x.data_incidente.dia : String(x.horario_call || "").slice(0, 10) || null);
+  const FD = () => UI().filtroData;
+  /* Localidade do INCIDENTE: todas as comunicações juntas (a principal primeiro), como no envio individual. Uma comunicação
+     vazia ou sem nome não tira o incidente da regional. Mapa refeito a cada desenho/poda (só leitura do lote em memória). */
+  let locsInc = new Map();
+  const atualizarLocs = () => { locsInc = new Map(srv().grupos().map((g) => [g.chave, g.membros.map((c) => c.localizacao)])); };
+  const localDe = (x) => L.classificarIncidente(locsInc.get(x.chave) || [x.localizacao]);
+  const confereLocal = (x) => localDe(x).chaves.some(filtroLote.contem);
+  function confereData(x) { return FD().confere(diaDe(x)); }
+  const operacional = (x) => confereLocal(x) && confereData(x) && SITUACOES[oper.situacao][1](x);
+  function htmlFiltrosOperacionais() {
+    const opt = (v, t, sel) => `<option value="${esc(v)}"${sel ? " selected" : ""}>${esc(t)}</option>`;
+    const v = FD().campos(), modo = FD().obter().modo, bt = (id, m, t) => `<button type="button" id="${id}" class="mini-botao${modo === m ? " ativo" : ""}" aria-pressed="${modo === m}">${t}</button>`;
+    return `<div class="filtros-lote" role="group" aria-label="Filtros do envio em lote">
+      <div class="campo-regionais"><span class="campo-rotulo">Regionais e municípios</span><div id="ds-regionais"></div></div>
+      <label>De <input id="ds-de" type="date" value="${esc(v.de)}"></label>
+      <label>Até <input id="ds-ate" type="date" value="${esc(v.ate)}"></label>
+      <label>Situação <select id="ds-situacao">${Object.entries(SITUACOES).map(([k, [t]]) => opt(k, t, k === oper.situacao)).join("")}</select></label>
+    </div><div class="filtro-data" role="group" aria-label="Data do incidente no envio em lote"><span class="fd-rotulo">Data do incidente: ${esc(FD().descrever())}</span>
+      ${bt("ds-hoje", "hoje", "Hoje")}${bt("ds-todas", "todas", "Todas as datas")}${bt("ds-sem-data", "sem_data", "Sem data")}
+      <span class="mini fd-info">O mesmo filtro da lista de incidentes: só o que está nele pode entrar na fila.</span></div>
+    <div id="ds-resumo" class="resumo-lote-filtros" aria-live="polite"></div>`;
+  }
+  /* Totais: importado (comunicações e incidentes do lote) e, depois de Regionais/Período, os incidentes encontrados. */
+  function resumoOperacional(lista) {
+    const achados = lista.filter((x) => confereLocal(x) && confereData(x)), comPeriodo = ["hoje", "periodo"].includes(FD().obter().modo);
+    const semData = (comPeriodo ? lista.filter((x) => confereLocal(x) && !diaDe(x)) : achados.filter((x) => !diaDe(x))).length;
+    const c = (v, r, cl = "", id = "") => `<div class="metrica ${cl}"${id ? ` data-total="${id}"` : ""}><div class="valor">${v}</div><div class="rotulo">${r}</div></div>`;
+    const comInc = lista.filter((x) => x.incidente).length, soCall = lista.length - comInc; // mesma conta dos cartões: incidentes únicos + CALL sem incidente
+    $("#ds-resumo").innerHTML = `<div class="metricas painel-disparo">${c(srv().chamadas().length, `comunicações importadas · ${comInc} incidentes${soCall ? ` + ${soCall} CALL sem incidente` : ""}`, "", "importado")}`
+      + c(achados.length, "incidentes encontrados", "destaque", "encontrados") + c(achados.filter((x) => x.elegivel).length, "pendentes", achados.some((x) => x.elegivel) ? "andamento" : "", "pendentes")
+      + c(achados.filter((x) => !x.telefone).length, "sem telefone", "", "sem_telefone") + c(achados.filter((x) => x.atendido).length, "já realizados", "", "realizados")
+      + c(semData, comPeriodo ? "sem data (fora do período)" : "sem data identificada", "", "sem_data") + `</div>`;
+  }
+  /* Ao mudar Regionais/Período/Situação, sai da seleção o que ficou fora: a fila nunca recebe incidente escondido. */
+  function podarSelecao() {
+    atualizarLocs();
+    const lista = srv().incidentesParaDisparo();
+    for (const k of [...selecao]) { const x = lista.find((y) => y.chave === k); if (!x || !operacional(x)) selecao.delete(k); }
+  }
+  function mudarOperacional(campo, valor) {
+    oper[campo] = valor;
+    podarSelecao(); desenharSelecao();
+  }
+
   /* ------------------------------------------------------------ seleção dos incidentes */
-  function casa(x) {
+  /* Tipos de ocorrência do lote (opções do filtro): o nome do modelo de mensagem sugerido para a comunicação PRINCIPAL de cada
+     incidente (x.ocorrencia de srv.incidentesParaDisparo). Única fonte das opções do envio em lote e do envio individual. */
+  const opcoesOcorrencia = (lista) => [...new Set(lista.map((x) => x.ocorrencia))].sort();
+  const casa = (x) => operacional(x) && casaBusca(x);
+  /* Busca, ocorrência e status do envio (sem regionais/período/situação): base também das contagens do filtro de regionais. */
+  function casaBusca(x) {
     const b = N.normalizarTexto(filtros.busca);
     if (filtros.ocorrencia && x.ocorrencia !== filtros.ocorrencia) return false;
     if (filtros.envio && x.status !== filtros.envio) return false;
@@ -62,31 +136,52 @@
     return !b || [x.incidente, x.protocolo, x.call_id, x.ocorrencia, x.motivo_adms, x.submotivos, x.nome].some((t) => N.normalizarTexto(t || "").includes(b)) || (digitos.length >= 3 && (x.telefone || "").includes(digitos));
   }
   function desenharSelecao() {
+    atualizarLocs();
     const lista = srv().incidentesParaDisparo();
     for (const k of [...selecao]) if (!lista.some((x) => x.chave === k && x.elegivel)) selecao.delete(k);
-    conteudo(`<div id="ds-confirmacoes">${htmlConfirmacoes()}</div><div class="barra-selecao">
+    conteudo(`${htmlFiltrosOperacionais()}<div class="barra-selecao">
         <input id="ds-busca" type="search" placeholder="Buscar número, protocolo, ocorrência ou contato" aria-label="Buscar incidentes" value="${esc(filtros.busca)}">
-        <select id="ds-ocorrencia" aria-label="Filtrar por ocorrência"><option value="">Todas as ocorrências</option>${[...new Set(lista.map((x) => x.ocorrencia))].sort().map((o) => `<option${o === filtros.ocorrencia ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>
+        <select id="ds-ocorrencia" aria-label="Filtrar por ocorrência"><option value="">Todas as ocorrências</option>${opcoesOcorrencia(lista).map((o) => `<option${o === filtros.ocorrencia ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>
         <select id="ds-envio" aria-label="Filtrar por status do envio"><option value="">Todos os status</option>${Object.entries(D.STATUS).map(([k, v]) => `<option value="${k}"${k === filtros.envio ? " selected" : ""}>${v}</option>`).join("")}</select>
         <button type="button" class="contorno" data-acao="marcar-todos">Selecionar todos</button><button type="button" class="contorno" data-acao="desmarcar-todos">Desmarcar todos</button>
       </div>
-      <div class="tabela-rolagem tabela-disparos"><table><thead><tr><th class="c-check"><input type="checkbox" id="ds-todos" aria-label="Selecionar todos os incidentes visíveis"></th><th>Incidente</th><th>Ocorrência</th><th>Contato</th><th>Telefone</th><th>Envio</th></tr></thead><tbody id="ds-linhas"></tbody></table></div>
+      <div class="tabela-rolagem tabela-disparos"><table><thead><tr><th class="c-check"><input type="checkbox" id="ds-todos" aria-label="Selecionar todos os incidentes visíveis"></th><th>Incidente</th><th>Data e hora</th><th>Localidade</th><th>Ocorrência</th><th>Contato</th><th>Telefone</th><th>Envio</th></tr></thead><tbody id="ds-linhas"></tbody></table></div>
       <div class="rodape-acao"><span id="ds-contagem" class="contagem"></span><button type="button" class="principal" id="ds-iniciar" data-acao="iniciar">INICIAR ATENDIMENTO</button></div>`);
+    filtroLote.montar($("#ds-regionais"));
     desenharLinhasSelecao();
     $("#ds-busca").oninput = (ev) => { filtros.busca = ev.target.value; desenharLinhasSelecao(); };
     $("#ds-ocorrencia").onchange = (ev) => { filtros.ocorrencia = ev.target.value; desenharLinhasSelecao(); };
     $("#ds-envio").onchange = (ev) => { filtros.envio = ev.target.value; desenharLinhasSelecao(); };
+    // Data: muda o filtro compartilhado (lista + lote); aoMudarFiltroData poda a seleção e redesenha.
+    const periodo = () => FD().definir({ modo: "periodo", de: $("#ds-de").value, ate: $("#ds-ate").value });
+    $("#ds-de").onchange = periodo; $("#ds-ate").onchange = periodo;
+    $("#ds-hoje").onclick = () => FD().definir({ modo: "hoje" });
+    $("#ds-todas").onclick = () => FD().definir({ modo: "todas" });
+    $("#ds-sem-data").onclick = () => FD().definir({ modo: "sem_data" });
+    $("#ds-situacao").onchange = (ev) => mudarOperacional("situacao", ev.target.value);
   }
   function desenharLinhasSelecao() {
-    const lista = srv().incidentesParaDisparo().filter(casa);
+    atualizarLocs();
+    const base = srv().incidentesParaDisparo(), lista = base.filter(casa);
+    if ($("#ds-resumo")) resumoOperacional(base);
+    // Contagens do filtro de regionais = incidentes por município com os OUTROS filtros (período, situação, busca, ocorrência, status).
+    const cont = new Map();
+    for (const x of base) if (confereData(x) && SITUACOES[oper.situacao][1](x) && casaBusca(x)) for (const k of localDe(x).chaves) cont.set(k, (cont.get(k) || 0) + 1);
+    filtroLote.atualizar(cont);
     $("#ds-linhas").innerHTML = lista.map((x) => `<tr data-chave="${esc(x.chave)}" class="${selecao.has(x.chave) ? "selecionada" : ""}${x.elegivel ? "" : " inelegivel"}${x.atendido ? " linha-callback" : ""}${x.risco >= 1 ? " linha-risco" : ""}" ${x.elegivel ? "" : `title="${esc(x.motivo_inelegivel)}"`}>
       <td class="c-check"><input type="checkbox" aria-label="Selecionar ${esc(x.incidente || x.call_id)}" ${selecao.has(x.chave) ? "checked" : ""} ${x.elegivel ? "" : "disabled"}></td>
       <td><b>${esc(x.incidente || "sem incidente")}</b>${x.qtd > 1 ? ` <span class="chip chip-qtd" title="A mensagem vai para a comunicação principal do incidente">${x.qtd} com.</span>` : ""}<div class="mini">${esc(x.call_id)}</div></td>
+      <td class="data-hora">${esc(N.formatarDataHora(x.horario_call))}</td>${celulaLocalidade(x)}
       <td>${esc(x.ocorrencia)}${x.risco >= 1 ? ' <span class="chip chip-risco" title="Indicação de risco">⚠</span>' : ""}</td><td>${esc(x.nome || "—")}</td>
       <td>${x.telefone ? esc(N.formatarTelefone(x.telefone)) : "—"}${x.tem_celular ? "" : ' <span class="etq e-contato_invalido">sem celular</span>'}</td>
       <td>${x.elegivel ? etiqueta(x.status) : `${x.atendido ? '<span class="etq e-callback_realizado">Callback realizado</span>' : etiqueta(x.status)} <span class="mini">${esc(x.motivo_inelegivel)}</span>`}${x.atendido ? ` <button type="button" class="link-botao" data-hist="${esc(x.chave)}">histórico</button>` : ""}</td></tr>`).join("")
-      || `<tr><td colspan="6" class="mini">Nenhum incidente neste filtro.</td></tr>`;
+      || `<tr><td colspan="8" class="mini">Nenhum incidente neste filtro.</td></tr>`;
     contarSelecao(lista);
+  }
+  /* Município reconhecido (nome oficial; regional e código na dica) ou, fora das regionais, o nome do ADMS com o motivo. */
+  function celulaLocalidade(x) {
+    const c = localDe(x), dica = c.status === "ok" ? `${c.regional_nome}${c.codigo ? " · código " + c.codigo : ""}` : `${L.ESPECIAIS[c.chave]}: ${c.motivo}`;
+    return `<td class="c-localidade" title="${esc(dica + (x.localizacao ? "\nADMS: " + x.localizacao : ""))}">${esc(L.rotulo(c))}${c.status === "ok" ? "" : ' <span class="etq e-sem_telefone">?</span>'}</td>`;
   }
   function contarSelecao(lista = srv().incidentesParaDisparo().filter(casa)) {
     const el = lista.filter((x) => x.elegivel), marcados = el.filter((x) => selecao.has(x.chave)).length, t = $("#ds-todos");
@@ -96,39 +191,44 @@
   }
 
   /* ------------------------------------------------------------ atendimento guiado */
-  function htmlConfirmacoes() {
-    const l = srv().pendentesConfirmacao(); if (!l.length) return "";
-    return `<section class="atend-confirmar" aria-label="Envios a confirmar"><h3 class="sem-margem">ENVIO NÃO CONFIRMADO (${l.length})</h3><p class="mini">O WhatsApp Web não informa se a mensagem saiu. Só "Enviei" conta como callback.</p>
-      <div class="tabela-rolagem rolagem-curta"><table><tbody>${l.map(({ fila, item: i }) => `<tr data-confirma-fila="${esc(fila)}" data-confirma-item="${esc(i.id)}"><td><b>${esc(i.incidente || i.call_id)}</b></td><td>${esc(i.ocorrencia)}</td><td>${i.telefone ? esc(N.formatarTelefone(i.telefone)) : "—"}</td><td class="c-acao-fila"><button type="button" class="mini-botao verde" data-confirmar="enviado">Enviei</button> <button type="button" class="mini-botao" data-confirmar="falha">Não enviei</button></td></tr>`).join("")}</tbody></table></div></section>`;
-  }
-  const htmlPulados = (f) => { const l = f.itens.filter((i) => i.status === "pulado"); return l.length ? `<p class="mini atend-pulados"><b>Pulados:</b> ${l.map((i) => esc(i.incidente || i.call_id)).join(", ")}</p>` : ""; };
+  /* Sem lista de enviados/não enviados: o controle fica todo na janela do incidente. Os contadores resumem a fila. */
   function htmlProgresso(f) {
     const p = srv().painelAtendimento(f), c = (v, r, cl = "") => `<div class="metrica ${cl}"><div class="valor">${v}</div><div class="rotulo">${r}</div></div>`;
-    return `<div class="metricas painel-disparo">${c(p.total, "na fila")}${c(p.atendidos, "atendidos", "destaque")}${c(p.restantes, "restantes", p.restantes ? "andamento" : "")}${c(p.pulados, "pulados")}${c(p.nao_confirmados, "não confirmados")}${c(p.percentual + "%", "concluído")}</div>
+    return `<div class="metricas painel-disparo">${c(p.total, "na fila")}${c(p.confirmados, "callback realizado", "destaque")}${c(p.restantes, "restantes", p.restantes ? "andamento" : "")}${c(p.pulados, "ignorados")}${c(p.nao_realizados, "não realizados")}${c(p.percentual + "%", "concluído")}</div>
       <progress class="progresso" max="100" value="${p.percentual}" aria-label="Percentual de conclusão">${p.percentual}%</progress>`;
   }
   function desenharAtendimento(f) {
-    const i = srv().itemAtual(f), pausada = f.situacao === "pausada", aberto = i && i.status === "aberto", pronto = i && (i.status === "preparado" || aberto), p = srv().painelAtendimento(f);
+    const i = srv().itemAtual(f), pausada = f.situacao === "pausada", p = srv().painelAtendimento(f), ant = srv().anteriorAtendimento(f);
+    const aberto = i && i.status === "aberto", feito = i && i.status === "enviado", pronto = i && (i.status === "preparado" || aberto), livre = !pausada;
     const ruim = i && i.pendencias.some((x) => x.codigo === "telefone"), conf = i && i.pendencias.some((x) => x.codigo === "confirmar");
     const faixa = pausada ? '<div class="atend-aviso pausa">Atendimento pausado. O progresso está guardado.</div>'
-      : aberto ? '<div class="atend-aviso">WhatsApp aberto. Confira, envie e volte para esta janela: o próximo incidente aparece sozinho.</div>' : "";
-    conteudo(`<div class="cabeca-revisao"><div><h3 class="sem-margem">Atendimento em lote <span class="etq situacao-${pausada ? "pausada" : "autorizada"}">${esc(SITUACAO[f.situacao])}</span></h3><span class="mini">Incidente ${Math.min(p.total, p.total - p.restantes + 1)} de ${p.total}</span></div>
+      : feito ? `<div class="atend-aviso ok">Callback registrado. ${avancoAuto ? "" : "Clique em PRÓXIMO INC para continuar."}</div>`
+      : aberto ? '<div class="atend-aviso">WhatsApp aberto. Depois de enviar, clique em CALLBACK REALIZADO. Se o WhatsApp deu erro, envie de novo, vá ao PRÓXIMO INC ou PULE.</div>' : "";
+    conteudo(`<div class="cabeca-revisao"><div><h3 class="sem-margem">Atendimento em lote <span class="etq situacao-${pausada ? "pausada" : "autorizada"}">${esc(SITUACAO[f.situacao])}</span></h3><span class="mini">Incidente ${p.posicao} de ${p.total}</span></div>
         <div class="botoes">${pausada ? '<button type="button" class="acao" data-acao="at-retomar">Retomar</button>' : '<button type="button" class="contorno" data-acao="at-pausar">Pausar</button>'}<button type="button" class="perigo" data-acao="at-cancelar">Cancelar atendimento</button></div></div>
       ${htmlProgresso(f)}${faixa}
       ${i ? `<article class="atend-card" data-item="${esc(i.id)}">
-        <div class="atend-topo"><div><span class="mini">Incidente</span><h2 id="at-incidente">${esc(i.incidente || i.call_id)}</h2></div>${i.risco >= 1 ? '<span class="chip chip-risco">⚠ Indicação de risco</span>' : ""}</div>
+        <div class="atend-topo"><div><span class="mini">Incidente</span><h2 id="at-incidente">${esc(i.incidente || i.call_id)}</h2></div>
+          <div class="atend-situacao">${i.risco >= 1 ? '<span class="chip chip-risco">⚠ Indicação de risco</span>' : ""}<span id="at-situacao">${indicador(i.status)}</span></div></div>
+        ${ant ? `<p class="mini atend-anterior" id="at-anterior">Anterior: <b>${esc(ant.incidente || ant.call_id)}</b> ${indicador(ant.status)}</p>` : ""}
         <div class="atend-dados"><div><span class="mini">Cliente</span><b id="at-cliente">${esc(i.destinatario || "—")}</b></div><div><span class="mini">Ocorrência</span><b>${esc(i.ocorrencia)}</b></div>
-          <label class="c-tel-edit"><span class="mini">Telefone</span><input data-tel id="at-telefone" class="${ruim ? "invalido" : ""}" inputmode="tel" maxlength="20" aria-label="Telefone do cliente" value="${esc(i.telefone ? N.formatarTelefone(i.telefone) : "")}" placeholder="(DDD) 9xxxx-xxxx" ${aberto ? "disabled" : ""}>${conf ? '<span class="confirma"><input type="checkbox" data-conf> é do cliente</span>' : ""}</label></div>
-        <div class="atend-mensagem" id="at-mensagem">${esc(i.texto)}</div>${i.editada ? '<span class="etq e-pendente">editada</span>' : ""}
+          <label class="c-tel-edit"><span class="mini">Telefone</span><input data-tel id="at-telefone" class="${ruim ? "invalido" : ""}" inputmode="tel" maxlength="20" aria-label="Telefone do cliente" value="${esc(i.telefone ? N.formatarTelefone(i.telefone) : "")}" placeholder="(DDD) 9xxxx-xxxx" ${aberto || feito ? "disabled" : ""}>${conf ? '<span class="confirma"><input type="checkbox" data-conf> é do cliente</span>' : ""}</label></div>
+        <div class="atend-mensagem" id="at-mensagem">${esc(i.texto)}</div>
+        <div class="atend-sob-mensagem">${i.editada ? '<span class="etq e-pendente">editada</span>' : ""}${aberto || feito ? "" : '<button type="button" class="link-botao" data-acao="at-editar">Editar mensagem</button>'}</div>
         ${i.pendencias.map((x) => `<div class="pendencia">${esc(x.texto)}</div>`).join("")}${i.avisos.map((a) => `<div class="mini aviso-linha">${esc(a)}</div>`).join("")}
-        <div class="botoes atend-acoes"><button type="button" class="principal" data-acao="at-abrir" ${pronto && !pausada ? "" : "disabled"}>${aberto ? "ABRIR WHATSAPP NOVAMENTE" : "ABRIR WHATSAPP"}</button>${aberto ? "" : '<button type="button" class="contorno" data-acao="at-editar">Editar mensagem</button>'}<button type="button" class="contorno" data-acao="at-pular" ${pausada ? "disabled" : ""}>Pular</button></div>
-      </article>` : ""}
-      ${htmlPulados(f)}${htmlConfirmacoes()}`);
+        <label class="atend-auto"><input type="checkbox" id="at-auto" ${avancoAuto ? "checked" : ""}> AVANÇAR AUTOMATICAMENTE APÓS CALLBACK REALIZADO</label>
+        <div class="atend-acoes">
+          <button type="button" class="principal" data-acao="at-abrir" ${pronto && livre ? "" : "disabled"}>${aberto ? "ENVIAR WHATSAPP NOVAMENTE" : "ENVIAR WHATSAPP"}</button>
+          <button type="button" class="btn-callback" data-acao="at-callback" ${aberto && livre ? "" : "disabled"} title="${feito ? "Callback já registrado" : aberto ? "Confirme só se a mensagem foi realmente enviada" : "Envie pelo WhatsApp primeiro"}">CALLBACK REALIZADO</button>
+          <button type="button" class="contorno" data-acao="at-proximo" ${livre ? "" : "disabled"}>PRÓXIMO INC</button>
+          <button type="button" class="contorno btn-pular" data-acao="at-pular" ${livre && !feito ? "" : "disabled"}>PULAR</button>
+        </div>
+      </article>` : ""}`);
     if (i && i.id !== cartaoVisto) { cartaoVisto = i.id; $(".atend-card").scrollIntoView({ block: "center" }); }
   }
   function desenharConclusao(f) {
     conteudo(`<div class="cabeca-revisao"><div><h3 class="sem-margem">Atendimento em lote <span class="etq situacao-${f.situacao}">${esc(SITUACAO[f.situacao])}</span></h3><span class="mini">Iniciado por ${esc(f.autorizacao.operador)} em ${horaBR(f.autorizacao.em)}</span></div>
-        <div class="botoes"><button type="button" class="principal" data-acao="nova">Nova seleção</button></div></div>${htmlProgresso(f)}${htmlPulados(f)}${htmlConfirmacoes()}`);
+        <div class="botoes"><button type="button" class="principal" data-acao="nova">Nova seleção</button></div></div>${htmlProgresso(f)}`);
   }
   function abrirMensagem(f, i) {
     $("#modal-caixa").className = "modal-caixa"; delete $("#modal-caixa").dataset.livre;
@@ -142,38 +242,20 @@
     $("#dm-salvar").onclick = async () => { if (await exec(() => srv().editarMensagemItem(f.id, i.id, $("#dm-texto").value))) fecharModal(); };
   }
 
-  /* ------------------------------------------------------------ WhatsApp e retorno à janela */
+  /* ------------------------------------------------------------ WhatsApp */
+  /* Abrir não é enviar: o incidente fica "WhatsApp aberto" até o operador clicar em CALLBACK REALIZADO, PRÓXIMO INC ou PULAR.
+     Não há escuta de foco/visibilidade: voltar à Central, fechar a aba do WhatsApp ou recarregar a página não mudam nada. */
   async function abrirWhatsapp(f, i) {
     const janela = window.open("", JANELA_WA); // no clique, para não ser bloqueado; não navega se a aba já existir
     if (!janela) { toast("O navegador bloqueou a nova janela. Permita pop-ups para a Central.", true); return; }
     try { janela.opener = null; } catch (e) { /* aba já no WhatsApp */ }
     try { janela.focus(); } catch (e) { /* o navegador decide */ }
-    retorno = { fila: f.id, item: i.id, saiu: false }; // antes de gravar, para não perder a saída da janela
     const r = await exec(() => srv().abrirAtendimento(f.id, i.id));
-    if (!r || r.pulado) { retorno = null; janela.close(); return; }
+    if (!r || r.pulado) { janela.close(); return; }
     janela.location.href = r.url;
-    if (retorno) retorno.saiu = retorno.saiu || document.hidden || !document.hasFocus();
   }
-  const marcarSaida = () => { if (retorno) retorno.saiu = true; };
-  /* Foco e visibilidade disparam juntos: tudo passa por um único temporizador, e a primeira checagem válida consome o retorno. */
-  function agendarRetorno() { clearTimeout(timerRetorno); timerRetorno = setTimeout(checarRetorno, 350); }
-  async function checarRetorno() {
-    if (!retorno || !retorno.saiu || document.hidden || !document.hasFocus()) return;
-    const r = retorno; retorno = null;
-    await exec(() => srv().registrarRetornoAtendimento(r.fila, r.item));
-  }
-  /* A página foi recarregada com um WhatsApp aberto: o operador já voltou. Nada se perde e nada conta como callback. */
-  function recuperarRetorno(s) {
-    if (recuperou) return false;
-    recuperou = true;
-    const f = s.filaAtiva(), i = f && f.assistido && s.itemAtual(f);
-    if (!i || i.status !== "aberto") return false;
-    exec(() => s.registrarRetornoAtendimento(f.id, i.id));
-    return true;
-  }
-  window.addEventListener("blur", marcarSaida);
-  window.addEventListener("focus", agendarRetorno);
-  document.addEventListener("visibilitychange", () => { if (document.hidden) marcarSaida(); else agendarRetorno(); });
+  /* Uma ação de cada vez: clique duplo não confirma nem avança duas vezes (o serviço também confere). */
+  async function umaVez(f) { if (ocupado) return null; ocupado = true; try { return await f(); } finally { ocupado = false; } }
 
   /* ------------------------------------------------------------ histórico */
   function celulaCallback(i) {
@@ -216,20 +298,29 @@
   areaC.addEventListener("click", async (ev) => {
     const s = srv(), f = s.filaAtiva() || (filaVista && s.fila(filaVista)), acao = ev.target.closest("[data-acao]");
     const hist = ev.target.closest("[data-hist]"); if (hist) { abrirHistoricoIncidente(hist.dataset.hist); return; }
-    const conf = ev.target.closest("[data-confirmar]");
-    if (conf) { const tr = conf.closest("tr"); if (await exec(() => s.confirmarEnvioAtendimento(tr.dataset.confirmaFila, tr.dataset.confirmaItem, conf.dataset.confirmar), conf.dataset.confirmar === "enviado" ? "Envio confirmado: callback registrado." : "Registrado como não enviado.")) UI().recarregar(); return; }
     if (acao) {
       const a = acao.dataset.acao, i = f && f.assistido ? s.itemAtual(f) : null;
       if (a === "ver-fila") { modo = "lote"; vista = ""; atualizar(); }
       else if (a === "marcar-todos") { s.incidentesParaDisparo().filter(casa).filter((x) => x.elegivel).forEach((x) => selecao.add(x.chave)); desenharLinhasSelecao(); }
       else if (a === "desmarcar-todos") { selecao.clear(); desenharLinhasSelecao(); }
-      else if (a === "iniciar") { const n = await exec(() => s.iniciarAtendimento([...selecao]), "Atendimento iniciado."); if (n) { filaVista = n.id; selecao.clear(); vista = ""; atualizar(); } }
+      else if (a === "iniciar") {
+        podarSelecao(); // garantia: só entra na fila o que está dentro de Regionais/Período/Situação
+        const n = await exec(() => s.iniciarAtendimento([...selecao]), "Atendimento iniciado."); if (n) { filaVista = n.id; selecao.clear(); vista = ""; atualizar(); }
+      }
       else if (a === "at-abrir" && i) abrirWhatsapp(f, i);
       else if (a === "at-editar" && i) abrirMensagem(f, i);
-      else if (a === "at-pular" && i) { retorno = null; exec(() => s.pularAtendimento(f.id, i.id)); }
-      else if (a === "at-pausar") { retorno = null; exec(() => s.pausarAtendimento(f.id), "Atendimento pausado."); }
+      else if (a === "at-callback" && i) {
+        const auto = avancoAuto; // lido no clique: só a confirmação explícita pode avançar
+        if (await umaVez(() => exec(() => s.confirmarEnvioAtendimento(f.id, i.id, "enviado", { avancar: auto }), auto ? "Callback registrado. Próximo incidente." : "Callback registrado."))) UI().recarregar();
+      }
+      else if (a === "at-proximo" && i) {
+        const r = await umaVez(() => exec(() => s.proximoAtendimento(f.id, i.id)));
+        if (r && r.mesmo) toast("Não há outro incidente pendente. Envie, ou use PULAR para ignorar este.");
+      }
+      else if (a === "at-pular" && i) umaVez(() => exec(() => s.pularAtendimento(f.id, i.id)));
+      else if (a === "at-pausar") exec(() => s.pausarAtendimento(f.id), "Atendimento pausado.");
       else if (a === "at-retomar") exec(() => s.retomarAtendimento(f.id));
-      else if (a === "at-cancelar") { if (await UI().confirmar("Cancelar atendimento", "<p>Os incidentes ainda não atendidos saem da fila. Os envios não confirmados continuam aguardando a sua confirmação.</p>", "Cancelar atendimento", "perigo")) { retorno = null; exec(() => s.cancelarAtendimento(f.id), "Atendimento cancelado."); } }
+      else if (a === "at-cancelar") { if (await UI().confirmar("Cancelar atendimento", "<p>Os incidentes ainda não atendidos saem da fila. Um WhatsApp aberto e não confirmado fica como não realizado; nada conta como callback.</p>", "Cancelar atendimento", "perigo")) exec(() => s.cancelarAtendimento(f.id), "Atendimento cancelado."); }
       else if (a === "encerrar-antiga") { if (await UI().confirmar("Encerrar fila antiga", "<p>As mensagens ainda não enviadas dessa fila serão canceladas.</p>", "Encerrar", "perigo")) { await exec(() => (f.situacao === "revisao" ? s.descartarFila(f.id) : s.cancelarRestante(f.id))); filaVista = null; vista = ""; atualizar(); } }
       else if (a === "nova") { filaVista = null; vista = ""; atualizar(); }
       return;
@@ -243,6 +334,7 @@
   });
   areaC.addEventListener("change", (ev) => {
     const s = srv(), f = s.filaAtiva(), box = ev.target.closest("[data-item]");
+    if (ev.target.id === "at-auto") { avancoAuto = ev.target.checked; atualizar(); return; }
     if (ev.target.id === "ds-todos") { const lista = s.incidentesParaDisparo().filter(casa).filter((x) => x.elegivel); lista.forEach((x) => (ev.target.checked ? selecao.add(x.chave) : selecao.delete(x.chave))); desenharLinhasSelecao(); return; }
     if (!box || !f) return;
     const id = box.dataset.item;
@@ -250,5 +342,11 @@
     else if (ev.target.matches("[data-tel]")) exec(() => s.corrigirTelefoneItem(f.id, id, ev.target.value), "Telefone corrigido.").then((r) => { if (!r) atualizar(); });
   });
 
-  window.CentralDisparos = { atualizar };
+  /* Filtro por data mudou (aqui ou na lista): sai da seleção o que ficou fora e a tela de seleção é redesenhada. */
+  function aoMudarFiltroData() {
+    const s = srv(); if (!s || !s.E || !s.loteAberto()) return;
+    podarSelecao();
+    if (vista === "selecao") desenharSelecao();
+  }
+  window.CentralDisparos = { atualizar, aoMudarFiltroData, opcoesOcorrencia };
 })();

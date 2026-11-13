@@ -10,7 +10,8 @@
   /* ================================================================ texto */
   function semAcento(t) { return String(t ?? "").normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^\x00-\x7f]/g, ""); }
   N.normalizarTexto = (t) => semAcento(t).toUpperCase().split(/\s+/).filter(Boolean).join(" ");
-  const chaveCabecalho = (nome) => N.normalizarTexto(nome).replace(/:+$/, "").trim();
+  // Cabeçalho: sem acento, maiúsculas, "_" e espaços repetidos viram um espaço ("Horario_Call" = "HORARIO CALL").
+  const chaveCabecalho = (nome) => N.normalizarTexto(String(nome ?? "").replace(/_/g, " ")).replace(/:+$/, "").trim();
 
   /* ================================================================ SHA-256 / HMAC (JS puro: funciona em file://) */
   const K = new Uint32Array([0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -77,8 +78,17 @@
     "Custom ID do SDP": "custom_id_sdp", "Recebido ADMS": "recebido_adms", "Anexos": "anexos",
     "ID do Incidente Pai": "incidente_pai",
   };
+  /* Outros nomes da MESMA coluna. chamadas_incidentes.csv (pasta ADMS, diagnóstico de 12/11/2026) traz "Horario_Call",
+     "Recebido_Adms", "Contato_Do_Consumidor", "Nome_do_Consumidor", "submotivo" e "Notas_endereco" no lugar de
+     "Horário da call", "Recebido ADMS", "Contato do reclamante", "Nome do reclamante", "Submotivos" e "Nota do endereço".
+     Os nomes de N.COLUNAS continuam valendo. */
+  N.COLUNAS_ALIASES = {
+    "Horario_Call": "horario_call", "Recebido_Adms": "recebido_adms", "Contato_Do_Consumidor": "contato",
+    "Nome_do_Consumidor": "nome_reclamante", "submotivo": "submotivos", "Notas_endereco": "nota_endereco",
+  };
   const MAPA = {};
   for (const [k, v] of Object.entries(N.COLUNAS)) MAPA[chaveCabecalho(k)] = v;
+  for (const [k, v] of Object.entries(N.COLUNAS_ALIASES)) MAPA[chaveCabecalho(k)] = v;
   N.SEPARADORES = [";", ",", "\t", "|"];
   N.MAX_PREAMBULO = 20;
 
@@ -262,11 +272,31 @@
   const ident = (v) => { v = txt(v); return v ? v.split(/\s+/).join(" ").toUpperCase() : null; };
   const VERD = new Set(["SIM", "S", "YES", "Y", "TRUE", "1"]), FALSO = new Set(["NAO", "N", "NO", "FALSE", "0"]);
   const bool = (v) => { v = txt(v); if (!v) return null; const k = N.normalizarTexto(v); return VERD.has(k) ? true : FALSO.has(k) ? false : null; };
+  /* Formatos aceitos (sem inventar nada; a ordem dia/mês vem SÓ do formato, nunca é adivinhada pelo valor):
+     - brasileiro: dd/mm/aaaa (também com "-" ou "."), hora opcional hh:mm[:ss[.fração]], separada por espaço(s) ou "T";
+     - ISO: aaaa-mm-dd (ou aaaa/mm/dd), mesma hora opcional — comum em CSV gerado automaticamente.
+     - ADMS com AM/PM: mm/dd/aaaa h:mm[:ss] AM|PM — o chamadas_incidentes.csv da pasta ADMS (12/11/2026) grava
+       "11/12/2026 6:13:51 PM" para o mesmo instante que o Navegador de Chamadas exporta como "12/11/2026 18:13:51"
+       (58 CALLs conferidas). Com AM/PM a ordem é SEMPRE mês/dia; sem AM/PM nada muda (continua dia/mês ou ISO).
+       12 AM = 00h, 1-11 AM = mesma hora, 12 PM = 12h, 1-11 PM = +12h; hora fora de 1-12 com AM/PM é recusada.
+     A fração de segundo é descartada (a Central guarda até os segundos). Recusados (valor original preservado + aviso):
+     fuso horário (Z, -03:00: não há como saber a hora local sem supor) e datas impossíveis. */
+  const HORA = String.raw`(?:[ T](\d{1,2}):(\d{2})(?::(\d{2})(?:[.,]\d{1,7})?)?)?`;
+  const RE_DATA_BR = new RegExp(String.raw`^(\d{1,2})([\/.-])(\d{1,2})\2(\d{4})` + HORA + "$"), RE_DATA_ISO = new RegExp(String.raw`^(\d{4})([-\/])(\d{1,2})\2(\d{1,2})` + HORA + "$");
+  const RE_DATA_AMPM = /^(\d{1,2})\/(\d{1,2})\/(\d{4}) (\d{1,2}):(\d{2})(?::(\d{2}))? (AM|PM)$/i;
+  N.padraoValor = (v) => String(v ?? "").trim().replace(/\d/g, "9").replace(/[A-Za-zÀ-ÿ]/g, "A").slice(0, 40); // formato sem o conteúdo
   function data(v) {
     v = txt(v); if (!v) return [null, false];
-    const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?: (\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(v);
-    if (!m) return [null, true];
-    const [, d, mo, a, h = "0", mi = "0", s = "0"] = m;
+    const t = v.replace(/\s+/g, " ");
+    let m, d, mo, a, h, mi, s;
+    if ((m = RE_DATA_BR.exec(t))) [, d, , mo, a, h, mi, s] = m;
+    else if ((m = RE_DATA_ISO.exec(t))) [, a, , mo, d, h, mi, s] = m;
+    else if ((m = RE_DATA_AMPM.exec(t))) {
+      let ap; [, mo, d, a, h, mi, s, ap] = m;
+      if (+h < 1 || +h > 12) return [null, true]; // "0:10 AM" ou "13:00 PM" não existem
+      h = String((+h % 12) + (ap.toUpperCase() === "PM" ? 12 : 0));
+    } else return [null, true];
+    h = h ?? "0"; mi = mi ?? "0"; s = s ?? "0";
     const dt = new Date(Date.UTC(+a, +mo - 1, +d, +h, +mi, +s));
     if (dt.getUTCDate() !== +d || dt.getUTCMonth() !== +mo - 1 || +h > 23 || +mi > 59 || +s > 59) return [null, true];
     const p = (x) => String(x).padStart(2, "0");
@@ -278,13 +308,31 @@
     for (const parte of v.split(/[;,]/)) { const s = parte.trim().toUpperCase(); if (s && !vistos.includes(s)) vistos.push(s); }
     return vistos.join("; ") || null;
   }
+  N.lerDataHora = (v) => data(v)[0];
+  /* Diagnóstico do CSV SEM dados de clientes: nomes das colunas, codificação, separador e, nas colunas de data, quantas foram
+     reconhecidas e o FORMATO das não reconhecidas (dígitos viram 9, letras viram A). Usado pela faixa da pasta ADMS. */
+  N.diagnosticoCSV = function (bytes) {
+    const arq = N.lerCSV(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)), datas = {};
+    for (const campo of ["horario_call", "recebido_adms"]) {
+      const coluna = arq.colunas_reconhecidas[campo] || Object.keys(N.COLUNAS).find((k) => N.COLUNAS[k] === campo), r = { coluna, presente: campo in arq.colunas_reconhecidas, total: 0, vazias: 0, reconhecidas: 0, formatos_nao_reconhecidos: {} };
+      if (r.presente) for (const l of arq.linhas) {
+        const bruto = l.valores[campo]; r.total++;
+        if (!String(bruto ?? "").trim()) { r.vazias++; continue; }
+        const [iso, inv] = data(bruto);
+        if (iso && !inv) r.reconhecidas++; else { const p = N.padraoValor(bruto); r.formatos_nao_reconhecidos[p] = (r.formatos_nao_reconhecidos[p] || 0) + 1; }
+      }
+      datas[campo] = r;
+    }
+    return { codificacao: arq.codificacao, separador: arq.separador, linhas: arq.linhas.length, cabecalho: arq.cabecalho.filter(Boolean),
+      colunas_ausentes: arq.colunas_ausentes, colunas_desconhecidas: arq.colunas_desconhecidas, datas };
+  };
   N.tratar = function (linha) {
     const v = linha.valores, avisos = [];
-    const [horario, hInv] = data(v.horario_call), [, rInv] = data(v.recebido_adms);
-    if (hInv || rInv) avisos.push(["aviso", "data_invalida", "Data/hora fora do formato dd/mm/aaaa hh:mm:ss (valor original preservado)."]);
+    const [horario, hInv] = data(v.horario_call), [recebido, rInv] = data(v.recebido_adms);
+    if (hInv || rInv) avisos.push(["aviso", "data_invalida", `Data/hora em formato não reconhecido (formato recebido: ${N.padraoValor(hInv ? v.horario_call : v.recebido_adms)}; aceitos: dd/mm/aaaa hh:mm:ss, aaaa-mm-dd hh:mm:ss ou mm/dd/aaaa h:mm:ss AM/PM). Valor original preservado.`]);
     return [{
       call_id: ident(v.call_id), incidente: ident(v.incidente), incidente_pai: ident(v.incidente_pai), uc: txt(v.uc),
-      custom_id_sdp: txt(v.custom_id_sdp), horario_call: horario, motivo: txt(v.motivo), submotivos: submotivos(v.submotivos),
+      custom_id_sdp: txt(v.custom_id_sdp), horario_call: horario, recebido_adms: recebido, motivo: txt(v.motivo), submotivos: submotivos(v.submotivos),
       emergencia: bool(v.emergencia), nome_reclamante: txt(v.nome_reclamante), localizacao: txt(v.localizacao),
       nota_endereco: txt(v.nota_endereco), comentario: txt(v.comentario),
     }, avisos];
@@ -360,7 +408,7 @@
       const tels = N.telefonesDaLinha(linha.valores, campos.comentario);
       const tipo = N.tipoOcorrencia(campos.submotivos), [subtipo] = N.detectarSubtipo([campos.submotivos], tipo);
       validas.push({ linha_arquivo: linha.numero, call_id: call, incidente: campos.incidente, incidente_pai: campos.incidente_pai,
-        uc: campos.uc, custom_id_sdp: campos.custom_id_sdp, horario_call: campos.horario_call, motivo: campos.motivo,
+        uc: campos.uc, custom_id_sdp: campos.custom_id_sdp, horario_call: campos.horario_call, recebido_adms: campos.recebido_adms, motivo: campos.motivo,
         submotivos: campos.submotivos, tipo_ocorrencia: tipo, subtipo, emergencia: campos.emergencia, nome: campos.nome_reclamante,
         localizacao: campos.localizacao, nota_endereco: campos.nota_endereco, comentario: campos.comentario, telefones: tels,
         estado: N.estadoInicial(tels) });
@@ -606,6 +654,56 @@
     const ha = a.principal.horario_call || "", hb = b.principal.horario_call || "";
     if (ha !== hb) { if (!ha) return 1; if (!hb) return -1; return hb.localeCompare(ha); }
     return (numeroIncidente(a) - numeroIncidente(b)) || String(a.chave).localeCompare(String(b.chave));
+  };
+  /* ================================================================ filtro de incidentes por DATA (só visualização/seleção)
+     Data do incidente = "Horário da call" (Horario_Call) da comunicação principal; sem ela, o horário da call mais recente
+     das outras comunicações do incidente. Sem nenhum horário da call: "Recebido ADMS" (origem "recebido_adms": data de
+     RECEBIMENTO no ADMS, não necessariamente a da ocorrência). Sem nenhuma das duas: SEM DATA — nunca vira "hoje" e nunca
+     recebe a data da importação. Nada aqui altera registros. */
+  const diaDe = (iso) => (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(iso || "") ? iso.slice(0, 10) : null);
+  N.dataDoIncidente = function (g) {
+    const membros = g.membros && g.membros.length ? g.membros : [g.principal], p = g.principal;
+    for (const campo of ["horario_call", "recebido_adms"]) {
+      if (diaDe(p[campo])) return { dia: p[campo].slice(0, 10), iso: p[campo], origem: campo };
+      const outro = membros.map((m) => m[campo]).filter(diaDe).sort().pop();
+      if (outro) return { dia: outro.slice(0, 10), iso: outro, origem: campo };
+    }
+    return { dia: null, iso: null, origem: null };
+  };
+  /* Filtro: { modo: "hoje" | "periodo" | "todas" | "sem_data", de, ate } (datas aaaa-mm-dd). Padrão: hoje. */
+  N.filtroDataPadrao = () => ({ modo: "hoje", de: "", ate: "" });
+  N.normalizarFiltroData = function (f) {
+    const ok = (d) => (/^\d{4}-\d{2}-\d{2}$/.test(d || "") ? d : "");
+    if (!f || !["hoje", "periodo", "todas", "sem_data"].includes(f.modo)) return N.filtroDataPadrao();
+    if (f.modo !== "periodo") return { modo: f.modo, de: "", ate: "" };
+    const de = ok(f.de), ate = ok(f.ate);
+    if (!de && !ate) return { modo: "todas", de: "", ate: "" }; // período sem datas = todas as datas
+    return { modo: "periodo", de, ate }; // início depois do fim: período vazio (as datas do operador não são trocadas)
+  };
+  N.conferirFiltroData = function (dia, filtro, hoje = N.hojeLocal()) {
+    const f = N.normalizarFiltroData(filtro);
+    if (f.modo === "todas") return true;
+    if (f.modo === "sem_data") return !dia;
+    if (!dia) return false; // sem data identificada: fora de qualquer dia/período (contada à parte)
+    if (f.modo === "hoje") return dia === hoje;
+    return (!f.de || dia >= f.de) && (!f.ate || dia <= f.ate);
+  };
+  /* Contagens para a tela: no filtro, em outras datas, sem data e quantos só têm a data de recebimento. */
+  N.resumoFiltroData = function (dias, filtro, hoje = N.hojeLocal()) {
+    const r = { total: dias.length, no_filtro: 0, outras_datas: 0, sem_data: 0, hoje: 0 };
+    for (const d of dias) {
+      if (!d) r.sem_data++; else if (d === hoje) r.hoje++;
+      if (N.conferirFiltroData(d, filtro, hoje)) r.no_filtro++; else if (d) r.outras_datas++;
+    }
+    return r;
+  };
+  N.descreverFiltroData = function (filtro, hoje = N.hojeLocal()) {
+    const f = N.normalizarFiltroData(filtro), br = (d) => d.split("-").reverse().join("/");
+    if (f.modo === "hoje") return `Hoje (${br(hoje)})`;
+    if (f.modo === "todas") return "Todas as datas";
+    if (f.modo === "sem_data") return "Sem data identificada";
+    if (f.de && f.ate) return f.de === f.ate ? br(f.de) : `${br(f.de)} a ${br(f.ate)}`;
+    return f.de ? `A partir de ${br(f.de)}` : `Até ${br(f.ate)}`;
   };
   N.resumoAgrupamento = function (lista) {
     const g = N.agruparIncidentes(lista), multi = g.filter((x) => x.qtd > 1);

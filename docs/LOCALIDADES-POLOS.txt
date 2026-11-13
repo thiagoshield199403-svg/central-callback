@@ -1,0 +1,86 @@
+CENTRAL DE CALLBACK COI - FILTRO REGIONAIS E MUNICIPIOS (SETE REGIONAIS, SELECAO MULTIPLA)
+==========================================================================================
+Codigo: js/localidades.js (divisao oficial, aliases e regras de reconhecimento) + js/filtro-regionais.js (componente de
+selecao multipla) + js/app.js (Envio individual) + js/central-disparos.js (Envio em lote).
+Conferencia com CSV real (somente leitura, nada gravado): node ferramentas\validar-localidades-csv.mjs "<caminho do CSV>"
+
+DIVISAO OFICIAL (63 municipios, cada codigo em um unico municipio e uma unica regional)
+1. Regional Aracaju (3): 001 Aracaju, 010 Barra dos Coqueiros, 020 Nossa Senhora do Socorro
+2. Regional Sao Cristovao (2): 620 Sao Cristovao, 630 Itaporanga d'Ajuda
+3. Regional Itabaiana (14): 030 Itabaiana, 050 Areia Branca, 060 Campo do Brito, 070 Carira, 080 Frei Paulo, 090 Macambira,
+   100 Malhador, 110 Moita Bonita, 120 Aparecida, 130 Pedra Mole, 140 Pinhao, 150 Ribeiropolis, 160 Sao Domingos,
+   170 Sao Miguel do Aleixo
+4. Regional Lagarto (4): 180 Lagarto, 190 Salgado, 200 Poco Verde, 210 Simao Dias
+5. Regional Gloria (13): 340 Nossa Senhora das Dores, 350 Caninde de Sao Francisco, 360 Capela, 370 Cumbe, 380 Feira Nova,
+   390 Gararu, 400 Graccho Cardoso, 410 Itabi, 420 Monte Alegre de Sergipe, 430 Nossa Senhora da Gloria, 440 Lourdes,
+   450 Poco Redondo, 461 Porto da Folha
+6. Regional Propria (15): 468 Propria, 480 Amparo de Sao Francisco, 490 Aquidaba, 500 Telha, 510 Canhoba,
+   521 Cedro de Sao Joao, 530 Ilha das Flores, 541 Japoata, 550 Malhada dos Bois, 560 Muribeca, 570 Neopolis,
+   580 Pacatuba, 590 Santana do Sao Francisco, 600 Sao Francisco, 700 Brejo Grande
+7. Regional Maruim (12): 220 Maruim, 230 Carmopolis, 240 Divina Pastora, 250 General Maynard, 260 Japaratuba,
+   270 Laranjeiras, 280 Pirambu, 290 Riachuelo, 300 Rosario do Catete, 310 Santa Rosa de Lima,
+   320 Santo Amaro das Brotas, 330 Siriri
+Codigos das legendas dos mapas, com as correcoes confirmadas pelo COI: 001/010/020 (Aracaju), 620/630 (Sao Cristovao),
+200 = Poco Verde (nao Poco Redondo), 350 = so Caninde de Sao Francisco (o 350 do desenho do mapa de Maruim estava errado).
+
+COMO O MUNICIPIO E RECONHECIDO NO ADMS (coluna "Localizacao", em TODOS os trechos)
+- Formatos reais: "End:: RUA X_10_CENTRO; 430_NOSSA SENHORA DA GLORIA" (endereco + codigo e nome da cidade),
+  "Dispositivo: ITABAIANA" (nome do EQUIPAMENTO eletrico), "ESE_Municipio_Pesquisa: CARIRA" (campo de municipio), "" (vazia).
+- Trechos separados por ";", "·", "|", " - " e rotulo "X:" (Dispositivo, End, ESE_Municipio_Pesquisa, Municipio).
+- PRIORIDADE = NOME: um trecho INTEIRO igual ao nome oficial (ou alias confirmado). Sem acento, sem diferenca de maiusculas,
+  sublinhado/apostrofo/espacos normalizados. Endereco do ADMS (com "_" e numero, ex.: "RUA ARACAJU_10_CENTRO") nunca vira
+  municipio; nome de rua tambem nao ("RUA NSRA DA GLORIA"). NAO ha correspondencia aproximada.
+- CODIGO = complemento: 1_ARACAJU = 001. Ausente ou fora dos mapas ("77_ITABAIANA") nao impede o nome. Codigo de OUTRO
+  municipio de Sergipe junto do nome ("620_ARACAJU", "200_POCO REDONDO") = Divergencia para revisao.
+- Forca da evidencia no mesmo campo: 3 = codigo + nome do mesmo municipio (a cidade do endereco); 2 = nome sem codigo ou campo
+  ESE_Municipio_Pesquisa; 1 = "Dispositivo:" (o equipamento pode ter nome de OUTRO municipio: "Dispositivo: LAGARTO; End:: ...;
+  10_BARRA DOS COQUEIROS" e Barra dos Coqueiros). Vale o nivel mais forte; dois municipios no MESMO nivel = Divergencia.
+- OUTROS ESTADOS: os mesmos numeros existem na Paraiba (1_JOAO PESSOA, 30_PEDRO REGIS, 113_ITABAIANA, 179_APARECIDA).
+  js/localidades-dados.js (gerado do HISTORICO.csv por ferramentas\gerar-localidades.mjs; so contagens, sem clientes) guarda
+  os nomes e os pares codigo_nome vistos SO fora de Sergipe: esses ficam "Fora da area de Sergipe", nunca numa regional.
+  "APARECIDA" solto so existe na Paraiba no ADMS (em SE vem 120_NOSSA SENHORA APARECIDA): sem o codigo 120, fica fora de SE.
+- INCIDENTE com varias comunicacoes (lista e lote): localidade da comunicacao PRINCIPAL; se ela nao tiver municipio, o unico
+  municipio das demais. Comunicacao vazia ou "ESE_Municipio_Pesquisa" nao tira mais o incidente da regional. O incidente
+  aparece em cada municipio reconhecido nas suas comunicacoes; principal sem municipio + outras em municipios diferentes =
+  Divergencia para revisao.
+- O valor original da Localizacao nunca e alterado (a classificacao so e calculada na tela).
+
+ALIASES (tabela unica em js/localidades.js) - so grafias confirmadas (mesmo codigo no ADMS real ou confirmacao do COI)
+- 120_NOSSA SENHORA APARECIDA = 120 Aparecida
+- 400_GRACHO CARDOSO = 400 Graccho Cardoso
+- 440_NOSSA SENHORA DE LOURDES = 440 Lourdes
+- SANTO AMARO (sem codigo; confirmado pelo COI) = 320 Santo Amaro das Brotas (Regional Maruim)
+- AMPARO DO SAO FRANCISCO (sem codigo; confirmado pelo COI) = 480 Amparo de Sao Francisco (Regional Propria)
+Alias com codigo de OUTRO municipio de Sergipe = divergencia (ex.: "220_SANTO AMARO"); codigo fora dos mapas nao impede ("999_SANTO AMARO" = 320).
+NAO adicionados: "N. Sra.", "NSRA", "N SRA", "M. Bonita", "S. Domingos", "P. Redondo": no ADMS real so aparecem em nomes de
+RUA ("RUA NSRA DA GLORIA", "AV NSRA DA GLORIA"), nunca no trecho do municipio. Associar por aproximacao classificaria errado.
+
+CORRESPONDENCIAS CONFIRMADAS (exibicao no filtro <- identificacao no ADMS)
+- 200 Poco Verde (Lagarto)             <- 200_POCO VERDE e POCO VERDE sem codigo
+- 450 Poco Redondo (Gloria)            <- 450_POCO REDONDO e POCO REDONDO sem codigo
+- 320 Santo Amaro das Brotas (Maruim)  <- 320_SANTO AMARO DAS BROTAS e SANTO AMARO
+- 480 Amparo de Sao Francisco (Propria)<- 480_AMPARO DE SAO FRANCISCO e AMPARO DO SAO FRANCISCO
+- 350 Caninde de Sao Francisco (Gloria)<- 350_CANINDE DE SAO FRANCISCO e sem codigo
+200_POCO REDONDO ou 450_POCO VERDE (codigo de um com o nome do outro) = divergente.
+
+FORA DAS REGIONAIS (grupo "Fora das regionais" do filtro: selecionavel, nada e escondido, motivo na dica do lote)
+1. Localidade desconhecida: Localizacao vazia ou sem informacao (so endereco, codigo de equipamento, rotulo).
+2. Localidade nao reconhecida: ha um nome, mas nao e de nenhum dos 63 municipios (ex.: ESTANCIA, TOBIAS BARRETO).
+3. Divergencia para revisao: codigo de um municipio com nome de outro; dois municipios no mesmo campo; incidente sem
+   municipio na principal e com municipios diferentes nas outras comunicacoes.
+4. Fora da area de Sergipe: municipio de outro estado (ex.: MANGABEIRA · JOAO PESSOA, 42_ALAGOINHA).
+Auditoria somente leitura (12/11/2026) com o historico real do ADMS e um export de incidentes: nenhuma divergencia e
+reconhecimento acima de 99,9% na area de Sergipe com informacao (volumes do export real nao sao publicados).
+Conferir outro arquivo: node ferramentas\validar-localidades-csv.mjs "<caminho>"
+
+COMO O FILTRO FUNCIONA (Envio individual e Envio em lote, um filtro em cada, independentes)
+- Campo "Regionais e municipios" com a mesma altura dos demais; o painel abre por cima da tela (nao aumenta a altura).
+- Lista por regional, recolhivel; caixa da regional marca todos os seus municipios; desmarcar um municipio tira so ele.
+- Pesquisa por nome (sem acento) ou codigo (30 = 030); "Limpar" desmarca tudo; etiquetas com x mostram a selecao.
+- Numero laranja no campo = quantidade selecionada. Contagem ao lado de cada municipio = incidentes com os DEMAIS filtros.
+- Nada marcado = todos os registros (inclusive os fora das regionais).
+- Contagem ao lado de cada municipio = incidentes com comunicacao naquele municipio (com os DEMAIS filtros aplicados).
+- Combina com tipo de ocorrencia, situacao, datas e pesquisa. Nao rele o CSV, nao grava e nao altera registros.
+- Envio individual: escolha lembrada neste navegador. Envio em lote: comeca vazio a cada abertura da Central.
+- Linha azul do envio individual: totais da selecao (mesma conta do lote) e quantas chamadas ficaram fora das regionais.
+- O filtro por DATA continua sendo o mesmo para os dois modulos (regra anterior, nao alterada).

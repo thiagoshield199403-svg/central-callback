@@ -1,4 +1,4 @@
-CENTRAL DE CALLBACK COI - HISTORICO PERMANENTE, CALLBACK WHATSAPP, FECHAMENTO, GOOGLE DRIVE, BI E POLOS
+CENTRAL DE CALLBACK COI - HISTORICO PERMANENTE, CALLBACK WHATSAPP, FECHAMENTO, GOOGLE DRIVE E POLOS
 ========================================================================================================
 Data: 08/11/2026.
 
@@ -21,7 +21,7 @@ Data: 08/11/2026.
   ate o operador clicar em "Enviei" ou "Falhou". So "Enviei" conta como callback.
 - Segundo telefone do mesmo incidente: fica Enviado e nao conta de novo. Marcar resolvido nunca gera callback.
 - O telefone fica gravado neste historico (pedido da etapa 4.5). Avaliar retencao com a LGPD.
-- EXCLUIR HISTORICO e uma exclusao VISUAL: pede a palavra EXCLUIR, tira da lista e registra quem, quando e quantos (E.auditoria_manual). Nao apaga nada: callbacks contados, indicadores, fechamentos e BI nao mudam,
+- EXCLUIR HISTORICO e uma exclusao VISUAL: pede a palavra EXCLUIR, tira da lista e registra quem, quando e quantos (E.auditoria_manual). Nao apaga nada: callbacks contados, indicadores e fechamentos nao mudam,
   e o telefone continua guardado. Envio ainda pendente nao sai da lista. Exclusao definitiva nao existe: exigiria autenticacao, que a Central nao tem.
 
 3. FECHAMENTO DIARIO
@@ -34,34 +34,37 @@ Data: 08/11/2026.
 - O gateway recusa qualquer arquivo fora do formato agregado exato (gateway\fechamento-csv.mjs).
 
 4. GOOGLE DRIVE - O QUE VOCE PRECISA FAZER (uma vez)
-O app cria sozinho: CENTRAL CALLBACK COI > FECHAMENTOS > ano > mes (arquivos diarios), BI e HISTORICO (reservadas). As pastas criadas antes pelo navegador nao sao vistas pelo app.
+O app cria sozinho: CENTRAL CALLBACK COI > FECHAMENTOS > ano > mes (arquivos diarios) e HISTORICO (reservada). A pasta BI de versoes anteriores nao e mais criada nem usada (ver secao 5). As pastas criadas antes pelo navegador nao sao vistas pelo app.
 1) console.cloud.google.com, na conta do Drive: criar um projeto e ativar a Google Drive API.
 2) Tela de consentimento: tipo Externo, incluir a propria conta como usuario de teste. Em modo "teste" o Google expira a autorizacao em 7 dias: repita o passo 5
    e reinicie o gateway. Para deixar de expirar, publique o app; o Console so libera "Publicar app" com a pagina de branding completa (pagina inicial e politica de privacidade publicas).
 3) Credenciais > Criar ID do cliente OAuth > App para computador > baixar o JSON.
 4) node gateway\importar-credencial-google.mjs "caminho\client_secret_....json"  (grava em gateway\.env sem exibir o segredo; apague o JSON depois).
 5) node --env-file=gateway\.env gateway\autorizar-drive.mjs  e autorize no navegador, com a conta do Drive.
-6) Inicie o gateway com: node --env-file=gateway\.env gateway\servidor.mjs  Os fechamentos pendentes vao na proxima abertura ou em Fechamento > Enviar pendentes.
+6) Inicie o gateway com: node --env-file=gateway\.env gateway\servidor.mjs  O envio e feito em Fechamento > Enviar ao Google Drive (opcional).
 ESCOPO: o padrao e drive.file, o mais restrito disponivel: o app so enxerga o que ele mesmo criou. O Google nao oferece escopo limitado a uma pasta escolhida. Por isso o app cria a
 propria arvore CENTRAL CALLBACK COI, separada das pastas criadas pelo navegador. Para usar pastas existentes seria preciso GOOGLE_ESCOPO=.../auth/drive (Drive inteiro) e GOOGLE_DRIVE_RAIZ_ID.
-Sem essa configuracao os fechamentos ficam em gateway\dados\fechamentos e o BI le de la, avisando que o Drive nao esta configurado.
+Sem essa configuracao os fechamentos ficam em gateway\dados\fechamentos, e a Central avisa que o Drive nao esta configurado.
 
-ENCERRAR O DIA: gera o fechamento, o gateway publica em FECHAMENTOS/ano/mes, le o arquivo de volta e confere o SHA-256, atualiza o BI e so entao a Central mostra "Fechamento concluido".
-Sem essa confirmacao o resultado e "ainda NAO sincronizado": o arquivo fica na Central e em gateway\dados\fechamentos para nova tentativa. Mesmo nome e mesmo conteudo reaproveita; conteudo diferente e recusado (nada e sobrescrito).
+MUDANCA: o ENCERRAR O DIA agora grava o fechamento na PASTA DE REDE (docs\EXPORTACAO-PASTA-REDE.txt) e NAO chama mais o Drive.
+O Drive ficou OPCIONAL: Fechamento > "Enviar ao Google Drive (opcional)". Nesse envio o gateway publica em FECHAMENTOS/ano/mes, le o arquivo de volta e confere
+o SHA-256 e so entao o fechamento fica "Salvo no Drive". Sem confirmacao fica "Nao enviado": o arquivo fica na Central e em gateway\dados\fechamentos para nova tentativa. Mesmo nome e mesmo conteudo reaproveita; conteudo diferente e recusado (nada e sobrescrito).
 A pasta local/W: vale so para o botao manual EXPORTAR DO DIA e para "salvar" no historico.
 
-5. BI (http://127.0.0.1:8787/bi.html)
-Central > fechamento > Drive > sincronizacao (a cada 5 min, BI_INTERVALO_MS) > base agregada (gateway\dados\bi-base.json) > BI (recarrega a cada 1 min).
-Tela unica no visual do Painel de Callbacks ADMS, com todas as visoes (mensal, operador, diaria, acumulado). Metricas principais: CALLBACKS EXECUTADOS e CALLBACKS RESOLVIDOS; taxa = resolvidos / executados x 100.
-A coluna incidentes_cancelados continua no arquivo de fechamento, mas nao aparece no BI.
-Por dia, polo e computador vale so a maior versao; computadores diferentes se somam (o nome do arquivo traz _PC e a identificacao da instalacao). Drive fora do ar: mostra os ultimos dados e informa "pendente". Um BI unico para todos os polos precisa rodar num
-gateway que leia a mesma pasta do Drive; os gateways dos polos podem publicar nela com a mesma credencial.
+5. BI INTEGRADO (RETIRADO)
+O painel bi.html e a rota /api/bi/dados do gateway foram retirados da Central. Os fechamentos diarios continuam sendo gerados e publicados no Drive
+(FECHAMENTOS/ano/mes). O gateway continua sincronizando a pasta (gateway\bi-sync.mjs) porque o fechamento usa essa base para guardar a copia local e
+recusar arquivo de mesmo nome com conteudo diferente. A base gateway\dados\bi-base.json foi mantida (nenhum dado foi apagado).
+Retirada definitiva: o botao BI e os arquivos bi.html, js\bi.js e css\bi.css sairam tambem das copias apps-script\central-*; o Apps Script (Codigo.gs)
+nao tem mais a acao "bi" (pedido recusado como acao desconhecida) e o conector nao tem mais dadosBI. O Apps Script so muda no Google depois de
+publicar uma nova versao do Web App. Pasta BI no Drive: o gateway nao a cria mais; uma pasta BI ja existente NAO foi apagada. Se estiver vazia,
+pode ser excluida manualmente no Drive; se tiver arquivos, confira a finalidade antes.
 
 6. POLOS E WHATSAPP (arquitetura)
 Cada polo roda o proprio gateway no proprio computador, com o seu gateway\.env: WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_TOKEN, GATEWAY_POLO e WHATSAPP_NUMERO_ROTULO.
-Os dados locais ficam em cada computador; a unificacao acontece no Drive/BI. Operador cobrindo outro polo abre o turno no computador daquele polo: fica registrado com a sua sigla,
+Os dados locais ficam em cada computador; a unificacao acontece no Drive. Operador cobrindo outro polo abre o turno no computador daquele polo: fica registrado com a sua sigla,
 o polo do turno e o numero usado. Nenhum numero foi configurado nem contratado. O historico de incidentes NAO e compartilhado entre polos (e local por privacidade): um incidente atendido em outro
 computador nao aparece verde aqui. Compartilhar exigiria um servidor central com autenticacao.
 
 7. TESTE REAL DO DRIVE
-node --env-file=gateway\.env gateway\testar-drive.mjs  envia um fechamento ficticio, le de volta, confere o BI e manda para a lixeira. Os testes automaticos usam APIs simuladas em 127.0.0.1.
+node --env-file=gateway\.env gateway\testar-drive.mjs  envia um fechamento ficticio, le de volta, confere a sincronizacao dos fechamentos e manda para a lixeira. Os testes automaticos usam APIs simuladas em 127.0.0.1.

@@ -17,10 +17,30 @@
   const STATUS = { aguardando: "Aguardando", preparado: "Preparado", enviando: "Enviando", enviado: "Enviado", falha: "Falha", cancelado: "Cancelado", aberto: "WhatsApp aberto", nao_confirmado: "Envio não confirmado", pulado: "Pulado" };
   const ATIVAS = ["revisao", "autorizada", "pausada", "atendimento"];
   const aguardaAtendimento = (i) => i.status === "preparado" || i.status === "aguardando";
-  const jaAbordado = (s) => ["enviado", "aberto", "nao_confirmado"].includes(s);
-  /* O incidente da vez sempre sai do estado gravado: não há ponteiro que possa avançar duas vezes. */
-  const atualDe = (f) => f.itens.find((i) => i.status === "aberto") || f.itens.find(aguardaAtendimento) || null;
+  /* "nao_confirmado" (o operador avançou sem confirmar) volta a poder ser selecionado: não há mais lista de confirmação. */
+  const jaAbordado = (s) => ["enviado", "aberto"].includes(s);
+  /* O incidente da vez é o ponteiro GRAVADO na fila (f.atual_id). Ele só muda por ação explícita do operador
+     (PRÓXIMO INC, PULAR, CALLBACK REALIZADO com avanço automático): voltar do WhatsApp nunca avança.
+     Cada ação confere se o item ainda é o atual, então um clique repetido não avança duas vezes.
+     Filas gravadas antes do ponteiro continuam sendo lidas pela regra antiga e ganham o ponteiro na primeira ação. */
+  const comPonteiro = (f) => Object.prototype.hasOwnProperty.call(f, "atual_id");
+  const atualAntigo = (f) => f.itens.find((i) => i.status === "aberto") || f.itens.find(aguardaAtendimento) || null;
+  const atualDe = (f) => (comPonteiro(f) ? f.itens.find((i) => i.id === f.atual_id) || null : atualAntigo(f));
+  function garantirPonteiro(f) { if (f.assistido && !comPonteiro(f)) { const a = atualAntigo(f); f.atual_id = a ? a.id : null; } }
   function concluirSeAcabou(f) { if (f.situacao === "atendimento" && !atualDe(f)) { f.situacao = "concluida"; f.concluida_em = new Date().toISOString(); f.eventos.push({ em: f.concluida_em, tipo: "concluida", detalhe: null, incidente: null }); } }
+  /* Próximo pendente depois de "de" (dá a volta para os que ficaram para depois). Sem outro pendente, fica no próprio "de"
+     se ele ainda estiver pendente; senão a fila termina. */
+  function avancar(f, de) {
+    garantirPonteiro(f);
+    const n = f.itens.length, k = de ? f.itens.indexOf(de) : -1;
+    let prox = null;
+    for (let d = 1; d <= n && !prox; d++) { const x = f.itens[(k + d + n) % n]; if (x !== de && aguardaAtendimento(x)) prox = x; }
+    if (!prox && de && aguardaAtendimento(de)) prox = de;
+    if (de && prox !== de) f.anterior_id = de.id;
+    f.atual_id = prox ? prox.id : null;
+    concluirSeAcabou(f);
+    return prox;
+  }
   const TEMPO_EXECUTOR = 45000, INTERVALO_PADRAO = 1200, TEMPO_RESPOSTA = 30000;
   const agora = () => new Date().toISOString();
   const espera = (ms) => new Promise((ok) => setTimeout(ok, ms));
@@ -95,9 +115,11 @@
         const c = g.principal, sug = N.sugerirMensagem(c), m = N.modelos().find((x) => x.codigo === sug.codigo), tel = escolherTelefone(c);
         const status = statusNoLote(this.E, lote.id, c.id);
         const at = this.atendimentoDoIncidente(g.chave);
-        const motivo = at ? `Por ${at.operador} em ${new Date(at.em).toLocaleString("pt-BR")}` : c.estado === "callback_realizado" ? "Callback já realizado" : status === "enviado" ? "Mensagem já enviada" : jaAbordado(status) ? "Envio não confirmado: confirme antes de atender de novo" : null;
+        const motivo = at ? `Por ${at.operador} em ${new Date(at.em).toLocaleString("pt-BR")}` : c.estado === "callback_realizado" ? "Callback já realizado" : status === "enviado" ? "Mensagem já enviada" : jaAbordado(status) ? "Em atendimento no WhatsApp" : null;
         return { chave: g.chave, id: c.id, incidente: c.incidente, call_id: c.call_id, protocolo: c.incidente || c.call_id, nome: c.nome, motivo_adms: c.motivo, // protocolo = o mesmo usado nas mensagens (N.renderizar)
           submotivos: c.submotivos, modelo: sug.codigo, ocorrencia: m ? m.nome : "Mensagem genérica", telefone: tel ? tel.numero : null,
+          localizacao: c.localizacao, horario_call: c.horario_call, // da comunicação principal: filtros de polo/localidade/período do lote
+          data_incidente: N.dataDoIncidente(g), // data do incidente para o filtro por data (só visualização/seleção)
           tem_celular: !!tel && tel.tipo === "celular", atendido: !!at || c.estado === "callback_realizado", qtd: g.qtd, risco: g.risco, estado: c.estado, status, elegivel: !motivo, motivo_inelegivel: motivo };
       });
     },
@@ -138,6 +160,7 @@
           f.assistido = true; f.situacao = "atendimento";
           f.autorizacao = { em: agora(), operador: E.sessao.operador, polo: E.sessao.polo, estacao: E.sessao.estacao || null, whatsapp: null, total: f.itens.length, conector_modo: "whatsapp_web", resumo: null };
           f.itens.forEach((i) => { i.assinatura = assinar(i); });
+          f.atual_id = null; f.anterior_id = null; avancar(f, null);
         }
         evento(f, "preparada", `${f.itens.length} incidente(s) preparados${ignorados ? `; ${ignorados} ignorado(s)` : ""}`);
         E.disparos.push(f);
@@ -153,31 +176,52 @@
         const f = achar(E, filaId);
         if (f.situacao === "pausada") throw new ErroCallback("Retome o atendimento para continuar.");
         if (f.situacao !== "atendimento") throw new ErroCallback("Este atendimento não está em andamento.");
+        garantirPonteiro(f);
         const i = itemDe(f, itemId), atual = atualDe(f);
         if (!atual || atual.id !== i.id) throw new ErroCallback("Este incidente não é o atual da fila.");
+        if (i.status === "enviado") throw new ErroCallback("O callback deste incidente já foi registrado. Clique em PRÓXIMO INC para continuar.");
         const ch = E.chamadas.find((x) => x.id === i.chamada_id);
-        if (i.status !== "aberto" && ch && ch.estado === "callback_realizado") { i.status = "pulado"; i.erro = "Callback registrado por outra via durante o atendimento."; i.callback = { situacao: "ja_registrado", operador: null, em: agora() }; evento(f, "callback_ja_registrado", i.erro, i); concluirSeAcabou(f); return { pulado: true }; }
+        if (i.status !== "aberto" && ch && ch.estado === "callback_realizado") { i.status = "pulado"; i.erro = "Callback registrado por outra via durante o atendimento."; i.callback = { situacao: "ja_registrado", operador: null, em: agora() }; evento(f, "callback_ja_registrado", i.erro, i); avancar(f, i); return { pulado: true }; }
         if (i.status !== "aberto") { revisar(E, f); if (i.status !== "preparado") throw new ErroCallback(i.pendencias.map((p) => p.texto).join(" ") || "Corrija a pendência deste incidente.", 422); }
+        const ant = i.tentativas[i.tentativas.length - 1]; if (ant && !ant.fim) ant.fim = agora(); // nova tentativa (ex.: o WhatsApp deu erro)
         i.status = "aberto"; i.tentativas.push({ n: i.tentativas.length + 1, inicio: agora(), fim: null, resultado: "whatsapp_aberto", codigo: null, detalhe: null, wamid: null });
         evento(f, "whatsapp_aberto", null, i);
         return { url: N.linkWhatsappWeb(i.telefone, i.texto) };
       });
     },
-    /* Retorno à janela. Repetido, não faz nada: só muda quem ainda está "aberto". */
+    /* Retorno à janela: só anota no histórico técnico. NUNCA muda a situação do incidente nem avança a fila —
+       voltar do WhatsApp não significa que a mensagem saiu. A tela de lote não usa mais este registro. */
     registrarRetornoAtendimento(filaId, itemId) {
       return this._alterarInsistindo((E) => {
-        const f = achar(E, filaId), i = itemDe(f, itemId);
-        if (i.status === "aberto") { i.status = "nao_confirmado"; const t = i.tentativas[i.tentativas.length - 1]; if (t) t.fim = agora(); evento(f, "retorno", "Retornou à Central: envio não confirmado.", i); concluirSeAcabou(f); }
+        const f = achar(E, filaId), i = itemDe(f, itemId), t = i.tentativas[i.tentativas.length - 1];
+        if (i.status === "aberto" && t && !t.fim) { t.fim = agora(); evento(f, "retorno", "Retornou à Central: callback ainda não confirmado.", i); }
         return f;
       });
     },
+    /* PRÓXIMO INC: avança sem registrar callback. Tentativa aberta e não confirmada fica "nao_confirmado" (Não realizado);
+       incidente nunca aberto continua pendente e volta no fim da fila; callback já confirmado só avança. */
+    proximoAtendimento(filaId, itemId) {
+      return this._alterar((E) => {
+        const f = achar(E, filaId), i = itemDe(f, itemId);
+        if (f.situacao !== "atendimento") throw new ErroCallback("Retome o atendimento para continuar.");
+        garantirPonteiro(f);
+        const atual = atualDe(f); if (!atual || atual.id !== i.id) return { fila: f, proximo: atual, mesmo: false }; // clique repetido
+        const t = i.tentativas[i.tentativas.length - 1];
+        if (i.status === "aberto") { if (t && !t.fim) t.fim = agora(); i.status = "nao_confirmado"; evento(f, "nao_confirmado", "Avançou sem confirmar o callback.", i); }
+        else if (aguardaAtendimento(i)) evento(f, "adiado", "Deixado para depois.", i);
+        const prox = avancar(f, i);
+        return { fila: f, proximo: prox, mesmo: prox === i };
+      });
+    },
+    /* PULAR: ignora o incidente e segue. Não registra callback; um callback já confirmado não é desfeito. */
     pularAtendimento(filaId, itemId) {
       return this._alterar((E) => {
         const f = achar(E, filaId), i = itemDe(f, itemId);
         if (f.situacao !== "atendimento") throw new ErroCallback("Retome o atendimento para continuar.");
+        garantirPonteiro(f);
         const atual = atualDe(f); if (!atual || atual.id !== i.id) return f; // clique repetido
-        const t = i.tentativas[i.tentativas.length - 1]; if (t && !t.fim) t.fim = agora();
-        i.status = "pulado"; evento(f, "pulado", null, i); concluirSeAcabou(f);
+        if (i.status !== "enviado") { const t = i.tentativas[i.tentativas.length - 1]; if (t && !t.fim) t.fim = agora(); i.status = "pulado"; evento(f, "pulado", null, i); }
+        avancar(f, i);
         return f;
       });
     },
@@ -193,20 +237,24 @@
           if (aguardaAtendimento(i)) { i.status = "cancelado"; i.erro = "Atendimento cancelado pelo operador."; n++; }
           else if (i.status === "aberto") { i.status = "nao_confirmado"; const t = i.tentativas[i.tentativas.length - 1]; if (t) t.fim = agora(); }
         }
-        f.situacao = "cancelada"; f.concluida_em = agora(); evento(f, "cancelada", `${n} incidente(s) não atendido(s)`);
+        f.situacao = "cancelada"; f.concluida_em = agora(); if (comPonteiro(f)) f.atual_id = null; evento(f, "cancelada", `${n} incidente(s) não atendido(s)`);
         return f;
       });
     },
-    /* Só o operador sabe se a mensagem saiu. "enviado" usa o mesmo registro de callback da fila: uma vez por chamada. */
-    confirmarEnvioAtendimento(filaId, itemId, resultado) {
+    /* CALLBACK REALIZADO: só o operador sabe se a mensagem saiu. É a ÚNICA ação que registra o callback do lote, pelo mesmo
+       registro da fila (_registrarCallbackDoEnvio): uma vez por chamada. Exige que o WhatsApp tenha sido aberto para o incidente.
+       { avancar: true } (opção do operador) passa ao próximo na mesma gravação, e só depois da confirmação. */
+    confirmarEnvioAtendimento(filaId, itemId, resultado, { avancar: avancarDepois = false } = {}) {
       if (!["enviado", "falha"].includes(resultado)) return Promise.reject(new ErroCallback("Resultado desconhecido.", 422));
       return this._alterar((E) => {
         const f = achar(E, filaId), i = itemDe(f, itemId);
-        if (i.status !== "nao_confirmado") throw new ErroCallback("Este envio não está aguardando confirmação.");
+        if (!["aberto", "nao_confirmado"].includes(i.status)) throw new ErroCallback(i.status === "enviado" ? "Este envio não está aguardando confirmação: o callback já foi registrado." : "Este envio não está aguardando confirmação: abra o WhatsApp primeiro.");
         if (!E.sessao || E.sessao.situacao !== "aberta") throw new ErroCallback("Abra o turno para confirmar o envio.", 422);
-        const momento = agora(), t = i.tentativas[i.tentativas.length - 1]; if (t) t.resultado = resultado === "enviado" ? "confirmado_pelo_operador" : "operador_nao_enviou";
+        const momento = agora(), t = i.tentativas[i.tentativas.length - 1];
+        if (t) { t.resultado = resultado === "enviado" ? "confirmado_pelo_operador" : "operador_nao_enviou"; if (!t.fim) t.fim = momento; }
         if (resultado === "falha") { i.status = "falha"; i.erro = "O operador informou que não enviou."; evento(f, "nao_enviado", null, i); return i; }
         i.status = "enviado"; i.enviado_em = momento; i.erro = null; this._registrarCallbackDoEnvio(E, f, i, momento); evento(f, "envio_confirmado", `por ${E.sessao.operador}`, i);
+        if (avancarDepois && f.situacao === "atendimento") { garantirPonteiro(f); if (f.atual_id === i.id) avancar(f, i); }
         return i;
       });
     },
@@ -216,8 +264,12 @@
     },
     painelAtendimento(f) {
       const c = (...s) => f.itens.filter((i) => s.includes(i.status)).length, total = f.itens.length, restantes = c("preparado", "aguardando", "aberto"), cancelados = c("cancelado");
-      return { total, atendidos: c("nao_confirmado", "enviado", "falha"), restantes, pulados: c("pulado"), nao_confirmados: c("nao_confirmado"), confirmados: c("enviado"), cancelados, percentual: total ? Math.round(100 * (total - restantes) / total) : 0 };
+      const atual = atualDe(f), posicao = atual ? f.itens.indexOf(atual) + 1 : total;
+      return { total, atendidos: c("nao_confirmado", "enviado", "falha"), restantes, pulados: c("pulado"), nao_confirmados: c("nao_confirmado"), confirmados: c("enviado"), cancelados,
+        nao_realizados: c("nao_confirmado", "falha"), posicao, percentual: total ? Math.round(100 * (total - restantes) / total) : 0 };
     },
+    /* Último incidente que o operador deixou (para o indicador discreto da janela). */
+    anteriorAtendimento(f) { return (f.anterior_id && f.itens.find((i) => i.id === f.anterior_id)) || null; },
 
     /* ------------------------------------------------ revisão */
     _naRevisao(filaId, itemId, aplicar) {

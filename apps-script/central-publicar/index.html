@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Central de Callback COI</title>
+  <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">
+      <strong>Central de Callback</strong>
+      <span id="dia-info" class="sub">Carregando…</span>
+    </div>
+    <div class="acoes-topo">
+      <button id="btn-exportar" class="principal" disabled title="Gera o arquivo do dia (indicadores, sem dados de clientes) e abre a janela do Windows para salvar">EXPORTAR DO DIA</button>
+      <button id="btn-encerrar-dia" class="secundario" disabled>Encerrar o dia</button>
+      <button id="btn-manual" class="discreto" type="button">Callback WhatsApp</button>
+      <button id="btn-fechamento" class="discreto" type="button" title="Arquivos diários agregados enviados ao Drive">Fechamento</button>
+      <button id="btn-painel" class="discreto" title="Indicadores por dia, operador e polo">Painel</button>
+      <button id="btn-config" class="discreto" title="Configuração da estação">Configuração</button>
+    </div>
+  </header>
+
+  <div id="aviso" class="aviso oculto"></div>
+
+  <main>
+    <section id="metricas" class="metricas"></section>
+
+    <section id="abrir-dia" class="cartao oculto">
+      <h2>Abrir o turno</h2>
+      <form id="form-dia" class="linha-form">
+        <label>Sigla do operador <input name="operador" required maxlength="40" placeholder="ex.: ABC1" autocomplete="off"></label>
+        <label id="campo-polo" class="oculto">Polo (só na primeira vez) <input name="polo" maxlength="80" placeholder="ex.: Aracaju"></label>
+        <button class="principal" type="submit">Abrir o turno</button>
+      </form>
+    </section>
+
+    <section id="importar" class="cartao oculto">
+      <h2>Importar CSV do ADMS</h2>
+      <p class="ajuda">Escolha o CSV exportado do ADMS (já filtrado pelo polo). Nada é gravado antes da sua confirmação.</p>
+      <input id="arquivo" type="file" accept=".csv,text/csv">
+      <div id="previa"></div>
+    </section>
+
+    <section id="callback-manual" class="oculto">
+      <div class="cartao">
+        <div class="cabeca-lote"><h2>CALLBACK WHATSAPP</h2><span id="cm-operador" class="mini"></span></div>
+        <div class="manual-grade">
+          <div class="manual-form">
+            <div class="manual-campos">
+              <label>Número do incidente <input id="cm-incidente" maxlength="40" autocomplete="off" placeholder="ex.: INC 8000013"></label>
+              <label>Telefone do contato <input id="cm-telefone" inputmode="tel" maxlength="20" autocomplete="off" placeholder="(DDD) 9xxxx-xxxx"></label>
+            </div>
+            <div class="manual-modo" role="radiogroup" aria-label="Tipo de mensagem">
+              <label><input type="radio" name="cm_modo" value="padronizada" checked> Mensagem padronizada</label>
+              <label><input type="radio" name="cm_modo" value="personalizada"> Mensagem personalizada</label>
+            </div>
+            <label id="cm-bloco-padrao">Tipo de ocorrência <select id="cm-modelo"></select></label>
+            <label id="cm-bloco-livre" class="oculto">Mensagem <textarea id="cm-texto" maxlength="1500"></textarea></label>
+            <div class="manual-envio"><button id="cm-enviar" type="button" class="principal">Enviar</button>
+              <p class="mini">Enviar abre o WhatsApp Web com a mensagem. Depois de enviar, confirme em "Enviei" no histórico: só então conta como callback.</p></div>
+          </div>
+          <div class="manual-previa" aria-label="Prévia da mensagem"><div class="manual-celular"><div id="cm-previa-texto" class="manual-bolha" aria-live="polite"></div></div></div>
+        </div>
+      </div>
+      <div class="cartao">
+        <div class="cabeca-lote"><h2>HISTÓRICO DE CALLBACKS MANUAIS</h2><button id="cm-excluir" type="button" class="perigo">EXCLUIR HISTÓRICO</button></div>
+        <div class="barra-selecao">
+          <input id="cm-f-incidente" type="search" placeholder="Pesquisar número do incidente" aria-label="Pesquisar número do incidente">
+          <select id="cm-f-operador" aria-label="Filtrar por operador"></select>
+          <input id="cm-f-de" type="date" aria-label="Período: início"><input id="cm-f-ate" type="date" aria-label="Período: fim">
+          <select id="cm-f-status" aria-label="Filtrar por status"><option value="">Todos os status</option><option value="pendente">Envio pendente</option><option value="enviado">Enviado</option><option value="falha">Falha</option><option value="aguardando">Aguardando resolução</option><option value="resolvido">Resolvido</option></select>
+        </div>
+        <div id="cm-indicadores" class="metricas"></div>
+        <p id="cm-ocultos" class="mini"></p>
+        <div class="tabela-rolagem tabela-disparos"><table><thead><tr><th>Incidente</th><th>Telefone</th><th>Operador</th><th>Data e hora</th><th>Tipo de mensagem</th><th>Envio</th><th>Resolução</th><th></th></tr></thead><tbody id="cm-linhas"></tbody></table></div>
+      </div>
+    </section>
+
+    <section id="central-disparos" class="cartao oculto">
+      <div class="cabeca-lote">
+        <h2>Central de disparos</h2>
+        <button id="btn-historico-disparos" type="button" class="mini-botao">Histórico de execução</button>
+      </div>
+      <div id="disparos-abas" class="modos-envio"></div>
+      <div id="disparos-conteudo" class="disparos-conteudo"></div>
+    </section>
+
+    <section id="lote" class="cartao oculto">
+      <div class="cabeca-lote">
+        <h2 id="lote-titulo">Lote</h2>
+        <div class="filtros">
+          <select id="filtro-estado">
+            <option value="">Todas</option>
+            <option value="pendente">Pendentes</option>
+            <option value="callback_realizado">Callback realizado</option>
+            <option value="servico">Serviço executado</option>
+            <option value="resolvida">Ocorrência resolvida</option>
+            <option value="contato_invalido">Contato inválido</option>
+            <option value="sem_telefone">Sem telefone</option>
+            <option value="risco">Com indício de risco</option>
+          </select>
+          <input id="busca" placeholder="Buscar incidente, nome, local ou CALL">
+          <button id="btn-encerrar-lote" class="perigo">Encerrar e limpar o lote</button>
+        </div>
+      </div>
+      <div id="resumo-lote" class="resumo-lote"></div>
+      <div class="tabela-rolagem">
+        <table class="tabela-principal">
+          <colgroup><col class="w-inc"><col class="w-data"><col class="w-motivo"><col class="w-cliente"><col class="w-tel"><col class="w-local"><col class="w-tent"><col class="w-sit"><col class="w-acoes"></colgroup>
+          <thead><tr><th>Incidente</th><th title="Horário da call registrado no ADMS">Data e hora</th><th>Motivo / subtipo</th><th>Cliente</th><th>Telefone</th><th title="Bairro · cidade (endereço completo no tooltip e no detalhe)">Localização</th><th title="Tentativas">Tent.</th><th>Situação</th><th>Ações</th></tr></thead>
+          <tbody id="linhas"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <details id="historico" class="cartao historico oculto">
+      <summary id="historico-titulo">Lotes do dia e exportações</summary>
+      <div id="lista-lotes"></div>
+      <div id="lista-exportacoes"></div>
+    </details>
+  </main>
+
+  <footer class="creditos">
+    <span>Criador: <strong>Thiago dos Santos Araujo</strong></span>
+    <span>Filtros ADMS: <strong>Any Carolinne dos Santos Muniz</strong></span>
+  </footer>
+
+  <aside id="painel" class="painel oculto" aria-live="polite"></aside>
+  <div id="modal" class="modal oculto"><div class="modal-caixa" id="modal-caixa"></div></div>
+  <div id="toast" class="toast oculto"></div>
+  <script src="js/config-local.js"></script><!-- local, não versionado -->
+  <script src="js/modelos.js"></script>
+  <script src="js/nucleo.js"></script>
+  <script src="js/armazenamento.js"></script>
+  <script src="js/servico.js"></script>
+  <script src="js/historico-atendimento.js"></script>
+  <script src="js/disparos.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/central-disparos.js"></script>
+  <script src="js/callback-manual.js"></script>
+  <script src="js/conector-apps-script.js"></script>
+  <script src="js/fechamento-ui.js"></script>
+</body>
+</html>

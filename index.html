@@ -7,25 +7,29 @@
   <meta name="referrer" content="no-referrer">
   <title>Central de Callback COI</title>
   <link rel="stylesheet" href="css/estilo.css">
+  <link rel="stylesheet" href="css/callback-manual.css">
 </head>
 <body>
   <header class="topo">
     <div class="marca">
-      <strong>Central de Callback</strong>
-      <span id="dia-info" class="sub">Carregando…</span>
+      <span class="marca-logo" aria-hidden="true">COI</span>
+      <div class="marca-texto">
+        <strong>Central de Callback</strong>
+        <span id="dia-info" class="sub">Carregando…</span>
+      </div>
     </div>
     <div class="acoes-topo">
       <button id="btn-exportar" class="principal" disabled title="Gera o arquivo do dia (indicadores, sem dados de clientes) e abre a janela do Windows para salvar">EXPORTAR DO DIA</button>
       <button id="btn-encerrar-dia" class="secundario" disabled>Encerrar o dia</button>
       <button id="btn-manual" class="discreto" type="button">Callback WhatsApp</button>
-      <button id="btn-fechamento" class="discreto" type="button" title="Arquivos diários agregados enviados ao Drive">Fechamento</button>
-      <a id="lnk-bi" class="discreto link-topo" href="bi.html">BI</a>
+      <button id="btn-fechamento" class="discreto" type="button" title="Fechamentos diários agregados e exportação para a pasta de rede">Fechamento</button>
       <button id="btn-painel" class="discreto" title="Indicadores por dia, operador e polo">Painel</button>
       <button id="btn-config" class="discreto" title="Configuração da estação">Configuração</button>
     </div>
   </header>
 
   <div id="aviso" class="aviso oculto"></div>
+  <div id="pasta-adms" class="pasta-adms" aria-live="polite"></div>
 
   <main>
     <section id="metricas" class="metricas"></section>
@@ -64,7 +68,7 @@
             <div class="manual-envio"><button id="cm-enviar" type="button" class="principal">Enviar</button>
               <p class="mini">Enviar abre o WhatsApp Web com a mensagem. Depois de enviar, confirme em "Enviei" no histórico: só então conta como callback.</p></div>
           </div>
-          <div class="manual-previa" aria-label="Prévia da mensagem"><div class="manual-celular"><div id="cm-previa-texto" class="manual-bolha" aria-live="polite"></div></div></div>
+          <div class="manual-previa" aria-label="Prévia da mensagem"><div class="manual-celular"><div class="mc-tela"><div class="mc-topo" aria-hidden="true"><span class="mc-avatar">C</span><span class="mc-contato"><b>Cliente</b><span>online</span></span></div><div class="mc-conversa"><div id="cm-previa-texto" class="manual-bolha" aria-live="polite"></div></div><div class="mc-barra" aria-hidden="true"><span class="mc-campo"></span><span class="mc-envio"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></span></div></div></div></div>
         </div>
       </div>
       <div class="cartao">
@@ -93,22 +97,42 @@
     <section id="lote" class="cartao oculto">
       <div class="cabeca-lote">
         <h2 id="lote-titulo">Lote</h2>
-        <div class="filtros">
-          <select id="filtro-estado">
-            <option value="">Todas</option>
-            <option value="pendente">Pendentes</option>
-            <option value="callback_realizado">Callback realizado</option>
-            <option value="servico">Serviço executado</option>
-            <option value="resolvida">Ocorrência resolvida</option>
-            <option value="contato_invalido">Contato inválido</option>
-            <option value="sem_telefone">Sem telefone</option>
-            <option value="risco">Com indício de risco</option>
-          </select>
-          <input id="busca" placeholder="Buscar incidente, nome, local ou CALL">
-          <button id="btn-encerrar-lote" class="perigo">Encerrar e limpar o lote</button>
+        <button id="btn-encerrar-lote" class="perigo">Encerrar e limpar o lote</button>
+      </div>
+      <div class="painel-filtros">
+        <div class="barra-filtros" role="group" aria-label="Filtros da lista de incidentes">
+          <div class="campo campo-regionais"><span class="campo-rotulo" title="Sete regionais; seleção múltipla de regionais e municípios">Regionais e municípios</span>
+            <div id="filtro-regionais"></div></div>
+          <label class="campo">Tipo de ocorrência
+            <select id="filtro-ocorrencia" aria-label="Filtrar por tipo de ocorrência" title="Mesmas opções e mesmo critério do envio em lote (mensagem sugerida para a comunicação principal do incidente)"><option value="">Todas as ocorrências</option></select></label>
+          <label class="campo">Situação
+            <select id="filtro-estado" aria-label="Filtrar por situação">
+              <option value="">Todas</option>
+              <option value="pendente">Pendentes</option>
+              <option value="callback_realizado">Callback realizado</option>
+              <option value="servico">Serviço executado</option>
+              <option value="resolvida">Ocorrência resolvida</option>
+              <option value="contato_invalido">Contato inválido</option>
+              <option value="sem_telefone">Sem telefone</option>
+              <option value="risco">Com indício de risco</option>
+            </select></label>
+          <label class="campo campo-busca">Pesquisa
+            <input id="busca" type="search" placeholder="Incidente, nome, local ou CALL" aria-label="Buscar incidente, nome, local ou CALL"></label>
+        </div>
+        <div id="filtro-data" class="filtro-data fd-linha" role="group" aria-label="Filtro por data do incidente">
+          <span class="fd-rotulo" title="Data real do incidente: Horário da call do ADMS (sem ele, Recebido ADMS, marcado como recebimento). Nunca a data da importação.">Data do incidente</span>
+          <label class="campo campo-data">De <input id="fd-de" type="date" aria-label="Data inicial"></label>
+          <label class="campo campo-data">Até <input id="fd-ate" type="date" aria-label="Data final"></label>
+          <button id="fd-aplicar" type="button" class="mini-botao">Aplicar filtro</button>
+          <span class="segmentos" role="group" aria-label="Atalhos de data">
+            <button id="fd-hoje" type="button" class="mini-botao">Hoje</button><button id="fd-todas" type="button" class="mini-botao">Todas as datas</button><button id="fd-sem-data" type="button" class="mini-botao" title="Incidentes sem Horário da call nem Recebido ADMS reconhecidos">Sem data</button>
+          </span>
+          <button id="fd-preencher" type="button" class="mini-botao oculto" title="Lê o chamadas_incidentes.csv atual da pasta ADMS e preenche SOMENTE Horário da call e Recebido ADMS que estão vazios. Mostra uma prévia e pede confirmação antes de gravar.">Preencher datas ausentes</button>
+          <span id="fd-info" class="mini fd-info" aria-live="polite"></span>
         </div>
       </div>
       <div id="resumo-lote" class="resumo-lote"></div>
+      <div id="resumo-filtro" class="resumo-filtro oculto" aria-live="polite"></div>
       <div class="tabela-rolagem">
         <table class="tabela-principal">
           <colgroup><col class="w-inc"><col class="w-data"><col class="w-motivo"><col class="w-cliente"><col class="w-tel"><col class="w-local"><col class="w-tent"><col class="w-sit"><col class="w-acoes"></colgroup>
@@ -133,15 +157,21 @@
   <aside id="painel" class="painel oculto" aria-live="polite"></aside>
   <div id="modal" class="modal oculto"><div class="modal-caixa" id="modal-caixa"></div></div>
   <div id="toast" class="toast oculto"></div>
+  <script src="js/config-local.js"></script><!-- local, não versionado: ver js/config-local.exemplo.js -->
   <script src="js/modelos.js"></script>
   <script src="js/nucleo.js"></script>
   <script src="js/armazenamento.js"></script>
   <script src="js/servico.js"></script>
   <script src="js/historico-atendimento.js"></script>
   <script src="js/disparos.js"></script>
+  <script src="js/localidades-dados.js"></script>
+  <script src="js/localidades.js"></script>
+  <script src="js/filtro-regionais.js"></script>
   <script src="js/app.js"></script>
   <script src="js/central-disparos.js"></script>
   <script src="js/callback-manual.js"></script>
   <script src="js/fechamento-ui.js"></script>
+  <script src="js/exportacao-rede.js"></script>
+  <script src="js/pasta-adms.js"></script>
 </body>
 </html>

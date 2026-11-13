@@ -1,0 +1,140 @@
+CENTRAL DE CALLBACK COI - ATUALIZACAO AUTOMATICA PELO ADMS (chamadas_incidentes.csv)
+====================================================================================
+Arquivo lido: chamadas_incidentes.csv (SOMENTE ele; os demais arquivos da pasta nunca sao abertos).
+Origem na Energisa: \\SERVIDOR\PASTA\ADMS\chamadas_incidentes.csv
+O caminho real fica em js\config-local.js (pasta_adms; nao versionado, modelo em js\config-local.exemplo.js). Aqui: exemplo generico.
+Codigo: js/pasta-adms.js + srv.atualizarLote (js/servico.js). Testes: testes/ponta-a-ponta/e2e-pasta-adms.mjs e
+e2e-adms-conexao.mjs.
+
+O LOCAL DA CENTRAL NAO IMPORTA
+- O caminho do ADMS nao depende de onde o index.html esta (pasta local, compartilhamento, GitHub). Nada no codigo usa o
+  caminho de instalacao. O navegador tambem NAO permite que uma pagina abra \\SERVIDOR\... sozinha, por caminho escrito:
+  o operador precisa CONECTAR a pasta (ou o arquivo) uma vez em cada computador/navegador. Isso e regra de seguranca do
+  Edge/Chrome, nao do codigo, e vale para qualquer pagina (file://, http:// ou https://).
+
+PRIMEIRA VEZ EM CADA COMPUTADOR / NAVEGADOR
+1. Abra a Central no Edge (fora de janela InPrivate).
+2. Na faixa "Pasta ADMS", clique em "Selecionar pasta". Na janela do Windows, cole \\SERVIDOR\PASTA\ADMS na barra de
+   endereco, Enter, e clique em "Selecionar pasta". Se o Edge perguntar, escolha "Permitir".
+   - Se o Edge disser "nao pode abrir esta pasta porque ela contem arquivos do sistema": e o bloqueio do navegador para
+     pastas "sensiveis" (ex.: a RAIZ de uma unidade mapeada, como Y:\). Use o caminho \\SERVIDOR\... em vez da letra da
+     unidade, OU clique em "Selecionar arquivo" e escolha o proprio chamadas_incidentes.csv (o bloqueio nao se aplica).
+3. Abra o turno (sigla). O CSV e importado sozinho como um lote, pela mesma importacao do botao manual.
+4. A Central rele o que gravou no IndexedDB para confirmar que a conexao ficou guardada. Se o navegador nao guardar
+   (InPrivate, dados apagados ao fechar), a faixa mostra em vermelho "O navegador nao guardou a conexao" - nao esquece calada.
+
+PROXIMAS ABERTURAS
+- A conexao (pasta ou arquivo) continua guardada. Nao e preciso selecionar de novo.
+- Autorizacao: enquanto o Edge estiver aberto, F5 le sem perguntar. Depois de FECHAR o Edge, o navegador normalmente
+  volta a pedir a autorizacao. A Central mostra "A autorizacao ... precisa ser renovada" e o botao "Renovar autorizacao":
+  um clique, o Edge pergunta, "Permitir" - sem janela de selecao. O clique em "Abrir o turno" tambem renova.
+- Versoes recentes do Edge/Chrome oferecem "Permitir em todas as visitas". Se aparecer e for escolhido, nas proximas
+  aberturas nem esse clique e pedido. Isso depende do navegador/politica e PRECISA ser confirmado na maquina da Energisa.
+- Nenhuma janela abre sozinha: a permissao so e pedida num clique do operador (regra do navegador).
+
+ATUALIZACAO COM F5
+- A cada abertura da pagina ou F5 a Central confere nome, tamanho e data de modificacao de chamadas_incidentes.csv.
+  - Igual a versao ja carregada hoje: "Arquivo sem alteracoes". O arquivo NEM e lido.
+  - Mudou: espera o arquivo ficar estavel (tamanho e data iguais em duas consultas, ~1,2 s), le, confere o conteudo
+    (SHA-256) e atualiza indicadores e lista.
+  - O ADMS ainda gravando (muda a cada consulta, ate 4 tentativas): "O ADMS esta gravando o arquivo: nada foi
+    carregado". Nada pela metade entra. Clique em "Verificar agora" em instantes.
+- Tambem verifica ao abrir o turno e no botao "Verificar agora". Sem verificacao continua, sem setInterval.
+
+COMO EVITA DUPLICIDADE (nada muda nas regras de calculo)
+- Conteudo: o SHA-256 do arquivo (o mesmo da importacao manual). Conteudo ja carregado hoje nao e carregado de novo.
+- Chamada: cada CALL e identificada pela mesma marca do dia ja usada pela Central (CALL unica no dia).
+- Sem lote aberto: a versao nova vira um lote. Lote aberto vindo da pasta: a versao nova SUBSTITUI os dados do ADMS no
+  mesmo lote, sem somar de novo (CALL nova entra; CALL sem registro do operador e atualizada; CALL com registro fica como
+  esta; CALL que saiu do arquivo continua no lote). Lote aberto importado A MAO: a pasta nao mexe nele.
+
+SITUACOES DA FAIXA
+- Atualizado / Arquivo sem alteracoes: tudo certo. "Ultima atualizacao" = quando a versao atual foi carregada.
+- Aguardando o turno: abra o turno; o CSV carrega sozinho.
+- Autorizacao precisa ser renovada: clique em "Renovar autorizacao" (ou abra o turno) e escolha Permitir.
+- Pasta/arquivo indisponivel: rede da empresa fora, sem acesso ao compartilhamento, pasta movida ou arquivo removido
+  (o navegador nao distingue esses casos). A Central continua funcionando; use a importacao manual.
+- Navegador sem a funcao (ex.: Firefox): avisa e mantem so a importacao manual. Nenhuma conexao e simulada.
+- Botao "Diagnostico": relatorio tecnico SEM dados de clientes (contexto, APIs, conexao guardada, permissao ao abrir,
+  erros recentes, colunas do CSV e o FORMATO das datas). Pode ser copiado e enviado ao suporte.
+
+DATAS (coluna "Data e hora")
+- Coluna usada: "Horario da call" (registro da comunicacao do cliente no ADMS). "Recebido ADMS" e sempre posterior
+  (entrada no ADMS). A data da importacao NUNCA substitui a data real.
+- Nomes aceitos (12/11/2026): "Horario da call" ou "Horario_Call"; "Recebido ADMS" ou "Recebido_Adms" (o
+  chamadas_incidentes.csv da pasta usa os nomes com "_"). Maiusculas, acentos, espacos e "_" nao importam.
+- FILTRO POR DATA (lista e envio em lote, o mesmo filtro): abre SEMPRE em Hoje (tambem no F5). Data do incidente =
+  Horario da call da comunicacao principal (sem ela, a mais recente das outras comunicacoes); sem nenhum Horario da call,
+  Recebido ADMS, marcado "receb." (data de RECEBIMENTO, nao necessariamente a da ocorrencia). Sem nenhuma das duas:
+  "Sem data" (botao proprio), nunca contado como hoje. O filtro so muda a visualizacao/selecao: nao reimporta, nao
+  apaga e nao altera registros nem metricas.
+- PREENCHER DATAS AUSENTES (botao na barra do filtro; aparece so quando ha chamada sem data): le o
+  chamadas_incidentes.csv ATUAL da pasta (sem importar) e grava SOMENTE horario_call e recebido_adms que estao vazios,
+  pela marca do dia da CALL. Mostra antes a previa (ausentes, recebem horario, recebem recebido, sem correspondencia,
+  ambiguos, sem data no CSV) e so grava apos a confirmacao, numa unica transacao (tudo ou nada). Ambiguo = mesma CALL
+  com datas diferentes no CSV, ou incidente diferente do gravado: nao e alterado. Nao insere, nao remove, nao
+  sobrescreve data existente e nao mexe em estado, tentativas, callbacks, WhatsApp, observacoes nem historico.
+  Auditoria (sem dados de clientes) no proprio lote: preenchimento_datas.
+- Formatos aceitos: dd/mm/aaaa (tambem com - ou .) e aaaa-mm-dd (tambem com /), com hora hh:mm, hh:mm:ss ou hh:mm:ss.fff,
+  separada por espaco ou "T". A fracao de segundo e descartada.
+- AM/PM (12/11/2026): o chamadas_incidentes.csv da pasta grava mm/dd/aaaa h:mm:ss AM|PM ("11/12/2026 6:13:51 PM" =
+  "12/11/2026 18:13:51" do Navegador de Chamadas; conferido em 59 CALLs). Com AM/PM a ordem e SEMPRE mes/dia;
+  12 AM = 00h, 12 PM = 12h, 1-11 PM = +12h. Sem AM/PM nada muda (dia/mes). Hora fora de 1-12 com AM/PM e recusada.
+- Recusados (a Central mostra um traco e avisa o FORMATO recebido, sem inventar): fuso horario (Z, -03:00) e datas
+  impossiveis. Se o CSV real usar um desses, o Diagnostico mostra o formato e a regra e ajustada.
+- Colunas com outro nome no chamadas_incidentes.csv (aceitas junto com os nomes antigos): Contato_Do_Consumidor
+  (Contato do reclamante: telefones), Nome_do_Consumidor (Nome do reclamante), submotivo (Submotivos), Notas_endereco
+  (Nota do endereco).
+- Codificacao (UTF-8 ou Windows-1252) e separador (; , tab |) sao detectados automaticamente, como antes.
+
+ONDE DEIXAR A CENTRAL (comparacao)
+A) Copia local (GitHub baixado ou pasta copiada), aberta por file:///C:/...
+   + Funciona sem servidor; a conexao com o ADMS e a mesma em qualquer pasta de instalacao.
+   - Todas as paginas file:// do navegador dividem o mesmo armazenamento. A opcao "Permitir em todas as visitas" pode
+     nao ser oferecida para file:// (a confirmar na maquina da Energisa): entao, 1 clique por abertura do Edge.
+   - Atualizar a Central = copiar a pasta nova em cada computador (os dados ficam no navegador, nao na pasta).
+B) Origem HTTPS (GitHub Pages ou servidor HTTPS interno)
+   + Origem estavel e "segura": e o cenario em que o Edge oferece a permissao persistente com mais chance.
+   + Atualizacao central: todos usam a mesma versao.
+   + Os dados do ADMS continuam so no navegador do operador (a pagina nao envia nada; CSP connect-src 'self').
+   - HTTPS NAO da acesso ao \\SERVIDOR por si so: a conexao continua sendo feita pelo operador, como em A.
+   - GitHub Pages e publico e pode estar bloqueado pelo proxy da empresa; um HTTPS interno depende da TI.
+C) index.html aberto direto do compartilhamento (file://servidor/...), como no desenvolvimento
+   + Nao precisa copiar nada.
+   - Mesmas limitacoes de A, mais: se o compartilhamento cair, a Central nem abre; varios operadores abrindo os mesmos
+     arquivos; politicas de "zona de intranet" podem tratar file de rede de forma diferente. Nao recomendado para uso diario.
+Recomendacao: B com um endereco HTTPS INTERNO aprovado pela TI (ou A, copia local, enquanto isso nao existir).
+Em qualquer cenario a conexao com o ADMS e feita uma vez por computador, com renovacao de 1 clique quando o Edge pedir.
+
+SE O EDGE NAO MANTIVER A AUTORIZACAO (alternativas, todas dependem de decisao da TI)
+1. HTTPS interno (B acima): melhora a chance da permissao persistente; nao muda o acesso a rede.
+2. Servico corporativo: a TI disponibiliza o CSV por um endereco HTTPS interno (ex.: um site/API somente leitura do
+   proprio servidor de arquivos). A Central passaria a buscar o arquivo nesse endereco (exige liberar esse endereco na CSP). Sem seletor
+   e sem permissao do navegador: e a solucao realmente automatica.
+3. Servico local: o gateway Node que ja existe no projeto (gateway/) poderia ler \\SERVIDOR\...\chamadas_incidentes.csv com
+   o usuario logado e entregar a Central em http://127.0.0.1. Exige Node.js instalado em cada computador = autorizacao
+   da TI para instalar software. NAO implementado sem essa autorizacao.
+4. Copia local + conexao por arquivo (A): o que ja funciona hoje, com 1 clique por abertura do Edge.
+
+O QUE PEDIR A TI (somente se o teste mostrar que a autorizacao nao persiste ou que o Edge bloqueia a pasta)
+- Confirmar que as politicas do Edge nao bloqueiam a API de arquivos para o endereco da Central:
+  DefaultFileSystemReadGuardSetting / FileSystemReadAskForUrls / FileSystemReadBlockedForUrls.
+- Confirmar que o Edge NAO apaga os dados de sites ao fechar (por exemplo ClearBrowsingDataOnExit no Edge, ou outra politica
+  de limpeza ao fechar): sem IndexedDB a Central esquece a conexao E os turnos.
+- Opcional, para eliminar o clique: um endereco HTTPS interno para a Central, ou um servico interno que entregue o CSV.
+
+ROTEIRO DE TESTE NA MAQUINA DA ENERGISA (o que os testes automaticos NAO cobrem)
+1. Abrir a Central (anotar: local, compartilhamento ou HTTPS). Clicar "Diagnostico" e copiar.
+2. "Selecionar pasta" pelo caminho \\SERVIDOR\PASTA\ADMS. Se der "arquivos do sistema", usar "Selecionar arquivo".
+3. Conferir: nenhuma faixa vermelha "nao guardou"; abrir o turno; conferir a coluna Data e hora.
+4. F5: deve mostrar "Arquivo sem alteracoes".
+5. Fechar TODAS as janelas do Edge, abrir de novo a Central: anotar se pediu "Renovar autorizacao" e se o Edge ofereceu
+   "Permitir em todas as visitas". Escolher essa opcao e repetir o passo 5.
+6. Clicar "Diagnostico" de novo e copiar (mostra a permissao ao abrir e os erros). Sem dados de clientes.
+7. Desconectar da rede (ou VPN) e dar F5: deve mostrar "indisponivel" sem travar; reconectar e dar F5.
+
+PRIVACIDADE
+- Somente leitura. Nada e enviado para fora: nenhuma requisicao de rede (CSP connect-src 'self' mantida).
+- A copia do arquivo em memoria e descartada apos o processamento; os dados ficam no armazenamento local, como na
+  importacao manual. O diagnostico guarda so nomes de colunas, contagens e formatos (digitos viram 9), nunca valores.
+- Nada de caminho de instalacao, usuario ou dado de cliente e gravado no codigo.

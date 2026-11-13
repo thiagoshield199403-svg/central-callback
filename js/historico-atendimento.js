@@ -233,9 +233,9 @@
           const x = E.fechamentos.find((y) => y.id === f.id);
           if (!x) return;
           const erro = ok ? null : resp.detalhe || "O Google Drive não confirmou o envio.", status = ok ? "enviado" : resp.resultado === "falha" ? "falha" : "pendente";
-          if (ok) Object.assign(x, { status, drive_id: resp.arquivo_id, enviado_em: agora(), erro, caminho_drive: resp.caminho || null, bi: resp.bi || null });
+          if (ok) Object.assign(x, { status, drive_id: resp.arquivo_id, enviado_em: agora(), erro, caminho_drive: resp.caminho || null });
           else Object.assign(x, { status, erro });
-          x.historico_envio = [...(x.historico_envio || []), { em: agora(), resultado: status, detalhe: erro, reaproveitado: !!resp.reaproveitado, bi: resp.bi || null }].slice(-30);
+          x.historico_envio = [...(x.historico_envio || []), { em: agora(), resultado: status, detalhe: erro, reaproveitado: !!resp.reaproveitado }].slice(-30);
         });
         if (ok) r.enviados++; else r.pendentes++;
       }
@@ -245,5 +245,20 @@
     fechamento(id) { return this.E.fechamentos.find((f) => f.id === id) || null; },
     ultimoFechamentoDoDia(data) { return this.E.fechamentos.filter((f) => f.data === data).pop() || null; },
     ultimosFechamentos(n = 10) { return this.E.fechamentos.slice(-n).reverse().map(({ conteudo, ...f }) => f); },
+    /* Exportação para a pasta de rede (js/exportacao-rede.js): só grava o RESULTADO de cada tentativa no próprio fechamento.
+       Não altera conteúdo, versão, nome, assinatura nem o status do Drive. "exportado" só é registrado depois da gravação conferida
+       por leitura do arquivo na pasta; uma falha posterior não apaga uma exportação já confirmada. Falha = "pendente" (com o detalhe), para nova tentativa. */
+    registrarExportacaoRede(id, r) {
+      return this._alterar((E) => {
+        const x = E.fechamentos.find((f) => f.id === id);
+        if (!x) throw new Erro("Fechamento não encontrado.", 404);
+        const ok = r.resultado === "exportado" || r.resultado === "ja_estava_na_pasta";
+        const reg = { em: agora(), operador: limpo(r.operador).slice(0, 40) || "—", resultado: r.resultado, arquivo: r.arquivo || null, pasta: r.pasta || null, detalhe: r.detalhe ? String(r.detalhe).slice(0, 300) : null };
+        if (ok) x.exportacao_rede = { status: "exportado", arquivo: reg.arquivo, pasta: reg.pasta, em: reg.em, operador: reg.operador, sha256: x.sha256 };
+        else if (!x.exportacao_rede || x.exportacao_rede.status !== "exportado") x.exportacao_rede = { status: "pendente", arquivo: reg.arquivo, em: reg.em, operador: reg.operador, detalhe: reg.detalhe };
+        x.historico_rede = [...(x.historico_rede || []), reg].slice(-30);
+        return { ...x.exportacao_rede };
+      });
+    },
   });
 })(typeof window !== "undefined" ? window : globalThis);

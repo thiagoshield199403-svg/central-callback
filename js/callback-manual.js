@@ -69,7 +69,7 @@
     const fechar = () => { $("#modal").classList.add("oculto"); $("#modal-caixa").className = "modal-caixa"; };
     $("#modal-caixa").className = "modal-caixa"; delete $("#modal-caixa").dataset.livre;
     $("#modal-caixa").innerHTML = `<h2>Excluir histórico</h2><p><b>${alvo.length}</b> registro(s) sairão desta lista.${pendentes ? ` <b>${pendentes}</b> com envio pendente permanecerão, para você confirmar o envio.` : ""}</p>
-      <ul class="lista mini"><li>Callbacks contados, indicadores, fechamentos diários e BI <b>não mudam</b>.</li><li>Os registros continuam guardados neste computador para auditoria; a exclusão fica registrada com o seu operador.</li><li>Registros excluídos não poderão mais ser marcados como resolvidos nesta tela.</li></ul>
+      <ul class="lista mini"><li>Callbacks contados, indicadores, fechamentos diários <b>não mudam</b>.</li><li>Os registros continuam guardados neste computador para auditoria; a exclusão fica registrada com o seu operador.</li><li>Registros excluídos não poderão mais ser marcados como resolvidos nesta tela.</li></ul>
       <label>Para confirmar, digite EXCLUIR <input id="cm-ex-palavra" maxlength="10" autocomplete="off"></label>
       <div class="botoes fim"><button type="button" class="contorno" id="cm-ex-cancelar">Cancelar</button><button type="button" class="perigo" id="cm-ex-confirmar" disabled>Excluir ${alvo.length} registro(s)</button></div>`;
     $("#modal").classList.remove("oculto");

@@ -68,7 +68,7 @@ export function criarDrive(amb, dados) {
 
   return {
     configurado,
-    async garantirEstrutura() { const r = await raiz(); for (const nome of ["BI", "HISTORICO", "FECHAMENTOS"]) await pasta(nome, r); },
+    async garantirEstrutura() { const r = await raiz(); for (const nome of ["HISTORICO", "FECHAMENTOS"]) await pasta(nome, r); }, // a pasta BI não é mais criada (o painel BI foi retirado); uma já existente não é apagada
     /* Publica um fechamento em FECHAMENTOS/<ano>/<mês>. */
     async publicar({ nome, data, conteudo, sha256, versao }) {
       const destino = await pasta(nomePastaMes(data), await pasta(data.slice(0, 4), await pastaFechamentos()));

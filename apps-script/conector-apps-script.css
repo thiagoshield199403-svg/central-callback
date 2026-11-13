@@ -1,0 +1,11 @@
+.as-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 6px 16px; background: #fde68a; color: #1c1917; font: 13px/1.4 system-ui, sans-serif; }
+.as-barra.producao { background: #1f2937; color: #e5e7eb; }
+.as-barra #as-cred { margin-left: auto; font-weight: 600; }
+.as-barra button, .as-caixa button { padding: 4px 10px; border: 1px solid #1c1917; border-radius: 4px; background: #fff; color: #1c1917; font: inherit; cursor: pointer; }
+.as-caixa { width: min(420px, calc(100vw - 32px)); padding: 18px; border: 0; border-radius: 8px; background: #fff; color: #1c1917; font: 14px/1.45 system-ui, sans-serif; }
+.as-caixa::backdrop { background: rgba(0, 0, 0, .55); }
+.as-caixa h2 { margin: 0 0 6px; font-size: 18px; }
+.as-caixa label { display: block; margin: 10px 0; font-weight: 600; }
+.as-caixa input { display: block; box-sizing: border-box; width: 100%; margin-top: 4px; padding: 6px 8px; border: 1px solid #78716c; border-radius: 4px; font: inherit; }
+.as-caixa #as-msg { min-height: 20px; margin: 8px 0; }
+.as-botoes { display: flex; flex-wrap: wrap; gap: 8px; }

@@ -122,7 +122,7 @@ function validar(d) {
   if (typeof d.modelo !== "string" || typeof d.incidente !== "string" || !d.incidente) return "Vínculo do incidente ausente.";
   return null;
 }
-const PUBLICOS = /^\/(index\.html|bi\.html|css\/[\w.-]+\.css|js\/[\w.-]+\.js)$/;
+const PUBLICOS = /^\/(index\.html|css\/[\w.-]+\.css|js\/[\w.-]+\.js)$/;
 function servirArquivo(req, res, caminho) {
   if (caminho === "/") caminho = "/index.html";
   if (!PUBLICOS.test(caminho)) { res.writeHead(404, SEGURANCA); res.end("Não encontrado"); return; }
@@ -147,7 +147,7 @@ async function receberFechamento(d) {
       const r = await drive.publicar({ nome: d.nome, data: p.data, conteudo: d.conteudo, sha256: sha, versao: p.versao });
       await drive.confirmar(r.arquivo_id, sha);
       await sync.sincronizar();
-      return { resultado: "enviado", confirmado: true, ...r, bi: sync.incluido(d.nome) ? "atualizado" : "pendente" };
+      return { resultado: "enviado", confirmado: true, ...r };
     } catch (e) { if (e instanceof ErroDrive) return e.status === 409 ? { resultado: "falha", codigo: "conflito", detalhe: e.message } : { resultado: "pendente", detalhe: e.message }; throw e; }
   });
 }
@@ -158,7 +158,6 @@ const servidor = createServer(async (req, res) => {
     const caminho = new URL(req.url, "http://x").pathname;
     if (caminho === "/api/disparo/status" && req.method === "GET")
       return json(res, 200, { pronto: true, modo: MODO, modelos_aprovados: Object.keys(APROVADOS), polo: POLO_GATEWAY, numero_rotulo: NUMERO_ROTULO });
-    if (caminho === "/api/bi/dados" && req.method === "GET") return json(res, 200, { linhas: sync.linhas(), sincronizacao: sync.estado() });
     if (caminho === "/api/drive/status" && req.method === "GET") return json(res, 200, { configurado: drive.configurado, ...sync.estado() });
     if (caminho === "/api/fechamento" && req.method === "POST") {
       if (!mesmaOrigem(req)) return recusa(res, 403, "Origem não permitida.");
@@ -182,6 +181,6 @@ const servidor = createServer(async (req, res) => {
 servidor.listen(PORTA, ENDERECO, () => {
   console.log(`Central de Callback: http://127.0.0.1:${PORTA}/  ·  modo: ${MODO.toUpperCase()}  ·  modelos aprovados: ${Object.keys(APROVADOS).length}`);
   if (MODO === "simulacao") console.log("SIMULAÇÃO: nenhuma mensagem será entregue a ninguém.");
-  console.log(`BI: http://127.0.0.1:${PORTA}/bi.html  ·  Google Drive: ${drive.configurado ? "configurado" : "NÃO configurado (fechamentos ficam neste computador)"}`);
+  console.log(`Google Drive: ${drive.configurado ? "configurado" : "NÃO configurado (fechamentos ficam neste computador)"}`);
   sync.iniciar();
 });

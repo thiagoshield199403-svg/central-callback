@@ -109,44 +109,71 @@ await teste("INICIAR ATENDIMENTO: primeiro incidente em destaque com telefone, c
   await clicar("#ds-iniciar"); await pg.aguardar("!!document.querySelector('#at-incidente')"); filaGuiada = await js(filaJs);
   igual([filaGuiada.situacao, filaGuiada.assistido, filaGuiada.itens.length], ["atendimento", true, 3]); const i = filaGuiada.itens[0];
   igual(await incidenteAtual(), rot(i)); verdade((await js(`document.querySelector("#at-telefone").value`)).replace(/\D/g, "") === i.telefone, "telefone"); igual(await texto("#at-mensagem"), i.texto); verdade((await texto("#at-cliente")).length > 1, "cliente");
-  igual(await js(`[...document.querySelectorAll(".painel-disparo .rotulo")].map((r) => r.textContent)`), ["na fila", "atendidos", "restantes", "pulados", "não confirmados", "concluído"]);
+  igual(await js(`[...document.querySelectorAll(".painel-disparo .rotulo")].map((r) => r.textContent)`), ["na fila", "callback realizado", "restantes", "ignorados", "não realizados", "concluído"]);
   igual([await metr(), meta.recebidas.length], [0, 0]); await foto("d3-atendimento"); await pg.tamanho(390, 844); verdade(await js("document.documentElement.scrollWidth <= innerWidth"), "celular"); await pg.tamanho(1366, 768);
 });
-await teste("Foco: não avança sem abrir o WhatsApp; abrir não conta; retorno com vários eventos avança uma vez e fica ENVIO NÃO CONFIRMADO", async () => {
-  const [a, b] = filaGuiada.itens; await js("(document.hasFocus = () => true, true)");
+const botoesAtend = () => js(`[...document.querySelectorAll(".atend-acoes button")].map((x) => x.textContent.trim())`);
+const desabilitado = (a) => js(`document.querySelector("[data-acao=${a}]").disabled`);
+const situacaoAtual = () => texto("#at-situacao");
+await teste("Janela do incidente: 4 botões na mesma linha, avanço automático desativado e sem lista inferior; abrir, sair, voltar e erro do WhatsApp não avançam nem contam", async () => {
+  const [a] = filaGuiada.itens; await js("(document.hasFocus = () => true, true)");
+  igual(await botoesAtend(), ["ENVIAR WHATSAPP", "CALLBACK REALIZADO", "PRÓXIMO INC", "PULAR"]);
+  igual(await js(`new Set([...document.querySelectorAll(".atend-acoes button")].map((x) => Math.round(x.getBoundingClientRect().top))).size`), 1, "mesma linha");
+  igual(await js(`document.querySelector("#at-auto").checked`), false, "avanço automático vem desativado");
+  verdade((await texto(".atend-auto")).includes("AVANÇAR AUTOMATICAMENTE APÓS CALLBACK REALIZADO"), "rótulo da opção");
+  verdade(await js(`document.querySelector(".atend-auto").getBoundingClientRect().bottom <= document.querySelector(".atend-acoes").getBoundingClientRect().top`), "opção acima dos botões");
+  verdade(!(await js("!!document.querySelector('.atend-confirmar, .atend-pulados, [data-confirmar]')")), "sem lista de enviados/não enviados");
+  igual([await situacaoAtual(), await desabilitado("at-callback")], ["Pendente", true], "callback só depois de abrir o WhatsApp");
   await sair(); await voltar(); await espera(700); igual(await incidenteAtual(), rot(a), "sem abrir não avança");
   const n = await js("window.__links.length"); await clicar("[data-acao='at-abrir']"); await pg.aguardar(`window.__links.length === ${n + 1}`); await pg.aguardar(`${filaJs}.itens[0].status === "aberto"`);
   verdade((await js(`window.__links[${n}]`)).startsWith(`https://web.whatsapp.com/send?phone=55${a.telefone}&text=`), "link do WhatsApp Web"); igual([await metr(), meta.recebidas.length], [0, 0], "abrir não conta");
-  await voltar(); await espera(700); igual(await incidenteAtual(), rot(a), "sem sair da janela não avança");
-  await sair(); await voltar(); await voltar(); await pg.aguardar(`document.querySelector("#at-incidente").textContent === ${JSON.stringify(rot(b))}`); await espera(800);
-  igual([await incidenteAtual(), await js(`${filaJs}.itens[0].status`), await metr(), await js(`${filaJs}.eventos.filter((e) => e.tipo === "retorno").length`)], [rot(b), "nao_confirmado", 0, 1], "avançou uma vez e não contou");
-  verdade((await texto(".atend-confirmar")).includes("ENVIO NÃO CONFIRMADO"), "lista de confirmação");
+  await sair(); await voltar(); await voltar(); await espera(900);
+  igual([await incidenteAtual(), await js(`${filaJs}.itens[0].status`), await metr(), await situacaoAtual(), await desabilitado("at-callback")], [rot(a), "aberto", 0, "WhatsApp aberto", false], "voltar não avança nem conta");
+  // o WhatsApp deu erro: o operador tenta de novo, sem perder o incidente
+  verdade((await texto("[data-acao='at-abrir']")).includes("NOVAMENTE"), "reenviar"); await clicar("[data-acao='at-abrir']"); await pg.aguardar(`window.__links.length === ${n + 2}`); await sair(); await voltar(); await espera(700);
+  igual([await incidenteAtual(), await js(`${filaJs}.itens[0].status`), await metr(), await js(`${filaJs}.itens[0].tentativas.length`)], [rot(a), "aberto", 0, 2], "erro no WhatsApp continua pendente");
+  await foto("d3b-whatsapp-aberto"); await pg.tamanho(390, 844); verdade(await js("document.documentElement.scrollWidth <= innerWidth"), "botões no celular sem rolagem lateral"); await pg.tamanho(1366, 768);
 });
-await teste("Pular identifica o incidente; pausar bloqueia e persiste ao recarregar; retomar; recarregar com WhatsApp aberto não perde progresso", async () => {
-  const [, b, c] = filaGuiada.itens; await clicar("[data-acao='at-pular']"); await pg.aguardar(`document.querySelector("#at-incidente").textContent === ${JSON.stringify(rot(c))}`); verdade((await texto(".atend-pulados")).includes(rot(b)), "pulado visível");
-  await clicar("[data-acao='at-pausar']"); await pg.aguardar("!!document.querySelector('[data-acao=at-retomar]')"); verdade(await js("document.querySelector('[data-acao=at-abrir]').disabled"), "pausado não abre"); await foto("d4-pausado");
+await teste("CALLBACK REALIZADO: clique duplo conta um único callback do operador; sem avanço automático fica no incidente até PRÓXIMO INC", async () => {
+  const [a, b] = filaGuiada.itens;
+  await js(`(() => { const x = document.querySelector("[data-acao=at-callback]"); x.click(); x.click(); return true; })()`); await pg.aguardar(`${filaJs}.itens[0].status === "enviado"`); await espera(600);
+  igual([await metr(), await incidenteAtual(), await situacaoAtual(), await js(`${srvJs}.E.historico_atendimento.length`)], [1, rot(a), "Callback realizado", 1], "registra uma vez e não avança");
+  const t0 = await js(`${srvJs}.painel().turnos[0]`); igual([t0.operador, t0.callbacks_realizados], ["OPT4", 1], "total do operador"); igual(await js(`document.querySelector("#metricas .metrica.destaque .valor").firstChild.textContent.trim()`), "1", "faixa de indicadores");
+  igual([await desabilitado("at-callback"), await desabilitado("at-pular"), await desabilitado("at-abrir"), await desabilitado("at-proximo")], [true, true, true, false]);
+  await clicar("[data-acao='at-proximo']"); await pg.aguardar(`document.querySelector("#at-incidente").textContent === ${JSON.stringify(rot(b))}`);
+  igual([await metr(), await situacaoAtual()], [1, "Pendente"]); verdade((await texto("#at-anterior")).includes(rot(a)) && (await texto("#at-anterior")).includes("Callback realizado"), "indicador do anterior");
+});
+await teste("PRÓXIMO INC sem confirmar não conta (fica Não realizado); pausar persiste; recarregar com WhatsApp aberto não conta; avanço automático só após CALLBACK REALIZADO", async () => {
+  const [a, b, c] = filaGuiada.itens;
+  await clicar("[data-acao='at-abrir']"); await pg.aguardar(`${filaJs}.itens[1].status === "aberto"`); await clicar("[data-acao='at-proximo']"); await pg.aguardar(`document.querySelector("#at-incidente").textContent === ${JSON.stringify(rot(c))}`);
+  igual([await js(`${filaJs}.itens[1].status`), await metr()], ["nao_confirmado", 1]); verdade((await texto("#at-anterior")).includes("Não realizado"), "anterior não realizado");
+  await clicar("[data-acao='at-pausar']"); await pg.aguardar("!!document.querySelector('[data-acao=at-retomar]')");
+  igual([await desabilitado("at-abrir"), await desabilitado("at-proximo"), await desabilitado("at-pular")], [true, true, true], "pausado bloqueia"); await foto("d4-pausado");
   const reabrir = async () => { await pg.ir(pgUrl); await pg.aguardar("document.body.dataset.pronto === '1'"); await js(stubAbrir); await clicar('[data-modo="lote"]'); };
   await reabrir(); await pg.aguardar("!!document.querySelector('[data-acao=at-retomar]')"); igual([await incidenteAtual(), await js(`${filaJs}.situacao`)], [rot(c), "pausada"], "persistiu");
   await clicar("[data-acao='at-retomar']"); await pg.aguardar("!document.querySelector('[data-acao=at-abrir]').disabled"); await clicar("[data-acao='at-abrir']"); await pg.aguardar(`${filaJs}.itens[2].status === "aberto"`);
-  await reabrir(); await pg.aguardar(`${filaJs}.itens[2].status === "nao_confirmado" && ${filaJs}.situacao === "concluida"`); igual(await metr(), 0, "recarregar não conta"); await pg.aguardar("!!document.querySelector('[data-confirmar]')"); await foto("d5-conclusao");
+  await reabrir(); await pg.aguardar("!!document.querySelector('#at-incidente')"); await espera(600);
+  igual([await incidenteAtual(), await js(`${filaJs}.itens[2].status`), await metr(), await situacaoAtual(), await js(`document.querySelector("#at-auto").checked`)], [rot(c), "aberto", 1, "WhatsApp aberto", false], "recarregar não conta e o avanço automático volta desativado");
+  await clicar("#at-auto"); await pg.aguardar(`document.querySelector("#at-auto").checked`); await espera(300); igual([await incidenteAtual(), await js(`${filaJs}.situacao`)], [rot(c), "atendimento"], "ativar não avança");
+  await clicar("[data-acao='at-callback']"); await pg.aguardar(`${filaJs}.situacao === "concluida"`); await pg.aguardar("!!document.querySelector('[data-acao=nova]')");
+  igual([await metr(), await js(`${filaJs}.itens.map((i) => i.status)`)], [2, ["enviado", "nao_confirmado", "enviado"]]); await foto("d5-conclusao");
+  await clicar("[data-acao='nova']"); await pg.aguardar("!!document.querySelector('#ds-linhas tr[data-chave]')");
+  await js(`(() => { const s = document.querySelector("#ds-situacao"); s.value = "todas"; s.dispatchEvent(new Event("change", { bubbles: true })); return true; })()`); // padrão = Pendentes: ver também os já realizados
+  verdade(await js(`document.querySelector('tr[data-chave="${chaveDe(a)}"] input').disabled`), "confirmado bloqueado"); await js(`document.querySelector('tr[data-chave="${chaveDe(a)}"]').click()`); verdade((await texto("#ds-contagem")).startsWith("0 "), "não seleciona");
+  verdade(!(await js(`document.querySelector('tr[data-chave="${chaveDe(b)}"] input').disabled`)), "não realizado volta a poder");
 });
-await teste("Confirmação: Enviei conta um callback do operador, sem duplicar; Não enviei não conta; incidente confirmado não volta à seleção", async () => {
-  const [a, , c] = filaGuiada.itens, conf = (it, r) => clicar(`tr[data-confirma-item="${it.id}"] [data-confirmar="${r}"]`);
-  await conf(a, "enviado"); await pg.aguardar(`${filaJs}.itens[0].status === "enviado"`); await pg.aguardar(`!document.querySelector('tr[data-confirma-item="${a.id}"]')`); igual(await metr(), 1);
-  const t0 = await js(`${srvJs}.painel().turnos[0]`); igual([t0.operador, t0.callbacks_realizados], ["OPT4", 1], "total do operador"); igual(await js(`document.querySelector("#metricas .metrica.destaque .valor").firstChild.textContent.trim()`), "1", "faixa de indicadores");
-  await conf(c, "falha"); await pg.aguardar(`${filaJs}.itens[2].status === "falha"`); igual(await metr(), 1, "não enviei não conta"); igual(await js(`${srvJs}.E.historico_atendimento.length`), 1, "um registro");
-  await pg.aguardar("!!document.querySelector('#ds-linhas tr[data-chave]')"); verdade(await js(`document.querySelector('tr[data-chave="${chaveDe(a)}"] input').disabled`), "confirmado bloqueado"); await js(`document.querySelector('tr[data-chave="${chaveDe(a)}"]').click()`); verdade((await texto("#ds-contagem")).startsWith("0 "), "não seleciona");
-  verdade(!(await js(`document.querySelector('tr[data-chave="${chaveDe(c)}"] input').disabled`)), "não enviei volta a poder");
-});
-await teste("Cancelar: o restante sai da fila, o aberto fica não confirmado; encerrar o lote é recusado durante o atendimento", async () => {
+await teste("PULAR ignora sem contar; cancelar: o restante sai da fila, o aberto fica não realizado; encerrar o lote é recusado durante o atendimento", async () => {
   lista = await js(`${srvJs}.incidentesParaDisparo()`); const al = prontos().slice(0, 2); for (const x of al) await js(`document.querySelector('tr[data-chave="${x.chave}"]').click()`);
-  await clicar("#ds-iniciar"); await pg.aguardar("!!document.querySelector('#at-incidente')"); await clicar("[data-acao='at-abrir']"); await pg.aguardar(`${filaJs}.itens[0].status === "aberto"`);
+  await clicar("#ds-iniciar"); await pg.aguardar("!!document.querySelector('#at-incidente')"); const antes = await metr(), f = await js(filaJs);
+  await clicar("[data-acao='at-pular']"); await pg.aguardar(`document.querySelector("#at-incidente").textContent === ${JSON.stringify(rot(f.itens[1]))}`);
+  verdade((await texto("#at-anterior")).includes("Ignorado"), "anterior ignorado"); igual(await metr(), antes, "pular não conta");
+  await clicar("[data-acao='at-abrir']"); await pg.aguardar(`${filaJs}.itens[1].status === "aberto"`);
   verdade((await js(`${srvJs}.encerrarLote().then(() => "", (e) => e.message)`)).includes("em andamento"), "encerrar recusado");
   await clicar("[data-acao='at-cancelar']"); await pg.aguardar("!!document.querySelector('#m-sim')"); await clicar("#m-sim"); await pg.aguardar(`${filaJs}.situacao === "cancelada"`);
-  igual(await js(`${filaJs}.itens.map((i) => i.status)`), ["nao_confirmado", "cancelado"]); igual(await metr(), 1, "cancelar não conta"); await js(`(() => { document.querySelector('[data-confirmar="falha"]').click(); return true; })()`); await pg.aguardar(`${filaJs}.itens[0].status === "falha"`);
+  igual(await js(`${filaJs}.itens.map((i) => i.status)`), ["pulado", "nao_confirmado"]); igual(await metr(), antes, "cancelar não conta");
   await clicar("[data-acao='nova']");
 });
-await teste("Foco real: nova aba aberta de verdade e volta à aba da Central apresentam o próximo incidente", async () => {
+await teste("Foco real: abrir uma aba de verdade e voltar à Central NÃO avança nem conta; o incidente continua com WhatsApp aberto", async () => {
   const p = await nav.novaPagina(`${BASE}/?bd=e2er${Date.now().toString(36)}`, { largura: 1366, altura: 768 }), pjs = (e) => p.js(e), cl = (s) => pjs(`(() => { document.querySelector(${JSON.stringify(s)}).click(); return true; })()`);
   await p.aguardar("document.body.dataset.pronto === '1'"); await pjs(`(() => { const f = document.querySelector("#form-dia"); f.operador.value = "opt4"; f.polo.value = "Aracaju"; f.requestSubmit(); return true; })()`); await p.aguardar("!!document.querySelector('#importar').offsetParent");
   const doc = await p.cmd("DOM.getDocument", {}), { nodeId } = await p.cmd("DOM.querySelector", { nodeId: doc.root.nodeId, selector: "#arquivo" }); await p.cmd("DOM.setFileInputFiles", { nodeId, files: [join(raiz, "exemplos", "navegador-chamadas-ADMS2026-FICTICIO.csv")] }); await p.aguardar("!!document.querySelector('#btn-confirmar-import')"); await cl("#btn-confirmar-import"); await p.aguardar("document.querySelectorAll('#linhas tr[data-id]').length > 0");
@@ -158,9 +185,9 @@ await teste("Foco real: nova aba aberta de verdade e volta à aba da Central apr
   await p.aguardar(`window.CentralUI.servico.filaDoLote().itens[0].status === "aberto"`); await espera(800);
   const nova = (await nav.enviar("Target.getTargets")).targetInfos.find((t) => t.type === "page" && t.url.includes("teste-sem-whatsapp")); verdade(nova, "a aba nova abriu"); await espera(300);
   const estado = await pjs(`({ foco: document.hasFocus(), oculta: document.hidden })`); verdade(!estado.foco || estado.oculta, "a Central perdeu o foco: " + JSON.stringify(estado));
-  igual(await pjs(`document.querySelector("#at-incidente").textContent`), primeiro, "continua no mesmo enquanto está fora");
-  await nav.enviar("Target.activateTarget", { targetId: p.targetId }); await p.aguardar(`document.querySelector("#at-incidente").textContent !== ${JSON.stringify(primeiro)}`, 6000);
-  igual(await pjs(`window.CentralUI.servico.filaDoLote().itens[0].status`), "nao_confirmado"); igual(await pjs(`window.CentralUI.servico.metricasTempoReal().callbacks_realizados`), 0); await nav.enviar("Target.closeTarget", { targetId: nova.targetId });
+  await nav.enviar("Target.closeTarget", { targetId: nova.targetId }); await nav.enviar("Target.activateTarget", { targetId: p.targetId }); await espera(1500);
+  igual([await pjs(`document.querySelector("#at-incidente").textContent`), await pjs(`window.CentralUI.servico.filaDoLote().itens[0].status`), await pjs(`window.CentralUI.servico.metricasTempoReal().callbacks_realizados`), await pjs(`document.querySelector("#at-situacao").textContent`)],
+    [primeiro, "aberto", 0, "WhatsApp aberto"], "fechar a aba do WhatsApp e voltar não muda nada");
 });
 await teste("Contato principal: os demais continuam pendentes e o envio individual do painel segue disponível, sem passar pela API", async () => {
   const f = (await js(`${srvJs}.historicoDisparos()`)).find((x) => x.itens.some((y) => y.comunicacoes > 1)), i = f.itens.find((x) => x.comunicacoes > 1); verdade(i, "fila com incidente de várias comunicações");

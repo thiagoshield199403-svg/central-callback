@@ -1,4 +1,6 @@
 # Credenciais
+# Configuração local (caminhos de rede, servidores e URLs de implantação): só o modelo js/config-local.exemplo.js é publicado
+config-local.js
 .env
 .env.*
 !.env.exemplo

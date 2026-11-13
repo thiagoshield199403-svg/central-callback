@@ -1,4 +1,5 @@
-/* Sincronização do BI: detecta fechamentos novos e atualiza a base agregada (arquivo JSON, gravação atômica).
+/* Sincronização dos fechamentos (o nome do arquivo vem do painel BI, já retirado; o fechamento ainda usa esta base para a cópia local
+   e para recusar arquivo de mesmo nome com conteúdo diferente): detecta fechamentos novos e atualiza a base agregada (arquivo JSON, gravação atômica).
    Por dia, polo e computador vale só a MAIOR versão; computadores diferentes se somam. Se o Drive falhar, a base continua servindo os últimos dados e o estado fica "pendente". */
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

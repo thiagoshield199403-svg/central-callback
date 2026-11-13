@@ -12,4 +12,4 @@ GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN, GOOGLE_ESCOPO
 PORT costuma ser definida pela propria hospedagem.
 
 Fora de 127.0.0.1 o gateway NAO inicia sem usuario, senha e GATEWAY_HOSTS: todas as paginas e APIs exigem login.
-Disco temporario nao perde fechamentos: a base do BI e refeita lendo o Drive, e o fechamento nao enviado continua guardado no navegador do operador.
+Disco temporario nao perde fechamentos: a base de sincronizacao dos fechamentos e refeita lendo o Drive, e o fechamento nao enviado continua guardado no navegador do operador.

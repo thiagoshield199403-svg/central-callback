@@ -8,24 +8,50 @@ Dados de teste 100% ficticios. Nenhuma mensagem real foi enviada durante o desen
 3) Callback manual: abre a tela CALLBACK WHATSAPP (docs\DRIVE-BI-E-POLOS.txt, secao 2).
 
 2. ENVIO EM LOTE, PASSO A PASSO
-a) Marque os incidentes na tela e clique em INICIAR ATENDIMENTO.
+a) Escolha Regionais e municipios, Periodo (De/Ate) e Situacao; depois marque os incidentes (ou "Selecionar todos", que marca
+   so os do filtro) e clique em INICIAR ATENDIMENTO. Detalhes na secao "FILTROS ANTES DA FILA".
 b) O primeiro incidente aparece em destaque com cliente, telefone, numero e mensagem.
-c) ABRIR WHATSAPP abre o WhatsApp Web com o contato e a mensagem prontos, sempre na mesma aba. Quem envia e o operador.
-d) Ao voltar para a janela da Central, o proximo incidente aparece sozinho.
-e) Pausar, Retomar, Pular e Cancelar ficam na propria tela. O progresso fica gravado: fechar ou recarregar a pagina nao perde nada.
+c) Todo o controle fica na janela do incidente, numa unica linha de botoes:
+   - ENVIAR WHATSAPP: abre o WhatsApp Web com o contato e a mensagem prontos, sempre na mesma aba. Quem envia e o operador.
+     Se o WhatsApp der erro, clique de novo (ENVIAR WHATSAPP NOVAMENTE).
+   - CALLBACK REALIZADO: o operador confirma que enviou. E a UNICA acao que registra o callback (habilitada depois de abrir o WhatsApp).
+   - PROXIMO INC: avanca sem registrar callback. Se o WhatsApp foi aberto e nao confirmado, o incidente fica "Nao realizado";
+     se nem foi aberto, continua pendente e volta no fim da fila.
+   - PULAR: ignora o incidente ("Ignorado") e avanca, sem registrar callback.
+d) Opcao "AVANCAR AUTOMATICAMENTE APOS CALLBACK REALIZADO", acima dos botoes: vem DESATIVADA sempre que a Central abre.
+   Desativada: depois do CALLBACK REALIZADO o incidente continua na tela ate o operador clicar em PROXIMO INC.
+   Ativada: avanca logo apos o clique em CALLBACK REALIZADO, e so nesse momento.
+e) Indicador discreto no cartao: Pendente, WhatsApp aberto, Callback realizado, Ignorado ou Nao realizado
+   (o do incidente atual e o do anterior). Nao ha mais lista de enviados / nao enviados abaixo da tela.
+f) Pausar, Retomar e Cancelar ficam na propria tela. O progresso fica gravado: fechar ou recarregar a pagina nao perde nada.
 
 3. CONTABILIZACAO (LIMITACAO DO WHATSAPP WEB)
-O navegador nao consegue saber se a mensagem saiu. Abrir o WhatsApp e voltar para a Central NAO contam como callback.
-Ao voltar, o incidente fica como ENVIO NAO CONFIRMADO, sem impedir o avanco. Na lista "Envio nao confirmado":
-- "Enviei": registra UM callback do operador, com data, hora e meio WhatsApp. Entra no painel, no fechamento diario e no BI.
-- "Nao enviei": nao conta, e o incidente volta a poder ser selecionado.
-Enquanto nao confirmado, o incidente nao pode ser selecionado de novo (evita mensagem repetida).
-Encerrar o lote sem confirmar: o envio fica sem contar, e a Central avisa antes.
+O navegador nao consegue saber se a mensagem saiu. Abrir o WhatsApp, voltar para a Central, fechar a aba do WhatsApp
+ou recarregar a pagina NAO contam como callback e NAO avancam a fila. Nao ha deteccao de foco nem temporizador.
+- CALLBACK REALIZADO: registra UM callback do operador, com data, hora e meio WhatsApp. Entra no painel e no fechamento diario.
+  Clicar de novo nao duplica.
+- Incidente "Nao realizado" ou "Ignorado" volta a poder ser selecionado numa nova selecao.
+Encerrar o lote com WhatsApp aberto e nao confirmado: o envio fica sem contar, e a Central avisa antes.
+
+FILTROS ANTES DA FILA (tela de selecao do envio em lote)
+- Regionais e municipios: selecao MULTIPLA com as sete regionais e todos os municipios (js/localidades.js), mesmo sem
+  incidentes no CSV atual (aparecem com 0), mais "Fora das regionais" (desconhecida, nao reconhecida, divergencia, fora de
+  Sergipe). Nada marcado = todas. Filtro PROPRIO do envio em lote: independe do envio individual e comeca vazio a
+  cada abertura da Central. Municipio sem incidentes: lista vazia, sem erro. Detalhes: docs\LOCALIDADES-POLOS.txt
+- Periodo (De/Ate): data REAL do incidente ("Horario da call" da comunicacao principal), nunca a data de importacao.
+  Incidente sem data identificada nao entra num periodo e aparece no total "sem data".
+- Situacao: "Pendentes" (padrao: so o que pode entrar na fila), "Sem telefone", "Callback ja realizado", "Todas".
+  Incidente com callback ja realizado nunca entra na fila (o servico recusa, mesmo que a tela tente).
+- Totais: comunicacoes importadas (e incidentes unicos + CALL sem incidente, a mesma conta dos cartoes), incidentes
+  encontrados apos Regionais/Periodo, pendentes, sem telefone, ja realizados e sem data.
+- Cada incidente usa a comunicacao PRINCIPAL (a que recebe a mensagem): um municipio e uma data por incidente, sem duplicar.
+- Trocar qualquer filtro so refaz a lista em memoria: nao reimporta o CSV e nao altera o lote. O que ficou fora do
+  filtro sai da selecao, entao a fila recebe somente os incidentes do filtro.
 
 4. REGRAS
 - Mensagens: as mesmas funcoes do envio individual. js\modelos.js nao foi alterado.
 - A mensagem vai so para o contato principal do incidente; os demais usam o envio individual do painel.
-- Nao podem ser selecionados: callback ja realizado, mensagem confirmada ou envio nao confirmado.
+- Nao podem ser selecionados: callback ja realizado ou mensagem confirmada.
 - Sem celular, telefone invalido ou achado no comentario: corrija ou confirme no cartao, ou pule o incidente.
 - Callback registrado por outra via durante o atendimento: o incidente e pulado sozinho e nao conta de novo.
 - Pop-up bloqueado: o incidente nao avanca. Permita pop-ups para a Central.
@@ -33,7 +59,7 @@ Encerrar o lote sem confirmar: o envio fica sem contar, e a Central avisa antes.
 
 5. CODIGO ANTERIOR DA API OFICIAL
 A tela nao usa mais a fila por API. O motor antigo (js\disparos.js, processarFila) e a rota /api/disparo/enviar do gateway continuam no codigo, sem uso pela tela,
-para abrir o historico de filas antigas. O gateway segue necessario para o fechamento no Drive e o BI.
+para abrir o historico de filas antigas. O gateway segue necessario para o fechamento no Drive.
 
 6. COMO LIGAR
 node --env-file=gateway\.env gateway\servidor.mjs  e abra http://127.0.0.1:8787/ no Edge ou Chrome (sem .env: node gateway\servidor.mjs).

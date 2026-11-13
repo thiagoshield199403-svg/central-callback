@@ -19,9 +19,23 @@ PRIMEIRA VEZ NO COMPUTADOR
 - So para o botao manual EXPORTAR DO DIA: no primeiro uso a Central pede, uma unica vez, a pasta de destino:
   <pasta de rede do COI>\CENTRAL DE CALLBACK (so a pasta CENTRAL DE CALLBACK e aceita).
 
+PASTA ADMS (ATUALIZACAO AUTOMATICA DO CSV)
+- Na faixa "Pasta ADMS", clique uma vez em "Selecionar pasta" e escolha a pasta onde o ADMS grava chamadas_incidentes.csv
+  (ex.: \\SERVIDOR\PASTA\ADMS (caminho real em js\config-local.js, nao versionado; modelo: js\config-local.exemplo.js)). A Central le SO esse arquivo, ao abrir, no F5 e em "Verificar agora".
+- Sem alteracao: nao rele. Arquivo novo: atualiza o lote sem duplicar. "Aguardando permissao": clique em "Reconectar pasta".
+- A importacao manual (passo 2 abaixo) continua disponivel. Detalhes e limitacoes: docs\PASTA-ADMS.txt
+
+FILTRO REGIONAIS E MUNICIPIOS
+- Envio individual e Envio em lote: selecao multipla nas sete regionais (Aracaju, Sao Cristovao, Itabaiana, Lagarto,
+  Gloria, Propria, Maruim). Regional inteira num clique, um ou varios municipios, pesquisa por nome ou codigo, Limpar.
+  Os dois filtros sao independentes. Filtra so a exibicao; nao rele o CSV e nao altera registros.
+- "Fora das regionais": localidade desconhecida, nao reconhecida, divergencia para revisao ou fora de Sergipe (para conferir).
+- Regras, aliases e divergencias dos mapas: docs\LOCALIDADES-POLOS.txt
+
 USO DIARIO
 1. Abrir o turno: so a sua SIGLA (ex.: ABC1).
 2. Importar CSV do ADMS: escolha o arquivo exportado do Navegador de Chamadas, confira a previa e importe.
+   (Com a pasta ADMS conectada isso e automatico.)
 3. Clique na ocorrencia. Confira a mensagem sugerida (pode trocar e editar o texto).
    - Telefone do ADMS: "Abrir WhatsApp Web".
    - ADMS sem telefone: procure o cadastro do cliente no incidente, digite o celular no campo ao lado de
@@ -36,8 +50,12 @@ USO DIARIO
 6. EXPORTAR DO DIA: gera CALLBACK_<POLO>_<data>.csv e abre a janela Salvar do Windows NA PASTA DE DESTINO, com o nome
    pronto; confirme em Salvar. Salvar fora do destino e recusado. Unidade de rede indisponivel: "Arquivo NAO salvo no destino"
    (o arquivo continua guardado na Central; ha copia de contingencia opcional para Downloads). O arquivo nao tem dados de clientes.
-   ENCERRAR O DIA: gera o fechamento e envia direto ao Google Drive (FECHAMENTOS/ano/mes). So mostra "Fechamento concluido" com o envio confirmado;
-   sem Drive, avisa "ainda NAO sincronizado", guarda o arquivo e tenta de novo ao abrir a Central (ou em Tentar novamente / Fechamento > Enviar pendentes).
+   ENCERRAR O DIA ("Encerrar e exportar para a pasta de rede"): gera o fechamento, guarda na Central e grava direto em
+   a pasta de rede definida em js\config-local.js (pasta_rede) (sem Salvar como). So mostra "Fechamento concluido" depois de ler o arquivo de volta na pasta.
+   Pasta nao configurada, permissao a renovar ou W: indisponivel: "Fechamento realizado, mas NAO exportado" (guardado, exportacao pendente),
+   com Configurar pasta agora / Autorizar e exportar / Tentar novamente. Configure a pasta uma vez em Fechamento > CONFIGURAR PASTA DE EXPORTACAO.
+   GOOGLE DRIVE: opcional, so pelo botao Fechamento > Enviar ao Google Drive (opcional). O encerramento nao chama mais o Drive.
+   Detalhes e roteiro de conferencia na rede: docs\EXPORTACAO-PASTA-REDE.txt.
 7. Botao PAINEL: indicadores de hoje e por dia, operador e polo (turnos feitos neste navegador).
 
 ONDE FICAM OS DADOS
@@ -53,13 +71,14 @@ TESTE RAPIDO (sem dados reais)
 
 CENTRAL DE DISPAROS
 - Tres opcoes na tela do lote: envio individual (como acima), envio em lote (atendimento guiado pelo WhatsApp Web, um incidente por vez) e callback manual (abre a tela Callback WhatsApp).
-- Envio em lote: marque os incidentes > INICIAR ATENDIMENTO > ABRIR WHATSAPP > envie > volte para a Central: o proximo aparece sozinho. So "Enviei" conta como callback.
-- Fechamento no Drive e BI exigem o gateway: node --env-file=gateway\.env gateway\servidor.mjs  e abra http://127.0.0.1:8787/ (os dados desse endereco sao separados dos do index.html).
+- Envio em lote: marque os incidentes > INICIAR ATENDIMENTO > ENVIAR WHATSAPP > envie > CALLBACK REALIZADO > PROXIMO INC (ou PULAR).
+  Voltar do WhatsApp nao conta nem avanca: so CALLBACK REALIZADO conta como callback. O avanco automatico (opcional) vem desativado.
+- Fechamento no Drive exige o gateway: node --env-file=gateway\.env gateway\servidor.mjs  e abra http://127.0.0.1:8787/ (os dados desse endereco sao separados dos do index.html).
 - Como funciona, protecoes e configuracao externa: docs\CENTRAL-DE-DISPAROS.txt
 
-HISTORICO, CALLBACK WHATSAPP, FECHAMENTO E BI
+HISTORICO, CALLBACK WHATSAPP E FECHAMENTO
 - Incidente ja atendido aparece com a linha verde-claro, mesmo em CSV novo.
-- Botao Callback WhatsApp: envio manual com historico proprio. Botao Fechamento: arquivos diarios agregados. Botao BI: indicadores.
+- Botao Callback WhatsApp: envio manual com historico proprio. Botao Fechamento: arquivos diarios agregados. (O painel BI integrado foi retirado da Central.)
 - Detalhes e configuracao do Google Drive: docs\DRIVE-BI-E-POLOS.txt
 
 Limitacoes e pendencias: docs\LIMITACOES-E-PENDENCIAS.txt
