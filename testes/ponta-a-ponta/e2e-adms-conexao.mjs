@@ -115,7 +115,7 @@ await teste("[file://] Selecionar arquivo chamadas_incidentes.csv: conecta, conf
   igual(await b.js(`window.CentralUI.servico.arm.lerArquivo("pasta_adms").then((h) => h && h.kind + ":" + h.name)`), "file:chamadas_incidentes.csv", "identificador no IndexedDB");
   verdade((await b.diagnostico()).includes("Gravação confirmada no IndexedDB (última seleção nesta página): true"), "gravação confirmada");
   verdade(!(await b.js(`!!document.querySelector("[data-adms-alerta]")`)), "sem alerta de não guardado");
-  igual([await b.caminhoPadrao(), await b.temBotao("copiar")], [null, false], "conectado: caminho padrão não aparece mais");
+  igual([await b.caminhoPadrao(), await b.temBotao("copiar")], [null, true], "conectado: caminho padrão não aparece mais (Copiar caminho continua disponível)");
 });
 await teste("[file://] Autorização expirada: mensagem clara, nenhuma janela abre sozinha; o clique em Abrir o turno renova e carrega", async () => {
   await b.js(`(localStorage.setItem("__revogada", "1"), true)`);
@@ -145,14 +145,14 @@ await teste("[file://] Reabertura COMPLETA do navegador: conexão recuperada do 
   const d = await b.diagnostico();
   verdade(d.includes(`Ao abrir a página: file "chamadas_incidentes.csv" encontrada no IndexedDB`) && d.includes("Permissão ao abrir: granted"), d);
   igual((await b.info()).chamadas, nCSV1, "turno e lote preservados");
-  igual([await b.caminhoPadrao(), await b.temBotao("copiar")], [null, false], "conexão guardada: caminho padrão não a substitui");
+  igual([await b.caminhoPadrao(), await b.temBotao("copiar")], [null, true], "conexão guardada: caminho padrão não a substitui (Copiar caminho continua disponível)");
   igual(await b.js(`window.CentralUI.servico.arm.lerArquivo("pasta_adms").then((h) => h && h.kind + ":" + h.name)`), "file:chamadas_incidentes.csv", "mesma conexão no IndexedDB");
 });
 await teste("[file://] Reabertura com autorização expirada: pede renovação (um clique), sem selecionar de novo", async () => {
   await b.fechar(); b = await navegador(perfilFile, urlFile + "&revogada=1");
   igual(await b.aguardarSituacao(), "permissao");
   verdade((await b.diagnostico()).includes("Permissão ao abrir: prompt"), "diagnóstico registra a permissão ao abrir");
-  igual([await b.temBotao("reconectar"), await b.caminhoPadrao(), await b.temBotao("copiar")], [true, null, false], "renovação, sem caminho padrão");
+  igual([await b.temBotao("reconectar"), await b.caminhoPadrao(), await b.temBotao("copiar")], [true, null, true], "renovação, sem caminho padrão (Copiar caminho disponível)");
   await b.clicar('#pasta-adms [data-adms="reconectar"]');
   igual(await b.aguardarSituacao(), "sem_alteracoes");
   igual(await b.js("[window.__nPasta, window.__nArquivo, window.__pedidoPermissao]"), [0, 0, 1]);
@@ -238,7 +238,7 @@ await teste("[http://127.0.0.1] Reabertura completa do navegador: pasta recupera
   igual(await b.aguardarSituacao(), "sem_alteracoes");
   igual(await b.js("[window.__nPasta, window.__nArquivo, window.__lidos.length]"), [0, 0, 0]);
   igual(await b.js(`document.querySelector("#pasta-adms").dataset.conexao`), "directory");
-  igual([await b.caminhoPadrao(), await b.temBotao("copiar")], [null, false], "pasta guardada: caminho padrão não aparece");
+  igual([await b.caminhoPadrao(), await b.temBotao("copiar")], [null, true], "pasta guardada: caminho padrão não aparece (Copiar caminho disponível)");
 });
 await teste("[http://127.0.0.1] Console sem erros (o favicon.ico é pedido pelo navegador ao servidor de teste)", async () => { igual(b.pg.erros.filter((e) => !e.includes("favicon.ico")), [], "erros"); });
 await b.fechar(); servidor.close();

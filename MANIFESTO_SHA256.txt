@@ -108,12 +108,13 @@ c988398aa1fcfad346cbbcfa05394ef32856afbd160915548bda6c45ba8b9681 *./js/fechament
 2d7172923a60cd12becad0ef56f25d09847418eef3cf5a3b52f0f968babb353c *./js/localidades.js
 0a3d7752321e33144be4e7cff49ce29bfa690ef27e980f630e2103cc09adb080 *./js/modelos.js
 82cf3a56967e10389fd91352e7808cac7d11f8aec3a8539924e324732b5ca70c *./js/nucleo.js
-6b141e9d4a412d76a376b373f6ed7e1b6998f274019d636f1913fcffd0bebc5a *./js/pasta-adms.js
+43a194767213a2a26f7c65f3376a25614c7798b80b6c0047b9f7cb2525b2abc9 *./js/pasta-adms.js
 8d116872b881bf66f4957648f6e49571bb7955296c91970164b42a1fc8ebc950 *./js/servico.js
 9ba668217ffa492f44e053430706f72587b0ed00d8ce54450e30d5f307a3231e *./package.json
-3fefe3c89859aaa61042408fa2ff3b19312adec391eadd4c95dde7bc1dcbfe25 *./testes/ponta-a-ponta/cdp.mjs
-a7eebf9452064a6d33fe1c189e86152addf5f639a5d73a5e13071d6e06abad17 *./testes/ponta-a-ponta/e2e-adms-conexao.mjs
+312a30e4cde9c7cc36863eb66b3e31a4a1c192787bf72a21d9b58f8523baf644 *./testes/ponta-a-ponta/cdp.mjs
+04ad4d2a0949d0b0c1cb5af34209fccbc890d7f7d7f0364d0103d1d1cca4343e *./testes/ponta-a-ponta/e2e-adms-conexao.mjs
 58660b67a236f037461bacaea32057c9cef0738c7c900bb2cc8e083ce1436dbb *./testes/ponta-a-ponta/e2e-bi.mjs
+41260b94c677bd5b073fca77218d2e05c8e9a0b5c11fa52a2dd4a6d0a88d0f0d *./testes/ponta-a-ponta/e2e-copiar-caminho.mjs
 41bd16373ecb0b37caab537defa30e7888087807ad2538b6fdb03cd8693a6b71 *./testes/ponta-a-ponta/e2e-disparos.mjs
 3423d90a341c66b40d49c6838ce4b19a3b877e1a05343bbd8a9d83cb0203d4a2 *./testes/ponta-a-ponta/e2e-exportacao-rede.mjs
 e52710c7f99b4df7481bc6d15e26b1524707c3a395cdc5018c11124915768d02 *./testes/ponta-a-ponta/e2e-filtro-data.mjs

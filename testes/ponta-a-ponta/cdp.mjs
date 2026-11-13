@@ -42,14 +42,14 @@ export async function abrirNavegador({ exe, largura = 1366, altura = 768, porta 
        antigas continuarem vendo o lote inteiro (como antes do filtro por data), assim que a Central fica pronta (inclusive a cada
        F5) o filtro passa para "Todas as datas" — o mesmo que o clique do operador. O padrão HOJE é testado em
        e2e-filtro-data.mjs, que abre a página com { todasAsDatas: false }. Nada disso existe no código da Central. */
-    async novaPagina(url = "about:blank", { largura: l = largura, altura: a = altura, todasAsDatas = true } = {}) {
+    async novaPagina(url = "about:blank", { largura: l = largura, altura: a = altura, todasAsDatas = true, config = CONFIG_TESTE } = {}) {
       const { targetId } = await enviar("Target.createTarget", { url: "about:blank" });
       const { sessionId } = await enviar("Target.attachToTarget", { targetId, flatten: true });
       const pg = new Pagina(enviar, sessionId, ouvintes, targetId);
       await pg.cmd("Runtime.enable"); await pg.cmd("Page.enable"); await pg.cmd("Log.enable");
       /* Configuração local (js/config-local.js, NÃO versionada) com valores FICTÍCIOS e fixos nos testes: os testes nunca dependem
          dos caminhos reais da empresa, e o arquivo real (se existir) não substitui estes valores (propriedade só de leitura). */
-      await pg.cmd("Page.addScriptToEvaluateOnNewDocument", { source: `Object.defineProperty(window, "CENTRAL_CONFIG_LOCAL", { value: Object.freeze(${JSON.stringify(CONFIG_TESTE)}), writable: false, configurable: false });` });
+      await pg.cmd("Page.addScriptToEvaluateOnNewDocument", { source: `Object.defineProperty(window, "CENTRAL_CONFIG_LOCAL", { value: Object.freeze(${JSON.stringify(config)}), writable: false, configurable: false });` });
       if (todasAsDatas) await pg.cmd("Page.addScriptToEvaluateOnNewDocument", { source: `(() => {
         const ob = new MutationObserver(() => { const b = document.body; if (!b || b.dataset.pronto !== "1") return; ob.disconnect();
           const f = window.CentralUI && window.CentralUI.filtroData; if (f) f.definir({ modo: "todas" }); });

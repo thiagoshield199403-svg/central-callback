@@ -22,7 +22,12 @@
   /* Caminho padrão da pasta ADMS: SÓ referência na tela do primeiro acesso (sem conexão guardada). Não é gravado, não abre nada
      sozinho e não substitui a conexão já autorizada: o Edge não aceita caminho escrito no seletor; o operador cola na janela. */
   // Vem da configuração local (js/config-local.js, não versionada). Sem ela, a faixa mostra "não definido" e não oferece copiar.
-  const CFG = window.CENTRAL_CONFIG_LOCAL || {}, CAMINHO_PADRAO = typeof CFG.pasta_adms === "string" ? CFG.pasta_adms.trim() : "";
+  const CFG = window.CENTRAL_CONFIG_LOCAL || {}, CAMINHO_CONFIG = typeof CFG.pasta_adms === "string" ? CFG.pasta_adms.trim() : "";
+  /* Sem js/config-local.js (ex.: Central publicada no GitHub Pages), o operador informa o caminho UMA vez e ele fica SÓ neste
+     navegador (localStorage), nunca no código publicado. O config-local.js, quando existe, tem prioridade. */
+  const CHAVE_CAMINHO_NAVEGADOR = "central-pasta-adms-caminho";
+  const caminhoDoNavegador = () => { try { return (localStorage.getItem(CHAVE_CAMINHO_NAVEGADOR) || "").trim(); } catch (e) { return ""; } };
+  const caminhoPadrao = () => CAMINHO_CONFIG || caminhoDoNavegador();
   const ESPERA_ESTAVEL_MS = 1200, TENTATIVAS = 4;
   const $ = (s) => document.querySelector(s);
   const espera = (ms) => new Promise((ok) => setTimeout(ok, ms));
@@ -54,7 +59,9 @@
     if (tipo === "permissao") botoes.push(b("reconectar", "Renovar autorização", "Pede ao navegador a permissão de leitura de novo, sem selecionar a pasta"));
     const semConexao = ["sem_pasta", "pasta_indisponivel", "nao_encontrado"].includes(tipo);
     const primeiroAcesso = !pasta && tipo === "sem_pasta"; // nenhuma conexão guardada no IndexedDB
-    if (primeiroAcesso && CAMINHO_PADRAO) botoes.push(b("copiar", "Copiar caminho", `Copia ${CAMINHO_PADRAO} para colar na janela de Selecionar pasta`));
+    // Sempre disponível (o operador pode precisar do caminho a qualquer momento). Só copia texto: não muda a conexão guardada.
+    const CAMINHO_PADRAO = caminhoPadrao();
+    botoes.push(b("copiar", "Copiar caminho", CAMINHO_PADRAO ? `Copia ${CAMINHO_PADRAO} para colar na janela de Selecionar pasta` : "Informe uma vez o caminho da pasta ADMS (fica salvo só neste navegador) e copie"));
     if (semConexao) {
       if (podePasta()) botoes.push(b("selecionar", "Selecionar pasta"));
       if (podeArquivo()) botoes.push(b("arquivo", "Selecionar arquivo", `Escolher diretamente ${NOME_ARQUIVO} (use se o Edge recusar a pasta)`));
@@ -70,7 +77,7 @@
     el.dataset.conexao = pasta ? pasta.kind : "";
     el.innerHTML = `<span class="pa-rotulo">Pasta ADMS</span>`
       + `<span class="pa-pasta" title="Arquivo lido: ${NOME_ARQUIVO}">${pasta ? (ehArquivo() ? "arquivo " : "") + esc(pasta.name)
-        : primeiroAcesso ? (CAMINHO_PADRAO ? `caminho padrão: <code class="pa-caminho" data-adms-caminho>${esc(CAMINHO_PADRAO)}</code>` : "caminho padrão não definido (js/config-local.js)") : "não conectada"}</span>`
+        : primeiroAcesso ? (CAMINHO_PADRAO ? `caminho padrão: <code class="pa-caminho" data-adms-caminho>${esc(CAMINHO_PADRAO)}</code>` : "caminho padrão não definido (clique em Copiar caminho para informar)") : "não conectada"}</span>`
       + `<span class="pa-situacao">${esc(texto)}</span>`
       + (naoGuardado ? `<span class="pa-alerta" data-adms-alerta="nao_guardado">${esc(naoGuardado)}</span>` : "")
       + (versao && versao.processado_em ? `<span class="pa-ultima">Última atualização: ${esc(hora(versao.processado_em))}</span>` : "")
@@ -85,15 +92,34 @@
     if (qual === "diagnostico") return mostrarDiagnostico();
     if (qual === "copiar") return copiarCaminho();
   }
-  /* Só copia o texto do caminho padrão. Não abre janela, não pede permissão e não grava nada. */
+  /* Só copia o texto do caminho padrão (js/config-local.js). Não abre janela, não pede permissão e não grava nada. */
   async function copiarCaminho() {
+    let CAMINHO_PADRAO = caminhoPadrao();
+    if (!CAMINHO_PADRAO) { CAMINHO_PADRAO = await informarCaminho(); if (!CAMINHO_PADRAO) return; }
     const dica = "Clique em Selecionar pasta, cole na barra de endereço da janela (Ctrl+V) e confirme a pasta.";
     try { await navigator.clipboard.writeText(CAMINHO_PADRAO); window.CentralUI.toast("Caminho copiado. " + dica); }
     catch (e) {
+      // Sem acesso à área de transferência: tenta a cópia clássica; se nem isso, seleciona o texto para Ctrl+C.
+      let ok = false;
+      try { const t = document.createElement("textarea"); t.value = CAMINHO_PADRAO; t.setAttribute("readonly", ""); t.style.position = "fixed"; t.style.opacity = "0"; document.body.appendChild(t); t.select(); ok = document.execCommand("copy"); t.remove(); } catch (x) { ok = false; }
+      if (ok) { window.CentralUI.toast("Caminho copiado. " + dica); return; }
       const el = document.querySelector("#pasta-adms [data-adms-caminho]");
-      if (el) { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
-      window.CentralUI.toast("Caminho selecionado: copie com Ctrl+C. " + dica);
+      if (el) { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); window.CentralUI.toast("Caminho selecionado: copie com Ctrl+C. " + dica); }
+      else window.CentralUI.toast("Copie o caminho: " + CAMINHO_PADRAO + " · " + dica);
     }
+  }
+
+  /* Pede o caminho da pasta ADMS uma vez (só quando não há config-local.js nem caminho salvo) e guarda SÓ neste navegador. */
+  async function informarCaminho() {
+    const UI = window.CentralUI;
+    const ok = await UI.confirmar("Caminho da pasta ADMS", `<p>Este computador ainda não tem o caminho da pasta ADMS. Informe-o uma vez (ex.: <code>\\\\SERVIDOR\\PASTA\\ADMS</code>):
+      ele fica salvo <b>só neste navegador</b> e não é publicado.</p><label>Caminho <input id="adms-caminho-novo" maxlength="300" autocomplete="off" spellcheck="false"></label>`, "Salvar e copiar");
+    const v = ok ? String((document.querySelector("#adms-caminho-novo") || {}).value || "").trim() : "";
+    if (!ok) return "";
+    if (!v) { UI.toastErro("Nenhum caminho informado: nada foi copiado.", true); return ""; }
+    try { localStorage.setItem(CHAVE_CAMINHO_NAVEGADOR, v); } catch (e) { /* navegador sem armazenamento: copia mesmo assim */ }
+    mostrar(situacao.tipo, situacao.texto);
+    return v;
   }
 
   /* ------------------------------------------------------------ conexão (pasta ou arquivo) */
