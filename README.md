@@ -16,6 +16,7 @@ Os dados de `file://` e de `http://127.0.0.1` ficam separados pelo navegador.
 - `docs/CENTRAL-DE-DISPAROS.txt`: fila de envio e API oficial do WhatsApp.
 - `docs/DRIVE-BI-E-POLOS.txt`: histórico, fechamento, Google Drive e polos (o painel BI integrado foi retirado).
 - `docs/PASTA-ADMS.txt`: atualização automática pelo `chamadas_incidentes.csv` da pasta ADMS (F5).
+- `docs/DESPACHO-OTIMIZADO.txt`: módulo DESPACHO OTIMIZADO (`despacho.html`): lotes de INCs por polo, município e bairro a partir do `chamadas_incidentes.csv`.
 - `docs/EXPORTACAO-PASTA-REDE.txt`: exportação do fechamento diário para a pasta de rede definida em `js/config-local.js` (não versionado; modelo em `js/config-local.exemplo.js`).
 - `js/config-local.exemplo.js`: copie para `js/config-local.js` e preencha o caminho real da pasta de rede (esse arquivo não é publicado). O caminho da pasta ADMS é fixo em `js/pasta-adms.js`.
 - `docs/LOCALIDADES-POLOS.txt`: filtro REGIONAIS E MUNICÍPIOS (sete regionais, seleção múltipla, reconhecimento no ADMS).
@@ -32,6 +33,9 @@ node testes\ponta-a-ponta\e2e-adms-conexao.mjs
 node testes\ponta-a-ponta\e2e-lote-filtros.mjs
 node testes\ponta-a-ponta\e2e-polos.mjs
 node testes\ponta-a-ponta\e2e-exportacao-rede.mjs
+node testes\ponta-a-ponta\e2e-copiar-caminho.mjs
+node testes\despacho\testes-despacho.mjs
+node testes\ponta-a-ponta\e2e-despacho.mjs
 ```
 
 Os testes usam dados fictícios e APIs simuladas em 127.0.0.1.

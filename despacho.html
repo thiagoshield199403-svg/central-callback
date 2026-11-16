@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Despacho Otimizado COI</title>
+  <link rel="stylesheet" href="css/despacho.css">
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">COI</div>
+    <div class="titulo"><h1>DESPACHO OTIMIZADO</h1><div class="sub">Central de Callback COI · fonte: chamadas_incidentes.csv</div></div>
+    <div class="dados" id="dados" title="Situação do arquivo chamadas_incidentes.csv"><span class="ponto"></span><span id="dados-texto">Sem dados</span></div>
+    <label class="polo">Polo
+      <select id="polo" aria-label="Polo"><option value="">Todos os polos</option></select>
+    </label>
+    <button type="button" class="primario" id="btn-atualizar">Atualizar</button>
+    <a class="botao-link" id="btn-central" href="index.html">Central</a>
+  </header>
+
+  <div class="pagina">
+    <div class="sigode" role="note"><strong>CONFIRMAÇÃO DO DESPACHO: consultar no SIGODE.</strong>
+      <span>O arquivo de chamadas não informa equipe nem despacho. Confira cada INC no SIGODE antes de lançar o lote.</span></div>
+    <div id="fonte" class="fonte oculto"></div>
+
+    <section class="kpis" aria-label="Resumo operacional">
+      <div class="kpi"><div class="rot">INCs identificadas</div><div class="val" data-kpi="incs">—</div><div class="det" data-kpi-det="incs"></div></div>
+      <div class="kpi"><div class="rot">Lotes</div><div class="val" data-kpi="lotes">—</div><div class="det" data-kpi-det="lotes"></div></div>
+      <div class="kpi alerta-laranja"><div class="rot">Localização não identificada</div><div class="val" data-kpi="nao_ident">—</div><div class="det">INCs sem bairro reconhecido</div></div>
+      <div class="kpi"><div class="rot">Indicação de falta de fase</div><div class="val" data-kpi="fase">—</div><div class="det" data-kpi-det="fase"></div></div>
+    </section>
+
+    <div class="filtros" id="filtros">
+      <select id="f-municipio" aria-label="Município"></select>
+      <select id="f-bairro" aria-label="Bairro"></select>
+      <select id="f-alimentador" aria-label="Alimentador"></select>
+      <select id="f-circuito" aria-label="Circuito"></select>
+      <select id="f-prioridade" aria-label="Indicação">
+        <option value="">Todas as indicações</option>
+        <option value="fase">Falta de fase (confirmada ou possível)</option>
+        <option value="fase_confirmada">Falta de fase confirmada</option>
+        <option value="risco">Risco de vida (classificado ou indício)</option>
+      </select>
+      <input type="search" id="f-busca" placeholder="Buscar INC, rua ou bairro" autocomplete="off" aria-label="Buscar">
+      <button type="button" class="fantasma mini" id="f-limpar">Limpar filtros</button>
+    </div>
+    <div class="conferencia" id="conferencia"></div>
+
+    <main id="lotes" aria-label="Lotes por município e bairro"></main>
+  </div>
+
+  <footer class="bandeja" id="bandeja">
+    <div class="conta"><strong id="sel-n">0</strong> INC(s) selecionada(s)</div>
+    <div class="itens" id="sel-itens"></div>
+    <button type="button" class="fantasma" id="sel-limpar">Limpar</button>
+    <button type="button" class="laranja" id="sel-copiar">Copiar selecionadas</button>
+  </footer>
+  <input type="file" id="arquivo-manual" accept=".csv,text/csv" class="oculto">
+  <div class="toast oculto" id="toast" role="status"></div>
+
+  <script src="js/armazenamento.js"></script>
+  <script src="js/localidades-dados.js"></script>
+  <script src="js/localidades.js"></script>
+  <script src="js/modelos.js"></script>
+  <script src="js/nucleo.js"></script>
+  <script src="js/despacho-config.js"></script>
+  <script src="js/despacho-motor.js"></script>
+  <script src="js/despacho-app.js"></script>
+</body>
+</html>

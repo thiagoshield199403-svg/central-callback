@@ -59,6 +59,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .secundario:hover:not(:disabled) { background: var(--azul-claro); }
 .discreto { background: rgba(255, 255, 255, .07); color: #fff; border-color: rgba(255, 255, 255, .22); }
 .discreto:hover:not(:disabled) { background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .5); }
+.discreto.despacho { border-color: rgba(255, 154, 60, .75); color: #ffd2a6; font-weight: 600; }
 .perigo { background: var(--vermelho); color: #fff; font-weight: 600; }
 .perigo:hover:not(:disabled) { background: #951c13; }
 .acao { background: var(--azul); color: #fff; font-weight: 600; }

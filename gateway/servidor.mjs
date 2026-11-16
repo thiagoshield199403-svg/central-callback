@@ -122,7 +122,7 @@ function validar(d) {
   if (typeof d.modelo !== "string" || typeof d.incidente !== "string" || !d.incidente) return "Vínculo do incidente ausente.";
   return null;
 }
-const PUBLICOS = /^\/(index\.html|css\/[\w.-]+\.css|js\/[\w.-]+\.js)$/;
+const PUBLICOS = /^\/(index\.html|despacho\.html|css\/[\w.-]+\.css|js\/[\w.-]+\.js)$/;
 function servirArquivo(req, res, caminho) {
   if (caminho === "/") caminho = "/index.html";
   if (!PUBLICOS.test(caminho)) { res.writeHead(404, SEGURANCA); res.end("Não encontrado"); return; }
