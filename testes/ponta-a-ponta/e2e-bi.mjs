@@ -49,7 +49,7 @@ const CSV = join(raiz, "exemplos", "navegador-chamadas-ADMS2026-FICTICIO.csv");
 async function importar() { const doc = await pg.cmd("DOM.getDocument", {}), { nodeId } = await pg.cmd("DOM.querySelector", { nodeId: doc.root.nodeId, selector: "#arquivo" }); await pg.cmd("DOM.setFileInputFiles", { nodeId, files: [CSV] }); await pg.aguardar("!!document.querySelector('#btn-confirmar-import')"); await clicar("#btn-confirmar-import"); await pg.aguardar("document.querySelectorAll('#linhas tr[data-id]').length > 0"); }
 const janela = () => js(`(window.__links = window.__links || [], window.open = () => { const j = { closed: false, opener: 1, close() {} }; Object.defineProperty(j, "location", { value: { set href(u) { window.__links.push(u); } } }); return j; }, true)`);
 const cor = (sel) => js(`getComputedStyle(document.querySelector(${JSON.stringify(sel)})).backgroundColor`);
-const VERDE = "rgb(217, 242, 224)";
+const VERDE = "rgba(60, 207, 126, 0.12)"; // identidade 2.0 (tema escuro): verde de callback realizado
 const metricas = () => js(`${S}.metricasTempoReal()`);
 let atendidos;
 
@@ -92,8 +92,8 @@ await teste("CALLBACK WHATSAPP: sem campo de operador, prévia ao vivo, só cont
   await digitar("#cm-f-status", "falha"); await pg.aguardar("document.querySelectorAll('#cm-linhas tr[data-id]').length === 0"); igual(await js(`document.querySelector("#cm-indicadores .valor").textContent`), "0", "indicadores seguem o filtro");
   await digitar("#cm-f-status", ""); await foto(pg, "b3-manual-historico"); await clicar("#btn-manual");
 });
-await teste("Opção 3 abre a tela manual; incidente e telefone lado a lado; personalizada com prévia; excluir histórico confirma, audita e não apaga contagem", async () => {
-  await clicar('[data-modo="manual"]'); await pg.aguardar("!!document.querySelector('#cm-enviar').offsetParent"); verdade(!(await js("!!document.querySelector('#linhas').offsetParent")), "abre direto");
+await teste("Callback manual (cabeçalho) abre a tela manual; incidente e telefone lado a lado; personalizada com prévia; excluir histórico confirma, audita e não apaga contagem", async () => {
+  await clicar("#btn-manual"); await pg.aguardar("!!document.querySelector('#cm-enviar').offsetParent"); // acesso pelo cabeçalho (a aba saiu do WhatsApp) verdade(!(await js("!!document.querySelector('#linhas').offsetParent")), "abre direto");
   const caixas = () => js(`["#cm-incidente", "#cm-telefone"].map((s) => { const r = document.querySelector(s).getBoundingClientRect(); return [Math.round(r.top), Math.round(r.width)]; })`);
   const [a, b] = await caixas(); igual(a[0], b[0], "mesma linha"); verdade(Math.abs(a[1] - b[1]) <= 2 && a[1] > 150, "larguras equilibradas");
   await foto(pg, "b2b-manual-compacta"); await pg.tamanho(390, 844); const [c, d] = await caixas(); verdade(d[0] > c[0], "um abaixo do outro no celular"); await pg.tamanho(1366, 768);

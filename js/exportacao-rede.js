@@ -156,24 +156,32 @@
     const erro = ult && (ult.resultado === "falha" || ult.resultado === "conflito") ? `<div class="mini">Última tentativa (${horaBR(ult.em)}): ${esc(ult.detalhe)}</div>` : "";
     return `${etq}${info ? `<div class="mini">${info}</div>` : ""}${erro}<div><button type="button" class="mini-botao" data-exportar-rede="${esc(f.id)}">${x && x.status === "exportado" ? "Exportar novamente" : "Exportar"}</button></div>`;
   }
-  function blocoHtml() {
-    return `<div class="rede-bloco" id="fe-rede" data-situacao="verificando">
-      <div class="rede-topo"><b>Pasta de rede</b> <span class="caminho">${esc(CAMINHO_TELA)}</span> <span class="etq" id="fe-rede-estado">verificando…</span></div>
-      <div class="mini" id="fe-rede-detalhe"></div>
-      <div class="botoes"><button type="button" class="acao" id="fe-rede-exportar">EXPORTAR FECHAMENTO</button>
-        <button type="button" class="contorno" id="fe-rede-configurar">CONFIGURAR PASTA DE EXPORTAÇÃO</button>
-        <button type="button" class="contorno oculto" id="fe-rede-autorizar">Autorizar acesso</button></div></div>`;
+  /* Cartão da janela Fechamento: mensagem clara (sucesso, pendência ou erro) e as ações. O caminho da pasta não aparece aqui:
+     fica em Configurações e no "Detalhes" recolhido da janela. "topo" e "acoes" vêm de js/fechamento-ui.js (arquivo e Baixar). */
+  function blocoHtml({ topo = "", acoes = "" } = {}) {
+    return `<div class="fe-cartao" id="fe-rede" data-situacao="verificando">${topo}
+      <div class="fe-msg" id="fe-rede-detalhe" role="status">Verificando a pasta de rede…</div>
+      <div class="fe-acoes"><button type="button" class="principal" id="fe-rede-exportar">EXPORTAR FECHAMENTO</button>${acoes}
+        <button type="button" class="acao oculto" id="fe-rede-autorizar">Autorizar acesso</button></div>
+      <div class="mini">Pasta de rede: <span class="etq" id="fe-rede-estado">verificando…</span>
+        <button type="button" class="link-botao" id="fe-rede-configurar">CONFIGURAR PASTA DE EXPORTAÇÃO</button></div></div>`;
   }
   async function atualizarBloco() {
     const el = document.querySelector("#fe-rede"); if (!el) return;
     const s = await situacao(), cls = { configurada: "e-callback_realizado", permissao: "e-pendente", nao_configurada: "e-pendente", indisponivel: "e-contato_invalido", sem_suporte: "e-contato_invalido" }[s.estado];
-    const p = pendentes().length;
+    const p = pendentes().length, nenhum = !srv().E.fechamentos.length;
     el.dataset.situacao = s.estado;
     const est = el.querySelector("#fe-rede-estado"); est.className = "etq " + cls; est.textContent = ESTADOS[s.estado];
-    const resumo = !srv().E.fechamentos.length ? "Nenhum fechamento gerado ainda." : p ? `${p} fechamento(s) com exportação pendente ou com erro.` : "Exportação concluída: todos os fechamentos estão na pasta.";
-    el.querySelector("#fe-rede-detalhe").textContent = [s.pasta ? `Pasta autorizada: ${s.pasta}.` : "", s.detalhe || "", resumo, ultimoErro && p ? "Último erro: " + ultimoErro : ""].filter(Boolean).join(" ");
-    el.querySelector("#fe-rede-configurar").textContent = s.estado === "nao_configurada" || s.estado === "sem_suporte" ? "CONFIGURAR PASTA DE EXPORTAÇÃO" : "Trocar pasta";
-    el.querySelector("#fe-rede-configurar").disabled = s.estado === "sem_suporte";
+    const resumo = nenhum ? "Nenhum fechamento gerado ainda. Ele é criado ao encerrar o dia." : p ? `${p} fechamento(s) com exportação pendente ou com erro.` : "Exportação concluída: todos os fechamentos estão na pasta.";
+    const problema = ["indisponivel", "sem_suporte"].includes(s.estado), atencao = ["permissao", "nao_configurada"].includes(s.estado);
+    const orienta = s.estado === "nao_configurada" ? "A pasta de rede ainda não foi configurada neste navegador: clique em CONFIGURAR PASTA DE EXPORTAÇÃO." : s.detalhe || "";
+    const msg = el.querySelector("#fe-rede-detalhe");
+    msg.textContent = [orienta, resumo, ultimoErro && p ? "Último erro: " + ultimoErro : ""].filter(Boolean).join(" ");
+    msg.className = "fe-msg" + (problema || (p && ultimoErro) ? " erro" : atencao || p ? " atencao" : nenhum ? "" : " ok");
+    const cfg = el.querySelector("#fe-rede-configurar"), configurar = s.estado === "nao_configurada" || s.estado === "sem_suporte";
+    cfg.textContent = configurar ? "CONFIGURAR PASTA DE EXPORTAÇÃO" : "Trocar pasta";
+    cfg.className = s.estado === "nao_configurada" ? "acao mini-acao" : "link-botao";
+    cfg.disabled = s.estado === "sem_suporte";
     el.querySelector("#fe-rede-exportar").disabled = s.estado === "sem_suporte" || s.estado === "nao_configurada" || !p;
     el.querySelector("#fe-rede-autorizar").classList.toggle("oculto", s.estado !== "permissao");
   }

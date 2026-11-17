@@ -1,7 +1,7 @@
-/* Aparência exclusiva da aba CALLBACK WHATSAPP (manual): cartão compacto com celular ao lado.
+/* Aparência exclusiva da aba CALLBACK MANUAL: cartão compacto com celular ao lado (tema escuro da Central 2.0).
    Toda regra deste arquivo começa em #callback-manual, para não afetar nenhuma outra tela. */
-#callback-manual { max-width: 980px; margin-inline: auto; }
-#callback-manual .cartao { padding: 20px 22px; margin-bottom: 16px; border-color: #e3e8ee; border-radius: 14px; box-shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 10px 26px -16px rgba(15, 23, 42, .22); }
+#callback-manual { max-width: 1240px; margin-inline: auto; }
+#callback-manual .cartao { padding: 16px 18px; margin-bottom: 12px; border-radius: 12px; }
 #callback-manual .cabeca-lote { margin-bottom: 14px; }
 
 /* Formulário à esquerda, celular à direita */
@@ -12,10 +12,10 @@
 
 /* Mensagem padronizada / personalizada */
 #callback-manual .manual-modo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-#callback-manual .manual-modo label { position: relative; justify-content: center; padding: 10px 8px; border: 1px solid #dfe5ec; border-radius: 10px; color: var(--suave); font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+#callback-manual .manual-modo label { position: relative; justify-content: center; padding: 10px 8px; border: 1px solid var(--borda-forte); border-radius: 10px; color: var(--suave); background: var(--campo); font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
 #callback-manual .manual-modo input { position: absolute; width: 0; height: 0; margin: 0; opacity: 0; }
-#callback-manual .manual-modo label:has(input:checked) { border-color: var(--azul); background: var(--azul-claro); color: var(--azul); }
-#callback-manual .manual-modo label:has(input:focus-visible) { outline: 2px solid var(--azul); outline-offset: 1px; }
+#callback-manual .manual-modo label:has(input:checked) { border-color: var(--laranja); background: var(--laranja-claro); color: var(--laranja2); }
+#callback-manual .manual-modo label:has(input:focus-visible) { outline: 2px solid var(--azul2); outline-offset: 1px; }
 
 /* Botão Enviar */
 #callback-manual .manual-envio { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -25,7 +25,7 @@
 
 /* Celular com a prévia */
 #callback-manual .manual-previa { justify-content: center; }
-#callback-manual .manual-previa .manual-celular { position: relative; flex: 0 0 auto; width: 248px; height: 440px; min-height: 0; padding: 11px; border-radius: 32px; background: #111; box-shadow: 0 18px 36px -10px rgba(15, 23, 42, .38); }
+#callback-manual .manual-previa .manual-celular { position: relative; flex: 0 0 auto; width: 248px; height: 440px; min-height: 0; padding: 11px; border-radius: 32px; background: #111; box-shadow: 0 0 0 1px #2e4166, 0 18px 36px -10px rgba(0, 0, 0, .6); }
 #callback-manual .manual-celular::before { content: ""; position: absolute; z-index: 2; top: 11px; left: 50%; width: 84px; height: 18px; border-radius: 0 0 13px 13px; background: #111; transform: translateX(-50%); }
 #callback-manual .mc-tela { display: flex; flex-direction: column; height: 100%; overflow: hidden; border-radius: 23px; background: #e5ddd5; }
 #callback-manual .mc-topo { display: flex; align-items: center; gap: 10px; padding: 24px 13px 11px; background: linear-gradient(135deg, #128c4a, #0c6b39); color: #fff; }
@@ -45,7 +45,7 @@
 #callback-manual .barra-selecao { display: grid; grid-template-columns: minmax(170px, 1.5fr) repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
 #callback-manual .barra-selecao input, #callback-manual .barra-selecao select { width: 100%; min-width: 0; border-radius: 8px; }
 #callback-manual .metricas { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 10px 0; }
-#callback-manual .tabela-rolagem { min-height: 110px; max-height: 340px; border-color: #e3e8ee; border-radius: 10px; }
+#callback-manual .tabela-rolagem { min-height: 110px; max-height: 340px; border-radius: 10px; }
 #callback-manual .tabela-disparos { font-size: 12.5px; }
 
 @media (max-width: 860px) {

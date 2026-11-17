@@ -15,8 +15,11 @@
     aberta = valor;
     document.querySelector("main").classList.toggle("aba-manual", aberta);
     $("#callback-manual").classList.toggle("oculto", !aberta);
-    $("#btn-manual").textContent = aberta ? "Voltar à Central" : "Callback WhatsApp";
-    if (aberta) atualizar();
+    // Navegação do cabeçalho: "Callback manual" e "Atendimento" mostram qual tela está aberta (clicar de novo volta à lista).
+    for (const [id, ativo] of [["#btn-manual", aberta], ["#btn-atendimento", !aberta]]) {
+      const b = $(id); if (b) { b.classList.toggle("ativo", ativo); b.setAttribute("aria-pressed", String(ativo)); }
+    }
+    if (aberta) { atualizar(); window.scrollTo(0, 0); }
   }
   function preencherModelos() {
     if (modelosProntos) return;
@@ -91,5 +94,5 @@
     else if (r) exec(() => srv().marcarResolucaoManual(tr.dataset.id, r.dataset.resolve === "1"), r.dataset.resolve === "1" ? "Marcado como resolvido." : "Resolução desfeita.");
   });
   previa();
-  window.CentralManual = { atualizar, abrir: () => alternar(true) };
+  window.CentralManual = { atualizar, fechar: () => { if (aberta) alternar(false); } }; // aberto só pelo botão do cabeçalho
 })();

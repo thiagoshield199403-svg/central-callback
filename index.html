@@ -14,28 +14,36 @@
     <div class="marca">
       <span class="marca-logo" aria-hidden="true">COI</span>
       <div class="marca-texto">
-        <strong>Central de Callback</strong>
+        <strong>CENTRAL DE CALLBACK</strong>
         <span id="dia-info" class="sub">Carregando…</span>
       </div>
     </div>
+    <nav class="nav-modulos" aria-label="Módulos da Central">
+      <button id="btn-atendimento" class="nav ativo" type="button" aria-pressed="true" title="Lista de incidentes e envio pelo WhatsApp">Atendimento</button>
+      <button id="btn-manual" class="nav" type="button" aria-pressed="false" title="Callback manual pelo WhatsApp: informe incidente e telefone">Callback manual</button>
+      <button id="btn-painel" class="nav" type="button" title="Indicadores por dia, operador e polo">Painel</button>
+      <button id="btn-historico" class="nav" type="button" aria-expanded="false" aria-controls="historico" title="Lotes do dia, exportações e fechamentos">Histórico</button>
+      <button id="btn-fechamento" class="nav" type="button" title="Fechamento diário e exportação para a pasta de rede">Fechamento</button>
+      <button id="btn-config" class="nav" type="button" title="Configuração da estação">Configurações</button>
+    </nav>
     <div class="acoes-topo">
-      <button id="btn-exportar" class="principal" disabled title="Gera o arquivo do dia (indicadores, sem dados de clientes) e abre a janela do Windows para salvar">EXPORTAR DO DIA</button>
-      <button id="btn-encerrar-dia" class="secundario" disabled>Encerrar o dia</button>
-      <button id="btn-despacho" class="discreto despacho" type="button" title="Abre o Despacho Otimizado: lotes de INCs por polo, município e bairro a partir do chamadas_incidentes.csv">DESPACHO OTIMIZADO</button>
-      <button id="btn-manual" class="discreto" type="button">Callback WhatsApp</button>
-      <button id="btn-fechamento" class="discreto" type="button" title="Fechamentos diários agregados e exportação para a pasta de rede">Fechamento</button>
-      <button id="btn-painel" class="discreto" title="Indicadores por dia, operador e polo">Painel</button>
-      <button id="btn-config" class="discreto" title="Configuração da estação">Configuração</button>
+      <button id="btn-despacho" class="despacho" type="button" title="Abre o Despacho Otimizado: lotes de INCs por polo, município e bairro">DESPACHO OTIMIZADO</button>
+      <span class="acoes-sep" aria-hidden="true"></span>
+      <button id="btn-encerrar-lote" class="perigo-contorno oculto" type="button" title="Encerrar e limpar o lote aberto (pede confirmação)">Limpar lote</button>
+      <button id="btn-exportar" class="laranja" type="button" disabled title="Gera o arquivo do dia (indicadores, sem dados de clientes) e abre a janela do Windows para salvar">EXPORTAR DO DIA</button>
+      <button id="btn-encerrar-dia" class="contorno-claro" type="button" disabled>Encerrar o dia</button>
     </div>
   </header>
 
-  <div id="aviso" class="aviso oculto"></div>
-  <div id="pasta-adms" class="pasta-adms" aria-live="polite"></div>
+  <div class="faixa-status">
+    <div id="aviso" class="aviso oculto"></div>
+    <div id="pasta-adms" class="pasta-adms" aria-live="polite"></div>
+  </div>
 
   <main>
-    <section id="metricas" class="metricas"></section>
+    <section id="metricas" class="metricas" aria-label="Indicadores do dia"></section>
 
-    <section id="abrir-dia" class="cartao oculto">
+    <section id="abrir-dia" class="cartao cartao-acao oculto">
       <h2>Abrir o turno</h2>
       <form id="form-dia" class="linha-form">
         <label>Sigla do operador <input name="operador" required maxlength="40" placeholder="ex.: ABC1" autocomplete="off"></label>
@@ -44,16 +52,16 @@
       </form>
     </section>
 
-    <section id="importar" class="cartao oculto">
+    <section id="importar" class="cartao cartao-acao oculto">
       <h2>Importar CSV do ADMS</h2>
-      <p class="ajuda">Escolha o CSV exportado do ADMS (já filtrado pelo polo). Nada é gravado antes da sua confirmação.</p>
+      <p class="ajuda">Sem a pasta ADMS conectada, escolha o CSV exportado do ADMS. Nada é gravado antes da confirmação.</p>
       <input id="arquivo" type="file" accept=".csv,text/csv">
       <div id="previa"></div>
     </section>
 
     <section id="callback-manual" class="oculto">
       <div class="cartao">
-        <div class="cabeca-lote"><h2>CALLBACK WHATSAPP</h2><span id="cm-operador" class="mini"></span></div>
+        <div class="cabeca-lote"><h2>CALLBACK MANUAL · WHATSAPP</h2><span id="cm-operador" class="mini"></span></div>
         <div class="manual-grade">
           <div class="manual-form">
             <div class="manual-campos">
@@ -67,7 +75,7 @@
             <label id="cm-bloco-padrao">Tipo de ocorrência <select id="cm-modelo"></select></label>
             <label id="cm-bloco-livre" class="oculto">Mensagem <textarea id="cm-texto" maxlength="1500"></textarea></label>
             <div class="manual-envio"><button id="cm-enviar" type="button" class="principal">Enviar</button>
-              <p class="mini">Enviar abre o WhatsApp Web com a mensagem. Depois de enviar, confirme em "Enviei" no histórico: só então conta como callback.</p></div>
+              <p class="mini">Abre o WhatsApp Web com a mensagem. Depois de enviar, confirme em "Enviei" no histórico.</p></div>
           </div>
           <div class="manual-previa" aria-label="Prévia da mensagem"><div class="manual-celular"><div class="mc-tela"><div class="mc-topo" aria-hidden="true"><span class="mc-avatar">C</span><span class="mc-contato"><b>Cliente</b><span>online</span></span></div><div class="mc-conversa"><div id="cm-previa-texto" class="manual-bolha" aria-live="polite"></div></div><div class="mc-barra" aria-hidden="true"><span class="mc-campo"></span><span class="mc-envio"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></span></div></div></div></div>
         </div>
@@ -86,27 +94,29 @@
       </div>
     </section>
 
-    <section id="central-disparos" class="cartao oculto">
-      <div class="cabeca-lote">
-        <h2>Central de disparos</h2>
-        <button id="btn-historico-disparos" type="button" class="mini-botao">Histórico de execução</button>
+    <section id="central-disparos" class="disparos oculto" aria-label="WhatsApp e disparos">
+      <div class="disparos-barra">
+        <span class="disparos-rotulo">WhatsApp</span>
+        <div id="disparos-abas" class="modos-envio" role="group" aria-label="Modo de envio"></div>
+        <button id="btn-historico-disparos" type="button" class="mini-botao" title="Histórico de execução dos envios em lote">Histórico de execução</button>
       </div>
-      <div id="disparos-abas" class="modos-envio"></div>
       <div id="disparos-conteudo" class="disparos-conteudo"></div>
     </section>
 
-    <section id="lote" class="cartao oculto">
-      <div class="cabeca-lote">
-        <h2 id="lote-titulo">Lote</h2>
-        <button id="btn-encerrar-lote" class="perigo">Encerrar e limpar o lote</button>
-      </div>
-      <div class="painel-filtros">
-        <div class="barra-filtros" role="group" aria-label="Filtros da lista de incidentes">
-          <div class="campo campo-regionais"><span class="campo-rotulo" title="Sete regionais; seleção múltipla de regionais e municípios">Regionais e municípios</span>
+    <section id="lote" class="cartao cartao-lista oculto">
+      <!-- Identificação do lote: fora da tela (os indicadores já mostram os totais); continua disponível para leitores de tela
+           e na dica do botão "Limpar lote". -->
+      <h2 id="lote-titulo" class="so-leitor">Lote</h2>
+      <span id="resumo-lote" class="so-leitor"></span>
+      <div class="painel-filtros" role="group" aria-label="Filtros da lista de incidentes">
+        <div class="barra-filtros">
+          <div class="campo campo-regionais"><span class="campo-rotulo" title="Sete regionais; seleção múltipla de regionais e municípios">Regional e municípios</span>
             <div id="filtro-regionais"></div></div>
-          <label class="campo">Tipo de ocorrência
+          <label class="campo campo-motivo">Motivo
+            <select id="filtro-motivo" aria-label="Filtrar por motivo do ADMS"><option value="">Todos os motivos</option></select></label>
+          <label class="campo campo-ocorrencia">Tipo de ocorrência
             <select id="filtro-ocorrencia" aria-label="Filtrar por tipo de ocorrência" title="Mesmas opções e mesmo critério do envio em lote (mensagem sugerida para a comunicação principal do incidente)"><option value="">Todas as ocorrências</option></select></label>
-          <label class="campo">Situação
+          <label class="campo campo-situacao">Situação
             <select id="filtro-estado" aria-label="Filtrar por situação">
               <option value="">Todas</option>
               <option value="pendente">Pendentes</option>
@@ -121,20 +131,20 @@
             <input id="busca" type="search" placeholder="Incidente, nome, local ou CALL" aria-label="Buscar incidente, nome, local ou CALL"></label>
         </div>
         <div id="filtro-data" class="filtro-data fd-linha" role="group" aria-label="Filtro por data do incidente">
-          <span class="fd-rotulo" title="Data real do incidente: Horário da call do ADMS (sem ele, Recebido ADMS, marcado como recebimento). Nunca a data da importação.">Data do incidente</span>
-          <label class="campo campo-data">De <input id="fd-de" type="date" aria-label="Data inicial"></label>
-          <label class="campo campo-data">Até <input id="fd-ate" type="date" aria-label="Data final"></label>
-          <button id="fd-aplicar" type="button" class="mini-botao">Aplicar filtro</button>
+          <label class="campo campo-data" title="Data real do incidente: Horário da call do ADMS (sem ele, Recebido ADMS, marcado como recebimento). Nunca a data da importação.">Data inicial <input id="fd-de" type="date" aria-label="Data inicial"></label>
+          <label class="campo campo-data">Data final <input id="fd-ate" type="date" aria-label="Data final"></label>
+          <button id="fd-aplicar" type="button" class="mini-botao">Aplicar</button>
           <span class="segmentos" role="group" aria-label="Atalhos de data">
             <button id="fd-hoje" type="button" class="mini-botao">Hoje</button><button id="fd-todas" type="button" class="mini-botao">Todas as datas</button><button id="fd-sem-data" type="button" class="mini-botao" title="Incidentes sem Horário da call nem Recebido ADMS reconhecidos">Sem data</button>
           </span>
-          <button id="fd-preencher" type="button" class="mini-botao oculto" title="Lê o chamadas_incidentes.csv atual da pasta ADMS e preenche SOMENTE Horário da call e Recebido ADMS que estão vazios. Mostra uma prévia e pede confirmação antes de gravar.">Preencher datas ausentes</button>
-          <span id="fd-info" class="mini fd-info" aria-live="polite"></span>
         </div>
       </div>
-      <div id="resumo-lote" class="resumo-lote"></div>
-      <div id="resumo-filtro" class="resumo-filtro oculto" aria-live="polite"></div>
-      <div class="tabela-rolagem">
+      <div class="linha-status">
+        <span id="fd-info" class="fd-info" aria-live="polite"></span>
+        <span id="resumo-filtro" class="resumo-filtro oculto" aria-live="polite"></span>
+        <button id="fd-preencher" type="button" class="mini-botao oculto" title="Lê o chamadas_incidentes.csv atual da pasta ADMS e preenche SOMENTE Horário da call e Recebido ADMS que estão vazios. Mostra uma prévia e pede confirmação antes de gravar.">Preencher datas ausentes</button>
+      </div>
+      <div class="tabela-rolagem tabela-lista">
         <table class="tabela-principal">
           <colgroup><col class="w-inc"><col class="w-data"><col class="w-motivo"><col class="w-cliente"><col class="w-tel"><col class="w-local"><col class="w-tent"><col class="w-sit"><col class="w-acoes"></colgroup>
           <thead><tr><th>Incidente</th><th title="Horário da call registrado no ADMS">Data e hora</th><th>Motivo / subtipo</th><th>Cliente</th><th>Telefone</th><th title="Bairro · cidade (endereço completo no tooltip e no detalhe)">Localização</th><th title="Tentativas">Tent.</th><th>Situação</th><th>Ações</th></tr></thead>
@@ -142,13 +152,13 @@
         </table>
       </div>
     </section>
-
-    <details id="historico" class="cartao historico oculto">
-      <summary id="historico-titulo">Lotes do dia e exportações</summary>
-      <div id="lista-lotes"></div>
-      <div id="lista-exportacoes"></div>
-    </details>
   </main>
+
+  <aside id="historico" class="gaveta oculto" aria-labelledby="historico-titulo">
+    <div class="gaveta-topo"><div><h2 id="historico-titulo">Histórico</h2><span id="historico-sub" class="mini"></span></div>
+      <button type="button" class="fechar" id="historico-fechar">Fechar</button></div>
+    <div class="gaveta-corpo"><div id="lista-lotes"></div><div id="lista-exportacoes"></div></div>
+  </aside>
 
   <footer class="creditos">
     <span>Criador: <strong>Thiago dos Santos Araujo</strong></span>

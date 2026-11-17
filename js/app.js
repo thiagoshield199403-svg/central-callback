@@ -43,6 +43,7 @@
       $("#modal").classList.remove("oculto");
       const fim = (v) => { $("#modal").classList.add("oculto"); ok(v); };
       $("#m-nao").onclick = () => fim(false); $("#m-sim").onclick = () => fim(true);
+      if (classe === "perigo") $("#m-nao").focus(); // ação destrutiva: Enter/Espaço por engano cancela, não confirma
     });
   }
   function fecharModal() { $("#modal").classList.add("oculto"); $("#modal-caixa").className = "modal-caixa"; }
@@ -69,7 +70,8 @@
     }
     $("#importar").classList.toggle("oculto", !s || !!estado.lote_aberto);
     $("#lote").classList.toggle("oculto", !estado.lote_aberto);
-    $("#historico").classList.toggle("oculto", !s && !estado.exportacoes.length);
+    $("#btn-encerrar-lote").classList.toggle("oculto", !estado.lote_aberto); // "Limpar lote" (cabeçalho): só com lote aberto
+    // Histórico (lotes do dia, exportações e fechamentos): fora da tela principal, na gaveta aberta pelo botão Histórico.
     metricas(); historico();
     if (estado.lote_aberto) carregarChamadas(); else { chamadas = []; fecharPainel(); }
     window.CentralDisparos.atualizar(); window.CentralManual.atualizar();
@@ -98,36 +100,60 @@
       + card(m.pendencias_contabilizadas, "ocorrências pendentes", "", "Chamadas ainda sem callback, contato inválido ou sem telefone")
       + card(m.tentativas, "tentativas (total)");
   }
+  /* Nota dos incidentes (detalhe do dia): fica na dica da faixa e no Painel > Hoje, não ocupa linha na tela principal. */
+  const notaIncidentes = (m) => `Incidentes: ${m.incidentes_unicos ?? 0} únicos · ${m.incidentes_com_callback ?? 0} com callback · ${m.chamadas_sem_incidente ?? 0} CALL(s) sem incidente · `
+    + `${m.callbacks_sem_resolucao ?? 0} callback(s) sem resolução confirmada.`
+    + (m.inclui_lote_aberto ? " Inclui o lote em andamento; a exportação considera só os lotes encerrados." : "");
+  /* Faixa da tela principal: os mesmos números do serviço, em quatro grupos (chamadas · resultado · sem êxito · lotes).
+     "Tentativas (total)" e a nota dos incidentes ficam no Painel (não repetem informação na tela de operação). */
   function metricas() {
-    const m = estado.metricas_tempo_real, rl = estado.resumo_lotes, a = estado.lote_em_andamento, el = $("#metricas"), nota = $("#nota-metricas-txt");
-    if (!m) { el.innerHTML = ""; if (nota) nota.remove(); return; }
+    const m = estado.metricas_tempo_real, rl = estado.resumo_lotes, a = estado.lote_em_andamento, el = $("#metricas");
+    if (!m) { el.innerHTML = ""; el.removeAttribute("title"); return; }
     const u = rl.ultimo, recente = Date.now() - destaqueEncerramento < 8000;
     const dica = (u ? `Último encerramento: lote ${u.numero} às ${hhmm(u.encerrado_em)} — ${u.chamadas} chamadas, ${u.callbacks} callbacks, ${u.pendentes} pendentes.` : "Nenhum lote encerrado hoje.")
       + (a ? ` Lote em andamento: ${a.callback_realizado}/${a.chamadas} com callback.` : "");
-    el.innerHTML = card(`${rl.encerrados}/${rl.importados}`, a ? `lotes encerrados · 1 em andamento` : u ? `lotes encerrados · ✓ lote ${u.numero} ${hhmm(u.encerrado_em)}` : "lotes encerrados",
-        "encerramento" + (a ? " andamento" : "") + (recente ? " pulso" : ""), dica)
-      + cartoes(m);
-    let p = nota;
-    if (!p) { p = document.createElement("p"); p.id = "nota-metricas-txt"; p.className = "mini metricas-nota"; el.after(p); }
-    p.textContent = `Incidentes: ${m.incidentes_unicos ?? 0} únicos · ${m.incidentes_com_callback ?? 0} com callback · ${m.chamadas_sem_incidente ?? 0} CALL(s) sem incidente · `
-      + `${m.callbacks_sem_resolucao ?? 0} callback(s) sem resolução confirmada.`
-      + (m.inclui_lote_aberto ? " Inclui o lote em andamento; a exportação considera só os lotes encerrados." : "");
+    // Destaque: os quatro indicadores de operação. Secundários: faixa discreta ao lado (os mesmos números; todos também no Painel).
+    el.innerHTML = `<div class="m-grupo" data-grupo="principais">`
+        + card(m.chamadas_processadas, "total de chamadas", "", "CALLs distintas do dia (cada chamada conta uma vez)")
+        + card(m.pendencias_contabilizadas, "ocorrências pendentes", m.pendencias_contabilizadas ? "andamento" : "", "Chamadas ainda sem callback, contato inválido ou sem telefone")
+        + card(m.callbacks_realizados, "callbacks realizados", "destaque", "Percentual sobre o total de chamadas", pct(m.callbacks_realizados, m.chamadas_processadas) + "%")
+        + card(m.ocorrencias_resolvidas ?? 0, "ocorrências resolvidas", "resultado", "Cliente confirmou que a situação foi normalizada. Percentual sobre os callbacks realizados.", pct(m.ocorrencias_resolvidas, m.callbacks_realizados) + "%")
+      + `</div><div class="m-secundarias" data-grupo="secundarios" aria-label="Indicadores secundários">`
+        + card(m.servicos_executados ?? 0, "serviços executados", "sec", "Registrados pelo operador depois do callback")
+        + card(m.tentativas_sem_sucesso ?? 0, "tentativas sem sucesso", "sec", `Registros de 'Tentativa sem sucesso' · ${m.tentativas} tentativa(s) no total`)
+        + card(m.contatos_invalidos, "contatos inválidos", "sec") + card(m.sem_telefone, "sem telefone", "sec")
+        + card(`${rl.encerrados}/${rl.importados}`, a ? "lotes encerrados · 1 em andamento" : u ? `lotes encerrados · ✓ ${hhmm(u.encerrado_em)}` : "lotes encerrados",
+          "sec encerramento" + (recente ? " pulso" : ""), dica)
+      + `</div>`;
+    el.title = notaIncidentes(m);
   }
 
+  /* HISTÓRICO (gaveta lateral, botão Histórico do cabeçalho): lotes do dia, exportações do dia e fechamentos. Nada foi
+     removido: só saiu da tela principal. Caminhos de pasta ficam em Configurações. */
   function historico() {
     const lotes = estado.lotes || [], ex = estado.exportacoes || [];
-    $("#historico-titulo").textContent = `Lotes do dia e exportações (${lotes.length} lote(s) · ${ex.length} exportação(ões))`;
-    $("#lista-lotes").innerHTML = lotes.length ? "<ul class='lista'>" + lotes.map((l) =>
+    $("#historico-titulo").textContent = "Histórico";
+    $("#historico-sub").textContent = `${lotes.length} lote(s) hoje · ${ex.length} exportação(ões)`;
+    $("#lista-lotes").innerHTML = lotes.length ? "<h3>Lotes do dia</h3><ul class='lista'>" + lotes.map((l) =>
       `<li>Lote ${l.numero} · ${esc(l.arquivo_nome)} · ${l.situacao === "aberto" ? "<b>aberto</b>" : "encerrado " + horaBR(l.encerrado_em)}
        ${l.metricas ? ` · ${l.metricas.chamadas} chamadas, ${l.metricas.callback_realizado} callbacks, ${l.metricas.pendente} pendentes` : ""}</li>`).join("") + "</ul>" : "";
     $("#lista-exportacoes").innerHTML = (ex.length ? "<h3>Exportações</h3><ul class='lista'>" + ex.map((e) =>
       `<li>${esc(e.nome)} · v${e.versao}${e.definitiva ? " (definitiva)" : ""} · ${horaBR(e.exportado_em)}
         <button class="mini-botao" data-baixar="${esc(e.id)}">salvar</button>
        <div class="mini">${e.salvo ? esc(e.salvo.onde) + " em " + horaBR(e.salvo.em) : e.definitiva ? "cópia local opcional: o fechamento do dia vai para a pasta de rede" : "<b>ainda não salvo no destino</b>"}${e.contingencia && !e.salvo ? ` · cópia de contingência baixada para Downloads em ${horaBR(e.contingencia.em)} (não está no destino)` : ""}</div></li>`).join("") + "</ul>" : "")
-      + window.CentralFechamento.historicoHtml()
-      + `<p class="mini">Exportação manual (botão Exportar do dia): pasta <span class="caminho">${esc(N.PASTA_EXPORTACAO_SUGERIDA)}</span>. O botão Encerrar o dia grava o fechamento na pasta de rede <span class="caminho">${esc(window.CentralExportacaoRede ? window.CentralExportacaoRede.CAMINHO : "")}</span>.</p>`;
+      + window.CentralFechamento.historicoHtml();
+    if (!lotes.length && !$("#lista-exportacoes").innerHTML.trim()) $("#lista-lotes").innerHTML = '<p class="lista-vazia">Nenhum lote, exportação ou fechamento registrado ainda.</p>';
     document.querySelectorAll("[data-baixar]").forEach((b) => b.onclick = () => salvarArquivo(srv.exportacao(b.dataset.baixar)));
   }
+  function gavetaHistorico(abrir) {
+    $("#historico").classList.toggle("oculto", !abrir);
+    $("#btn-historico").classList.toggle("ativo", abrir); $("#btn-historico").setAttribute("aria-expanded", String(abrir));
+    if (abrir) { historico(); $("#historico-fechar").focus({ preventScroll: true }); }
+  }
+  $("#btn-historico").onclick = () => gavetaHistorico($("#historico").classList.contains("oculto"));
+  $("#historico-fechar").onclick = () => gavetaHistorico(false);
+  /* Navegação: "Atendimento" volta da tela de callback manual para a lista (js/callback-manual.js). */
+  $("#btn-atendimento").onclick = () => { if (window.CentralManual) window.CentralManual.fechar(); };
 
   /* ------------------------------------------------------------ salvar a exportação: DESTINO OBRIGATÓRIO */
   /* Destino: N.PASTA_EXPORTACAO_SUGERIDA.
@@ -138,7 +164,7 @@
         o destino tem prioridade);
      3) depois da escolha, a Central confere se o arquivo ficou DENTRO da pasta de destino; fora dela, NÃO grava e avisa;
      4) W: inacessível / sem permissão / gravação falhou: NADA é dado como salvo; o arquivo continua guardado na Central
-        (Lotes do dia e exportações > salvar) e há uma "cópia de contingência" opcional para Downloads, marcada como tal.
+        (Histórico > salvar) e há uma "cópia de contingência" opcional para Downloads, marcada como tal.
      Sem a função no navegador (ex.: Firefox): só a cópia de contingência, com o aviso da limitação. */
   const DESTINO = N.PASTA_EXPORTACAO_SUGERIDA, NOME_PASTA_DESTINO = "CENTRAL DE CALLBACK", CHAVE_DESTINO = "pasta_destino";
   const TIPOS_CSV = [{ description: "Arquivo CSV (Power BI)", accept: { "text/csv": [".csv"] } }];
@@ -225,13 +251,13 @@
     return "salvo";
   }
   function naoSalvo(exp, motivo) {
-    toast(`${motivo} O arquivo NÃO foi salvo; ele continua guardado na Central (Lotes do dia e exportações > salvar).`, true);
+    toast(`${motivo} O arquivo NÃO foi salvo; ele continua guardado na Central (Histórico > salvar).`, true);
     return null;
   }
   /* Falha: nada é dado como salvo e nada é descartado. Contingência só por escolha explícita (e registrada como tal). */
   async function falhaSalvar(exp, motivo, podeRepetir) {
     const v = await escolher("Arquivo NÃO salvo no destino", `<p><b>${esc(exp.nome)}</b> não foi salvo em ${caminhoHtml}.</p><p>${esc(motivo)}</p>
-      <p class="mini">O arquivo continua guardado na Central (Lotes do dia e exportações &gt; salvar). A cópia de contingência vai para a pasta
+      <p class="mini">O arquivo continua guardado na Central (Histórico &gt; salvar). A cópia de contingência vai para a pasta
       Downloads e <b>não</b> conta como entregue no destino: mova-a para a pasta CENTRAL DE CALLBACK quando a unidade W: voltar.</p>`,
       [{ valor: "fechar", rotulo: "Fechar" }, { valor: "contingencia", rotulo: "Baixar cópia de contingência" },
         ...(podeRepetir ? [{ valor: "repetir", rotulo: "Tentar de novo", classe: "acao" }] : [])]);
@@ -323,8 +349,11 @@
     chamadas = srv.chamadas(); grupos = srv.grupos();
     const l = estado.lote_aberto, a = estado.lote_em_andamento, multi = grupos.filter((g) => g.qtd > 1).length;
     $("#lote-titulo").textContent = `Lote ${l.numero} · ${l.arquivo_nome}`;
-    $("#resumo-lote").textContent = `${a.chamadas} chamadas em ${grupos.length} linha(s)${multi ? ` (${multi} incidente(s) com várias comunicações)` : ""} · ${a.pendente} pendentes · ${a.callback_realizado} callbacks · ${a.servico_executado} serviços executados · ${a.resolvida} resolvidas · ${a.contato_invalido} contatos inválidos · ${a.sem_telefone} sem telefone · ${a.tentativas} tentativas`;
-    montarFiltroOcorrencia();
+    $("#btn-encerrar-lote").title = `Encerrar e limpar o lote ${l.numero} (${l.arquivo_nome}). Pede confirmação; as métricas são somadas ao dia.`;
+    // Resumo do LOTE (base completa, sem filtros): curto na barra; o detalhe completo fica na dica.
+    $("#resumo-lote").textContent = `${a.chamadas} chamadas em ${grupos.length} linha(s) · ${a.pendente} pendentes · ${a.callback_realizado} callbacks`;
+    $("#resumo-lote").title = `${a.chamadas} chamadas em ${grupos.length} linha(s)${multi ? ` (${multi} incidente(s) com várias comunicações)` : ""} · ${a.pendente} pendentes · ${a.callback_realizado} callbacks · ${a.servico_executado} serviços executados · ${a.resolvida} resolvidas · ${a.contato_invalido} contatos inválidos · ${a.sem_telefone} sem telefone · ${a.tentativas} tentativas`;
+    montarFiltroOcorrencia(); montarFiltroMotivo();
     desenharTabela();
     if (selecionada) abrirChamada(selecionada, painelEstado.id === selecionada ? painelEstado.modelo : null);
   }
@@ -458,21 +487,32 @@
     sel.innerHTML = `<option value="">Todas as ocorrências</option>` + ops.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
     sel.value = ops.includes(atual) ? atual : "";
   }
+  /* MOTIVO (motivo do ADMS, como veio no CSV): opções = motivos presentes no lote aberto. Como Situação e Pesquisa, vale por
+     comunicação (o incidente aparece se alguma comunicação dele atende a todos esses filtros). Só filtra a exibição; em memória. */
+  function montarFiltroMotivo() {
+    const sel = $("#filtro-motivo"), atual = sel.value;
+    const ops = [...new Set(chamadas.map((c) => (c.motivo || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    sel.innerHTML = `<option value="">Todos os motivos</option>` + ops.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
+    sel.value = ops.includes(atual) ? atual : "";
+  }
   /* Localidade de cada INCIDENTE (todas as comunicações juntas, a principal primeiro): uma comunicação vazia ou sem nome não
      tira o incidente da regional (js/localidades.js, classificarIncidente). Só leitura: nada é gravado. */
   const localDoGrupo = (g) => L.classificarIncidente(g.membros.map((c) => c.localizacao));
   /* Linha azul: totais das chamadas da seleção (mesma conta do lote) + aviso dos incidentes que não entram em nenhuma regional. */
   function resumoFiltro(sel, locais) {
     const el = $("#resumo-filtro"), fora = grupos.filter((g) => locais.get(g.chave).status !== "ok").length;
-    const nota = fora ? ` · ${fora} incidente(s) fora das regionais (desconhecida, não reconhecida, divergência ou fora de Sergipe): veja "Fora das regionais" no filtro` : "";
-    if (!sel.size) { el.textContent = nota ? nota.slice(3) : ""; el.classList.toggle("oculto", !nota); return; }
+    // Aviso compacto; o detalhe (motivos e totais completos) fica na dica.
+    const nota = fora ? ` · ${fora} incidente(s) fora das regionais` : "";
+    const explica = fora ? `${fora} incidente(s) fora das regionais (desconhecida, não reconhecida, divergência ou fora de Sergipe): veja "Fora das regionais" no filtro.` : "";
+    if (!sel.size) { el.textContent = nota ? nota.slice(3) : ""; el.title = explica; el.classList.toggle("oculto", !nota); return; }
     const lista = grupos.filter((g) => L.confereIncidente(locais.get(g.chave), sel)).flatMap((g) => g.membros), m = srv.metricasLote(lista);
-    el.textContent = `Filtro ${L.descrever(sel)}: ${m.chamadas} chamadas · ${m.pendente} pendentes · ${m.callback_realizado} callbacks · ${m.servico_executado} serviços executados · ${m.resolvida} resolvidas · ${m.contato_invalido} contatos inválidos · ${m.sem_telefone} sem telefone · ${m.tentativas} tentativas${nota}`;
+    el.textContent = `Filtro ${L.descrever(sel)}: ${m.chamadas} chamadas · ${m.pendente} pendentes · ${m.callback_realizado} callbacks${nota}`;
+    el.title = `Filtro ${L.descrever(sel)}: ${m.chamadas} chamadas · ${m.pendente} pendentes · ${m.callback_realizado} callbacks · ${m.servico_executado} serviços executados · ${m.resolvida} resolvidas · ${m.contato_invalido} contatos inválidos · ${m.sem_telefone} sem telefone · ${m.tentativas} tentativas. ${explica}`;
     el.classList.remove("oculto");
   }
   function desenharTabela() {
-    const f = $("#filtro-estado").value, b = $("#busca").value.trim().toUpperCase(), sel = filtroRegionais.selecao();
-    const casaOutros = (c) => confere(c, f) && (!b || [c.call_id, c.incidente, c.nome, c.localizacao].some((x) => (x || "").toUpperCase().includes(b)));
+    const f = $("#filtro-estado").value, b = $("#busca").value.trim().toUpperCase(), sel = filtroRegionais.selecao(), mot = $("#filtro-motivo").value;
+    const casaOutros = (c) => confere(c, f) && (!mot || (c.motivo || "").trim() === mot) && (!b || [c.call_id, c.incidente, c.nome, c.localizacao].some((x) => (x || "").toUpperCase().includes(b)));
     const locais = new Map(grupos.map((g) => [g.chave, localDoGrupo(g)]));
     resumoFiltro(sel, locais);
     const datas = new Map(grupos.map((g) => [g.chave, N.dataDoIncidente(g)])), hoje = N.hojeLocal();
@@ -516,12 +556,15 @@
     bp.textContent = `Preencher datas ausentes (${semData})`;
     const soRecebido = lista.filter((g) => datas.get(g.chave).origem === "recebido_adms").length;
     $("#fd-sem-data").textContent = `Sem data (${r.sem_data})`;
-    $("#fd-info").textContent = `Exibindo: ${N.descreverFiltroData(filtroData, hoje)} · ${lista.length} incidente(s)`
-      + (filtroData.modo !== "todas" && r.outras_datas ? ` · ${r.outras_datas} em outras datas` : "")
-      + (filtroData.modo !== "todas" && filtroData.modo !== "sem_data" && r.sem_data ? ` · ${r.sem_data} sem data (fora do filtro)` : "")
+    // Linha curta (a data escolhida já aparece no botão ativo e nos campos); a explicação completa fica na dica.
+    const outras = filtroData.modo !== "todas" && r.outras_datas, fora = filtroData.modo !== "todas" && filtroData.modo !== "sem_data" && r.sem_data;
+    $("#fd-info").textContent = `${lista.length} incidente(s)` + (outras ? ` · ${r.outras_datas} em outras datas` : "")
+      + (fora ? ` · ${r.sem_data} sem data` : "") + (soRecebido ? ` · ${soRecebido} com data de recebimento` : "");
+    $("#fd-info").title = `Exibindo: ${N.descreverFiltroData(filtroData, hoje)} · ${lista.length} incidente(s)`
+      + (outras ? ` · ${r.outras_datas} em outras datas` : "") + (fora ? ` · ${r.sem_data} sem data (fora do filtro)` : "")
       + (soRecebido ? ` · ${soRecebido} com data de recebimento no ADMS (sem Horário da call)` : "");
   }
-  $("#filtro-estado").onchange = desenharTabela; $("#busca").oninput = desenharTabela; $("#filtro-ocorrencia").onchange = desenharTabela;
+  $("#filtro-estado").onchange = desenharTabela; $("#busca").oninput = desenharTabela; $("#filtro-ocorrencia").onchange = desenharTabela; $("#filtro-motivo").onchange = desenharTabela;
   $("#linhas").addEventListener("click", (ev) => {
     const bol = ev.target.closest("[data-bolinha]");
     if (bol) { ev.stopPropagation(); clicarBolinha(Number(bol.dataset.bolinha), bol); return; }
@@ -532,7 +575,8 @@
 
   $("#btn-encerrar-lote").onclick = async () => {
     const a = estado.lote_em_andamento;
-    if (!await confirmar("Encerrar e limpar o lote", `<p>As métricas deste lote serão somadas ao dia:</p>
+    if (!estado.lote_aberto) return; // botão no cabeçalho: sem lote aberto não há o que limpar
+    if (!await confirmar(`Encerrar e limpar o lote ${estado.lote_aberto.numero}`, `<p>Arquivo <b>${esc(estado.lote_aberto.arquivo_nome)}</b>. As métricas deste lote serão somadas ao dia:</p>
         <p><b>${a.chamadas}</b> chamadas · <b>${a.callback_realizado}</b> callbacks · ${a.servico_executado} serviços executados · ${a.resolvida} resolvidas ·
         <b>${a.pendente}</b> pendências · ${a.sem_telefone} sem telefone · ${a.contato_invalido} contatos inválidos · ${a.tentativas} tentativas</p>
         <p><b>Os dados das chamadas (nomes, telefones, endereços, comentários) serão apagados</b> e não poderão ser recuperados.
@@ -710,7 +754,8 @@
     const abas = { hoje: "Hoje", dia: "Por dia", operador: "Por operador", polo: "Por polo" };
     let corpo;
     if (aba === "hoje") corpo = m ? `<div class="metricas">${cartoes(m)}</div><p class="mini">Turno aberto: ${esc(estado.sessao.operador)} · ${esc(estado.sessao.polo)} · ${dataBR(estado.sessao.data_operacional)}.
-        ${m.inclui_lote_aberto ? "Inclui o lote em andamento." : ""} Taxa de resolução: ${String(m.taxa_resolucao).replace(".", ",")}% dos callbacks.</p>`
+        ${m.inclui_lote_aberto ? "Inclui o lote em andamento." : ""} Taxa de resolução: ${String(m.taxa_resolucao).replace(".", ",")}% dos callbacks.</p>
+        <p class="mini">${esc(notaIncidentes(m))}</p>`
       : '<p class="mini">Nenhum turno aberto. Veja os turnos anteriores nas outras abas.</p>';
     else if (aba === "dia") corpo = tabela(P.por_dia.map((g) => ({ ...g, rotulo: dataBR(g.chave) })), "Dia", true);
     else if (aba === "operador") corpo = tabela(P.por_operador.map((g) => ({ ...g, rotulo: g.chave })), "Operador", true);
@@ -744,6 +789,8 @@
           ${podeDestino() ? `<button type="button" id="cfg-pasta" class="contorno mini-botao">${pasta ? "Selecionar de novo…" : "Selecionar a pasta…"}</button>`
             : '<p class="mini"><b>Este navegador não permite salvar no destino</b>: use o Microsoft Edge ou o Google Chrome.</p>'}
           <p class="mini">O navegador não aceita um caminho escrito (W:\\…): a pasta ${esc(NOME_PASTA_DESTINO)} é selecionada uma vez e lembrada. Só essa pasta é aceita.</p></div>
+        ${window.CentralExportacaoRede ? `<div><b>Pasta de rede do fechamento diário</b><br><span class="caminho">${esc(window.CentralExportacaoRede.CAMINHO)}</span>
+          <p class="mini">Usada pelo Encerrar o dia e pela janela Fechamento (configurar ou trocar a pasta é feito lá).</p></div>` : ""}
         <p class="mini">Os dados ficam só neste computador e neste navegador. Limpar os dados de navegação ou usar janela anônima apaga o turno em andamento:
           exporte ao fim de cada dia.<br>Instalação: ${esc(c.instalacao_id)} · Versão ${esc(N.VERSAO)} · Armazenamento: ${esc(NOME_BANCO)}.</p>
         <div class="botoes fim"><button type="button" id="cfg-cancelar" class="contorno">Cancelar</button><button class="acao">Salvar</button></div>
@@ -769,7 +816,11 @@
     }
     if (canal) canal.onmessage = async () => { try { await srv.carregar(); carregar(); } catch (e) { toast(e.message, true); } };
     window.addEventListener("focus", async () => { try { const rev = srv.arm.revisao; await srv.carregar(); if (srv.arm.revisao !== rev) carregar(); } catch (e) { /* mantém a tela */ } });
-    document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !$("#modal").classList.contains("oculto") && $("#modal-caixa").dataset.livre) fecharModal(); });
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Escape") return;
+      if (!$("#modal").classList.contains("oculto")) { if ($("#modal-caixa").dataset.livre) fecharModal(); return; }
+      if (!$("#historico").classList.contains("oculto")) gavetaHistorico(false);
+    });
     window.CentralUI.servico = srv;
     carregar();
     window.CentralFechamento.automatico();

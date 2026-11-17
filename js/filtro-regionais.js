@@ -99,8 +99,21 @@
       if (!el) return;
       q(".fr-painel").classList.toggle("oculto", !sim); q(".fr-gatilho").setAttribute("aria-expanded", String(sim));
       el.querySelector(".fr").classList.toggle("aberto", sim);
+      posicionar();
       if (sim) q(".fr-busca").focus({ preventScroll: true });
     }
+    /* Só aparência: a linha de filtros pode rolar na horizontal (overflow), o que cortaria um painel "absolute". No desktop o
+       painel é posicionado na tela (fixed), logo abaixo do campo; no celular vale a folha do CSS (max-width: 640px). */
+    function posicionar() {
+      const p = q(".fr-painel"), g = q(".fr-gatilho");
+      if (!p || !g) return;
+      if (!aberto || window.matchMedia("(max-width: 640px)").matches) { p.style.cssText = ""; return; }
+      const r = g.getBoundingClientRect(), w = Math.min(460, window.innerWidth - 32);
+      const esq = Math.max(16, Math.min(r.left, window.innerWidth - w - 16)), alt = Math.max(220, Math.min(560, window.innerHeight - r.bottom - 16));
+      p.style.cssText = `position:fixed;top:${Math.round(r.bottom + 4)}px;left:${Math.round(esq)}px;width:${Math.round(w)}px;max-height:${Math.round(alt)}px`;
+    }
+    window.addEventListener("resize", () => { if (aberto) posicionar(); });
+    window.addEventListener("scroll", (ev) => { if (aberto && !(ev.target instanceof Element && el && el.contains(ev.target))) posicionar(); }, true);
     function montar(container) {
       el = container; aberto = false;
       el.innerHTML = html();

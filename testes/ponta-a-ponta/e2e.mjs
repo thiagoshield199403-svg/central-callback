@@ -89,7 +89,7 @@ await teste("Créditos mais visíveis: nomes maiores e em destaque, rodapé baix
       cor: getComputedStyle(n[0]).color, altura: f.getBoundingClientRect().height }; })()`);
   verdade(r.fonte >= 14, "fonte " + r.fonte);
   igual(r.nomes, ["Thiago dos Santos Araujo", "Any Carolinne dos Santos Muniz"]);
-  igual([r.peso, r.cor], ["700", "rgb(29, 39, 51)"]);
+  igual([r.peso, r.cor], ["700", "rgb(230, 237, 248)"]); // identidade 2.0 (tema escuro): nomes em texto claro
   verdade(r.altura <= 48, "rodapé alto demais: " + r.altura);
 });
 await teste("Tela inicial enxuta: 1ª vez pede sigla + polo; abre o turno", async () => {
@@ -114,7 +114,7 @@ await teste("Lista de OS compacta: incidente em negrito escuro, sem rolagem hori
   const st = await js(`(() => { const b = document.querySelector("#linhas .c-inc b"), cs = getComputedStyle(b);
     const t = document.querySelector(".tabela-rolagem"); return { peso: cs.fontWeight, cor: cs.color, sobra: t.scrollWidth - t.clientWidth,
     pagina: document.documentElement.scrollWidth - innerWidth, altura: document.querySelector("#linhas tr").getBoundingClientRect().height }; })()`);
-  igual(st.peso, "700"); igual(st.cor, "rgb(11, 22, 34)"); verdade(st.sobra <= 0, "rolagem horizontal na tabela: " + st.sobra);
+  igual(st.peso, "700"); igual(st.cor, "rgb(244, 248, 255)"); /* identidade 2.0: incidente em negrito, claro sobre fundo escuro */ verdade(st.sobra <= 0, "rolagem horizontal na tabela: " + st.sobra);
   verdade(st.pagina <= 0, "rolagem horizontal na página"); verdade(st.altura <= 40, "linha alta demais: " + st.altura);
   await foto("03-lista-os-1366");
 });

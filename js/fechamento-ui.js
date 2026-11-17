@@ -88,7 +88,7 @@
     if (!erro) toast("Turno encerrado. Não há callbacks registrados neste dia: nenhum fechamento foi gerado.");
     return "sem_registros";
   }
-  /* Histórico das operações, na seção "Lotes do dia e exportações" (inclui o Drive dos fechamentos antigos). */
+  /* Histórico das operações, na gaveta Histórico (inclui o Drive dos fechamentos antigos). */
   function historicoHtml() {
     const l = srv().ultimosFechamentos();
     if (!l.length) return "";
@@ -102,20 +102,34 @@
     const url = URL.createObjectURL(new Blob([f.conteudo], { type: "text/csv;charset=utf-8" })), a = document.createElement("a");
     a.href = url; a.download = f.nome; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
+  /* Identificação operacional: data, operador, polo e estação do turno aberto (ou da configuração, sem turno). */
+  function identificacao() {
+    const s = srv().sessao(), c = srv().E.config || {}, it = (r, v) => (v ? `<span>${r} <b>${esc(v)}</b></span>` : "");
+    return `<div class="fe-ident">${it("Data", s ? dataBR(s.data_operacional) : new Date().toLocaleDateString("pt-BR"))}${it("Operador", s ? s.operador : c.operador)}${it("Polo", s ? s.polo : c.polo)}${it("Estação", s ? s.estacao : c.estacao)}${s ? "" : '<span class="mini">sem turno aberto</span>'}</div>`;
+  }
+  /* Janela FECHAMENTO: só o que o operador precisa (identificação, último arquivo, Exportar, Baixar e a mensagem do resultado).
+     O histórico completo, o Google Drive (opcional), o reprocessamento e o caminho da pasta ficam em "Histórico e detalhes". */
   function desenhar() {
     const l = srv().listaFechamentos(), R = window.CentralExportacaoRede; // exportação para a pasta de rede (js/exportacao-rede.js)
+    const maisAberto = !!document.querySelector("#modal-caixa details.fe-mais[open]"); // redesenho após uma ação: mantém aberto
+    const u = l[0], x = u && u.exportacao_rede, situ = !u ? "" : x && x.status === "exportado" ? '<span class="etq e-callback_realizado">Exportado</span>' : '<span class="etq e-pendente">Exportação pendente</span>';
+    const topo = `<div class="fe-arquivo">${u ? `<span class="mini">Último fechamento · ${dataBR(u.data)} · v${u.versao}</span><strong>${esc(u.nome)}</strong>${situ}` : ""}</div>`;
+    const baixarUltimo = u ? `<button type="button" class="contorno" id="fe-baixar-ultimo" data-f="${esc(u.id)}">Baixar arquivo</button>` : "";
     $("#modal-caixa").className = "modal-caixa larga"; $("#modal-caixa").dataset.livre = "1";
     $("#modal-caixa").innerHTML = `<button type="button" class="fechar" id="fe-fechar">Fechar</button><h2>Fechamento diário</h2>
-      <p class="mini">O arquivo é gerado ao encerrar o dia e exportado para a pasta de rede. Contém só totais por operador, sem nenhum dado de cliente. Uma nova versão nunca substitui a anterior.</p>
-      ${R ? R.blocoHtml() : ""}
+      ${identificacao()}
+      ${R ? R.blocoHtml({ topo, acoes: baixarUltimo }) : `<div class="fe-cartao">${topo}<div class="fe-acoes">${baixarUltimo}</div></div>`}
+      <details class="fe-mais"${maisAberto ? " open" : ""}><summary>Histórico e detalhes (${l.length} fechamento(s))</summary>
+      <p class="fe-detalhes">Gerado ao encerrar o dia; contém só totais por operador, sem dados de clientes. Uma nova versão nunca substitui a anterior.${R ? ` Pasta de rede: <span class="caminho">${esc(R.CAMINHO)}</span>` : ""}</p>
       <div class="tabela-rolagem rolagem-curta"><table><thead><tr><th>Dia</th><th>Arquivo</th><th>Versão</th><th>Gerado</th><th>Google Drive</th>${R ? "<th>Pasta de rede</th>" : ""}<th></th></tr></thead><tbody>
       ${l.map((f) => `<tr data-f="${esc(f.id)}" data-dia="${esc(f.data)}"><td>${dataBR(f.data)}</td><td>${esc(f.nome)}${f.motivo ? `<div class="mini">${esc(f.motivo)}</div>` : ""}</td><td class="c-num">${f.versao}</td><td class="mini">${esc(f.gerado_por)} · ${horaBR(f.gerado_em)}</td>
         <td><span class="etq ${ST[f.status][1]}">${ST[f.status][0]}</span>${f.erro ? `<div class="mini">${esc(f.erro)}</div>` : ""}${(f.historico_envio || []).length ? `<div class="mini">Última tentativa: ${horaBR(f.historico_envio[f.historico_envio.length - 1].em)} · ${f.historico_envio.length} no total</div>` : ""}</td>${R ? `<td class="c-rede">${R.celula(f)}</td>` : ""}
         <td class="c-acao-fila"><button type="button" class="mini-botao" data-baixar-f>Baixar</button>${f.desatualizado ? ' <button type="button" class="mini-botao verde" data-reprocessar>Reprocessar</button>' : ""}</td></tr>`).join("") || `<tr><td colspan="${R ? 7 : 6}" class="mini">Nenhum fechamento gerado ainda. Ele é criado ao encerrar o dia.</td></tr>`}
       </tbody></table></div><div id="fe-reproc"></div>
-      <div class="botoes"><button type="button" class="contorno" id="fe-tentar" title="Opcional: envia ao Google Drive (pelo gateway) os fechamentos ainda não enviados">Enviar ao Google Drive (opcional)</button></div>`;
+      <div class="botoes"><button type="button" class="contorno" id="fe-tentar" title="Opcional: envia ao Google Drive (pelo gateway) os fechamentos ainda não enviados">Enviar ao Google Drive (opcional)</button></div></details>`;
     $("#modal").classList.remove("oculto");
     $("#fe-fechar").onclick = () => { aberto = false; $("#modal").classList.add("oculto"); };
+    if ($("#fe-baixar-ultimo")) $("#fe-baixar-ultimo").onclick = (ev) => { const f = srv().fechamento(ev.currentTarget.dataset.f); if (f) { baixar(f); toast(`Arquivo baixado: ${f.nome}.`); } };
     $("#fe-tentar").onclick = async () => { const r = await enviarAoDrive(); toast(r ? `Google Drive: ${r.enviados} enviado(s) · ${r.pendentes} não enviado(s).` : "Gateway do Google Drive indisponível.", !r); };
     if (R) R.ligar($("#modal-caixa"), async () => { if (aberto) desenhar(); });
     $("#modal-caixa").querySelectorAll("[data-baixar-f]").forEach((b) => { b.onclick = () => baixar(srv().fechamento(b.closest("tr").dataset.f)); });

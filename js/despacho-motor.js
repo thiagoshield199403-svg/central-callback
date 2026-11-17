@@ -12,7 +12,15 @@
    - Alimentador / circuito / subestação / equipamento: SÓ de colunas que existirem no arquivo (e "Dispositivo:" da Localização).
    - Falta de fase: CONFIRMADA = campo estruturado do ADMS (Motivo/Submotivos) cita falta de fase; POSSÍVEL = citada só no texto
      livre (regra da Central); SEM INFORMAÇÃO = o resto. Oscilação ou falta de energia NUNCA viram falta de fase.
-   - O arquivo NÃO informa despacho/equipe: nada aqui afirma que um INC foi despachado. */
+   - O arquivo NÃO informa despacho/equipe: nada aqui afirma que um INC foi despachado.
+   2.1 — SEGUNDA FONTE (Incidentes.xlsx, js/despacho-incidentes.js): consolidar() cruza as duas leituras pelo número da INC.
+   - Localização/endereço/bairro: das chamadas. Status, equipes, horários, alimentador/subestação: do Incidentes.xlsx.
+   - Status (DespachoIncidentes.classificarStatus): SÓ as INCs "operacionais" seguem para montar(); Concluído/Arquivado/
+     Cancelado saem AQUI (lista "excluidas") e status vazio/desconhecido/divergente vai para "excecoes" — nenhuma das duas
+     entra em lotes, seleção, contadores ou cópia, porque a tela só recebe "incs".
+   - Só nas chamadas (com o Incidentes.xlsx lido): "sem_registro_adms" -> exceções (status e equipe desconhecidos).
+   - Só no Incidentes.xlsx: município do campo "local"; bairro/endereço NÃO são inventados (localização incompleta).
+   - Sem Incidentes.xlsx disponível: modo "so_chamadas" = funcionamento 2.0 (a tela avisa que nada foi filtrado por status). */
 "use strict";
 (function (raiz) {
   const CFG = raiz.DespachoConfig, N = raiz.Nucleo, L = raiz.Localidades;
@@ -143,6 +151,85 @@
     };
   }
 
+  /* ------------------------------------------------------------ 2.1: consolidação das duas fontes */
+  const numeroDe = (inc) => { const m = /^\s*(?:INC\s*)?(\d+)\s*$/i.exec(inc || ""); return m ? m[1] : ""; };
+  function admsDe(x) {
+    const c = x.campos;
+    return { status: x.situacao, equipes: x.equipes, horarios: x.horarios, alimentador: x.alimentador, subestacao: x.subestacao,
+      alimentadorNormal: c.alimentador_normal || "", subestacaoNormal: c.subestacao_normal || "", local: c.local || "", subregiao: c.subregiao || "",
+      powerStatus: c.power_status || "", elemento: c.elemento || "", tipoElemento: c.tipo_elemento || "", causa: c.causa || "", subCausa: c.sub_causa || "",
+      problema: c.problema || "", incidentePai: c.incidente_pai || "", obs: x.obs, usuarios: x.usuarios, ultimaAlteracao: x.ultimaAlteracao, linhas: x.linhas.length };
+  }
+  const SEM_REGISTRO = { grupo: "excecao", codigo: "sem_registro_adms", rotulo: "Sem registro no ADMS",
+    motivo: "INC das chamadas sem registro no Incidentes.xlsx (nova e ainda não exportada, ou já encerrada): status e equipe desconhecidos" };
+  /* chamadas = processar(csv); adms = DespachoIncidentes.processar(xlsx) ou null. Devolve { modo, incs (só operacionais),
+     excluidas, excecoes, resumo }. */
+  function consolidar(chamadas, adms) {
+    const base = chamadas ? chamadas.incs : [];
+    if (!adms) {
+      const incs = base.map((i) => ({ ...i, origem: "chamadas", adms: null, situacao: null, inconsistencias: [] }));
+      return { modo: "so_chamadas", incs, excluidas: [], excecoes: [], resumo: { incs: incs.length, ambas: 0, soChamadas: incs.length, soIncidentes: 0, excluidasPorStatus: {}, excecoes: 0 } };
+    }
+    const todos = [], vistos = new Set();
+    for (const i of base) {
+      const n = numeroDe(i.incidente), x = adms.incs.get(n);
+      if (!x) { todos.push({ ...i, origem: "chamadas", adms: null, situacao: SEM_REGISTRO, inconsistencias: [] }); continue; }
+      vistos.add(n);
+      const inc = [...x.inconsistencias];
+      if (i.municipio.status === "ok" && x.municipio.status === "ok" && i.municipio.chave !== x.municipio.chave)
+        inc.push(`município diferente nas fontes: chamadas = ${i.municipio.nome}; Incidentes.xlsx = ${x.municipio.nome} (o lote usa o das chamadas)`);
+      todos.push({ ...i, origem: "ambas", adms: admsDe(x), situacao: x.situacao, inconsistencias: inc,
+        alimentadores: unicos([...i.alimentadores, x.alimentador]), subestacoes: unicos([...i.subestacoes, x.subestacao]) });
+    }
+    for (const x of adms.incs.values()) {
+      if (vistos.has(x.numero)) continue;
+      const mun = x.municipio, ok = mun.status === "ok";
+      todos.push({
+        id: rotuloInc(x.numero), incidente: x.numero, chamadas: 0, calls: [],
+        municipio: { status: mun.status, chave: mun.chave, nome: mun.nome || "", codigo: mun.codigo || "", motivo: mun.motivo || (x.campos.local ? "" : "campo local vazio no Incidentes.xlsx"), chaves: [...(mun.chaves || [])] },
+        polo: ok ? mun.regional : "", polosCandidatos: ok ? [mun.regional] : polosDe(mun.chaves),
+        bairro: null, bairroMotivo: "localização incompleta: INC só no Incidentes.xlsx (sem chamada) — só o município é conhecido", bairrosDiferentes: [],
+        logradouro: "", numeroEnd: "", complemento: "", localizacoes: [], alimentadores: unicos([x.alimentador]), circuitos: [], subestacoes: unicos([x.subestacao]),
+        equipamentos: [], fase: { nivel: "sem", origem: "" }, risco: { nivel: 0, origem: "" }, clientes: [], motivos: [],
+        primeira: x.horarios.data_inicial.iso, ultima: x.horarios.data_inicial.iso,
+        origem: "incidentes", localizacaoIncompleta: true, adms: admsDe(x), situacao: x.situacao, inconsistencias: [...x.inconsistencias],
+      });
+    }
+    const incs = todos.filter((i) => i.situacao.grupo === "operacional"), excluidas = todos.filter((i) => i.situacao.grupo === "excluido");
+    const excecoes = todos.filter((i) => i.situacao.grupo === "excecao"), porRotulo = (xs) => xs.reduce((o, i) => ((o[i.situacao.rotulo] = (o[i.situacao.rotulo] || 0) + 1), o), {});
+    return { modo: "duas_fontes", incs, excluidas, excecoes,
+      resumo: { incs: incs.length, ambas: todos.filter((i) => i.origem === "ambas").length, soChamadas: todos.filter((i) => i.origem === "chamadas").length,
+        soIncidentes: todos.filter((i) => i.origem === "incidentes").length, excluidasPorStatus: porRotulo(excluidas), excecoesPorMotivo: porRotulo(excecoes), excecoes: excecoes.length } };
+  }
+  const semEquipe = (i) => !!i.adms && !i.adms.equipes.length;
+
+  /* ------------------------------------------------------------ 2.1: troca de leitura e atualidade (regras puras) */
+  /* Uma leitura nova de UMA fonte só substitui a anterior se não for pior: arquivo com data de modificação ANTERIOR à da leitura
+     em uso (extração antiga reaparecendo) ou sem nenhum registro quando a anterior tinha (exportação incompleta) = recusada.
+     leitura = { arquivo: { lastModified }, total } */
+  function aceitarLeitura(anterior, nova) {
+    if (!anterior) return { aceita: true };
+    if (nova.arquivo.lastModified < anterior.arquivo.lastModified) return { aceita: false, motivo: "extracao_antiga" };
+    if (!nova.total && anterior.total) return { aceita: false, motivo: "sem_registros" };
+    return { aceita: true };
+  }
+  /* fontes = { chamadas: {arquivo}|null, incidentes: {arquivo}|null } -> avisos (não rejeitam nada: as fontes são gravadas
+     em momentos diferentes pelo robô do ADMS; só informam). */
+  function avisosAtualidade(fontes, agora) {
+    const A = CFG.atualidade, out = [];
+    for (const [nome, f] of Object.entries(fontes)) {
+      if (!f || !f.arquivo || !f.arquivo.lastModified) continue;
+      const min = Math.floor((agora - f.arquivo.lastModified) / 60000);
+      if (min >= A.desatualizadaMin) out.push({ fonte: nome, tipo: "desatualizada", minutos: min });
+    }
+    const a = fontes.chamadas && fontes.chamadas.arquivo, b = fontes.incidentes && fontes.incidentes.arquivo;
+    if (a && b && a.lastModified && b.lastModified) {
+      const d = Math.floor(Math.abs(a.lastModified - b.lastModified) / 60000);
+      if (d >= A.distanciaFontesMin) out.push({ fonte: a.lastModified < b.lastModified ? "chamadas" : "incidentes", tipo: "distantes", minutos: d });
+    }
+    return out;
+  }
+
   /* ------------------------------------------------------------ polos, filtros e lotes */
   const POLOS = L.REGIONAIS.map((r) => ({ id: r.id, nome: "Polo " + r.nome.replace(/^Regional\s+/i, ""), regional: r.nome, municipios: r.municipios.map((m) => m.nome) }));
   const NAO_IDENT = "?nao_identificada", SEM_MUN = "?sem_municipio";
@@ -158,9 +245,14 @@
     if (f.prioridade === "fase" && inc.fase.nivel === "sem") return false;
     if (f.prioridade === "fase_confirmada" && inc.fase.nivel !== "confirmada") return false;
     if (f.prioridade === "risco" && inc.risco.nivel < 1) return false;
+    if (f.status && ignorar !== "status" && (!inc.situacao || inc.situacao.codigo !== f.status)) return false;
+    if (f.equipe === "sem" && !semEquipe(inc)) return false;
+    if (f.equipe === "com" && !(inc.adms && inc.adms.equipes.length)) return false;
+    if (f.equipe === "inconsistente" && !(inc.inconsistencias && inc.inconsistencias.length)) return false;
     if (f.busca) {
       const b = norm(f.busca), d = b.replace(/\D/g, "");
-      const alvo = norm([inc.id, inc.logradouro, inc.bairro ? inc.bairro.nome : "", inc.municipio.nome, ...inc.alimentadores, ...inc.circuitos, ...inc.equipamentos].join(" "));
+      const alvo = norm([inc.id, inc.logradouro, inc.bairro ? inc.bairro.nome : "", inc.municipio.nome, ...inc.alimentadores, ...inc.circuitos, ...inc.equipamentos,
+        ...(inc.adms ? inc.adms.equipes : [])].join(" "));
       if (!(alvo.includes(b) || (d.length >= 4 && inc.id.replace(/\D/g, "").includes(d)))) return false;
     }
     return true;
@@ -180,6 +272,7 @@
       bairro: conta("bairro", (i) => [[chaveBairro(i), chaveBairro(i) === NAO_IDENT ? "Localização não identificada" : i.bairro.nome + (f.municipio ? "" : " · " + i.municipio.nome)]]),
       alimentador: conta("alimentador", (i) => i.alimentadores.map((x) => [x, x])),
       circuito: conta("circuito", (i) => i.circuitos.map((x) => [x, x])),
+      status: conta("status", (i) => (i.situacao ? [[i.situacao.codigo, i.situacao.rotulo]] : [])),
     };
   }
   function contarPolos(incs) { return POLOS.map((p) => ({ ...p, n: incs.filter((i) => noPolo(i, p.id)).length })); }
@@ -204,7 +297,8 @@
         return { ...l, n: l.incs.length, alimentadores: unicos(l.incs.flatMap((i) => i.alimentadores)), circuitos: unicos(l.incs.flatMap((i) => i.circuitos)),
           subestacoes: unicos(l.incs.flatMap((i) => i.subestacoes)), nFase: l.incs.filter((i) => i.fase.nivel !== "sem").length,
           nFaseConf: l.incs.filter((i) => i.fase.nivel === "confirmada").length, nRisco: l.incs.filter((i) => i.risco.nivel >= 1).length,
-          nRiscoVida: l.incs.filter((i) => i.risco.nivel >= 2).length };
+          nRiscoVida: l.incs.filter((i) => i.risco.nivel >= 2).length, nSemEquipe: l.incs.filter(semEquipe).length,
+          nInterrompido: l.incs.filter((i) => i.situacao && i.situacao.destaque).length, nInconsistente: l.incs.filter((i) => i.inconsistencias && i.inconsistencias.length).length };
       }).sort((a, b) => (a.tipo === "nao_identificado") - (b.tipo === "nao_identificado") || b.n - a.n || alfa(a.bairro, b.bairro));
       return { ...s, lotes };
     }).sort((a, b) => a.especial - b.especial || b.n - a.n || alfa(a.nome, b.nome));
@@ -214,7 +308,10 @@
       indicadores: { incs: lista.length, lotes: todosLotes.filter((l) => l.tipo !== "nao_identificado").length, lotesNaoIdent: todosLotes.filter((l) => l.tipo === "nao_identificado").length,
         naoIdentificados: lista.filter((i) => chaveBairro(i) === NAO_IDENT).length, faseConfirmada: lista.filter((i) => i.fase.nivel === "confirmada").length,
         fasePossivel: lista.filter((i) => i.fase.nivel === "possivel").length, risco: lista.filter((i) => i.risco.nivel >= 1).length,
-        chamadas: lista.reduce((t, i) => t + i.chamadas, 0) },
+        chamadas: lista.reduce((t, i) => t + i.chamadas, 0),
+        porStatus: lista.reduce((o, i) => { if (i.situacao) o[i.situacao.codigo] = (o[i.situacao.codigo] || 0) + 1; return o; }, {}),
+        semEquipe: lista.filter(semEquipe).length, inconsistencias: lista.filter((i) => i.inconsistencias && i.inconsistencias.length).length,
+        equipes: unicos(lista.flatMap((i) => (i.adms ? i.adms.equipes : []))).length },
     };
   }
 
@@ -227,6 +324,6 @@
     return ns.length ? CFG.copia.abertura + ns.join(CFG.copia.separador) + CFG.copia.fechamento : "";
   }
 
-  raiz.DespachoMotor = { processar, montar, opcoes, contarPolos, textoCopia, endereco, bairroDaChamada, bairroDoComentario, colunasEletricas, faltaDeFase, rotuloInc, passa,
-    POLOS, NAO_IDENT, SEM_MUN };
+  raiz.DespachoMotor = { processar, consolidar, aceitarLeitura, avisosAtualidade, montar, opcoes, contarPolos, textoCopia, endereco, bairroDaChamada, bairroDoComentario, colunasEletricas, faltaDeFase, rotuloInc, passa,
+    numeroDe, POLOS, NAO_IDENT, SEM_MUN };
 })(typeof window !== "undefined" ? window : globalThis);

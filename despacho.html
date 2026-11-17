@@ -11,8 +11,11 @@
 <body>
   <header class="topo">
     <div class="marca">COI</div>
-    <div class="titulo"><h1>DESPACHO OTIMIZADO</h1><div class="sub">Central de Callback COI · fonte: chamadas_incidentes.csv</div></div>
-    <div class="dados" id="dados" title="Situação do arquivo chamadas_incidentes.csv"><span class="ponto"></span><span id="dados-texto">Sem dados</span></div>
+    <div class="titulo"><h1>DESPACHO OTIMIZADO</h1><div class="sub">Central de Callback COI · fontes: chamadas_incidentes.csv + Incidentes.xlsx</div></div>
+    <div class="fontes-topo">
+      <div class="dados" id="dados" title="Situação do arquivo chamadas_incidentes.csv"><span class="ponto"></span><span class="rot-fonte">Chamadas</span><span id="dados-texto">Sem dados</span></div>
+      <div class="dados" id="dados-inc" title="Situação do arquivo Incidentes.xlsx"><span class="ponto"></span><span class="rot-fonte">Incidentes</span><span id="dados-inc-texto">não lido</span></div>
+    </div>
     <label class="polo">Polo
       <select id="polo" aria-label="Polo"><option value="">Todos os polos</option></select>
     </label>
@@ -22,15 +25,17 @@
 
   <div class="pagina">
     <div class="sigode" role="note"><strong>CONFIRMAÇÃO DO DESPACHO: consultar no SIGODE.</strong>
-      <span>O arquivo de chamadas não informa equipe nem despacho. Confira cada INC no SIGODE antes de lançar o lote.</span></div>
+      <span>Status, equipes e horários vêm do Incidentes.xlsx do ADMS; aceite, chegada e conclusão não são informados. Confira cada INC no SIGODE antes de lançar o lote.</span></div>
     <div id="fonte" class="fonte oculto"></div>
+    <div id="fonte-inc" class="fonte-inc oculto" aria-live="polite"></div>
 
     <section class="kpis" aria-label="Resumo operacional">
-      <div class="kpi"><div class="rot">INCs identificadas</div><div class="val" data-kpi="incs">—</div><div class="det" data-kpi-det="incs"></div></div>
+      <div class="kpi kpi-incs"><div class="rot">INCs identificadas</div><div class="val" data-kpi="incs">—</div><div class="det" data-kpi-det="incs"></div></div>
       <div class="kpi"><div class="rot">Lotes</div><div class="val" data-kpi="lotes">—</div><div class="det" data-kpi-det="lotes"></div></div>
       <div class="kpi alerta-laranja"><div class="rot">Localização não identificada</div><div class="val" data-kpi="nao_ident">—</div><div class="det">INCs sem bairro reconhecido</div></div>
       <div class="kpi"><div class="rot">Indicação de falta de fase</div><div class="val" data-kpi="fase">—</div><div class="det" data-kpi-det="fase"></div></div>
     </section>
+    <div class="status-ind oculto" id="status-ind" role="group" aria-label="Indicadores por status do ADMS"></div>
 
     <div class="filtros" id="filtros">
       <select id="f-municipio" aria-label="Município"></select>
@@ -43,7 +48,14 @@
         <option value="fase_confirmada">Falta de fase confirmada</option>
         <option value="risco">Risco de vida (classificado ou indício)</option>
       </select>
-      <input type="search" id="f-busca" placeholder="Buscar INC, rua ou bairro" autocomplete="off" aria-label="Buscar">
+      <select id="f-status" aria-label="Status do ADMS"></select>
+      <select id="f-equipe" aria-label="Equipe">
+        <option value="">Com e sem equipe</option>
+        <option value="sem">Sem equipe</option>
+        <option value="com">Com equipe</option>
+        <option value="inconsistente">Com inconsistência</option>
+      </select>
+      <input type="search" id="f-busca" placeholder="Buscar INC, rua, bairro ou equipe" autocomplete="off" aria-label="Buscar">
       <button type="button" class="fantasma mini" id="f-limpar">Limpar filtros</button>
     </div>
     <div class="conferencia" id="conferencia"></div>
@@ -57,7 +69,7 @@
     <button type="button" class="fantasma" id="sel-limpar">Limpar</button>
     <button type="button" class="laranja" id="sel-copiar">Copiar selecionadas</button>
   </footer>
-  <input type="file" id="arquivo-manual" accept=".csv,text/csv" class="oculto">
+  <input type="file" id="arquivo-manual" accept=".csv,text/csv,.xlsx" class="oculto">
   <div class="toast oculto" id="toast" role="status"></div>
 
   <script src="js/armazenamento.js"></script>
@@ -66,6 +78,8 @@
   <script src="js/modelos.js"></script>
   <script src="js/nucleo.js"></script>
   <script src="js/despacho-config.js"></script>
+  <script src="js/despacho-xlsx.js"></script>
+  <script src="js/despacho-incidentes.js"></script>
   <script src="js/despacho-motor.js"></script>
   <script src="js/despacho-app.js"></script>
 </body>

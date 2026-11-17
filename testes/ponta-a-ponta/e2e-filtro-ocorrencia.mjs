@@ -142,7 +142,7 @@ await teste("7. Alertas de risco preservados: faixa e fundo vermelhos, ⚠ e eti
         chip: !!chip, chipFundo: chip ? getComputedStyle(chip).backgroundColor : null, etq: !!t.querySelector(".c-motivo .etq.risco") }; }); })()`);
   verdade(r.length >= 2 && r.every((x) => x.risco >= 1), "condutor partido com risco: " + JSON.stringify(r));
   for (const x of r) {
-    verdade(x.classe && x.faixa.includes("rgb(180, 35, 24)") && x.fundo === "rgb(255, 246, 245)", "faixa/fundo de risco: " + JSON.stringify(x));
+    verdade(x.classe && x.faixa.includes("rgb(180, 35, 24)") && x.fundo === "rgba(255, 85, 102, 0.08)", "faixa/fundo de risco: " + JSON.stringify(x));
     verdade(x.chip && x.chipFundo === "rgb(180, 35, 24)", "⚠ vermelho: " + JSON.stringify(x));
     verdade(x.etq, "etiqueta da mensagem em vermelho (risco)");
   }
@@ -185,16 +185,16 @@ await teste("11. Alinhamento e responsividade dos filtros (1366, 1024 e 390): me
   const sobrepoe = (a, b) => a.x < b.d - 1 && b.x < a.d - 1 && a.y < b.b - 1 && b.y < a.b - 1;
   for (const [l, a] of [[1366, 768], [1024, 768], [390, 844]]) {
     await pg.tamanho(l, a); const m = await medir();
-    igual(m.campos.length, 4, "quatro campos (regionais, ocorrência, situação, pesquisa)");
+    igual(m.campos.length, 5, "cinco campos (regionais, motivo, ocorrência, situação, pesquisa)");
     verdade(m.pagina <= 0, `${l}: rolagem lateral (${m.pagina}px)`);
     verdade(new Set(m.campos.map((x) => Math.round(x.c.h))).size === 1, `${l}: alturas diferentes ${JSON.stringify(m.campos.map((x) => x.c.h))}`);
     verdade(new Set(m.data.map((x) => Math.round(x.h))).size === 1, `${l}: data/botões com alturas diferentes ${JSON.stringify(m.data.map((x) => x.h))}`);
     for (let i = 0; i < m.campos.length; i++) for (let j = i + 1; j < m.campos.length; j++) verdade(!sobrepoe(m.campos[i].l, m.campos[j].l), `${l}: campos ${i} e ${j} sobrepostos`);
     for (let i = 0; i < m.data.length; i++) for (let j = i + 1; j < m.data.length; j++) verdade(!sobrepoe(m.data[i], m.data[j]), `${l}: controles de data ${i} e ${j} sobrepostos`);
     verdade(m.campos.every((x) => x.l.d <= m.largura + 0.5 && x.l.x >= 0), `${l}: campo fora da tela`);
-    if (l === 1366) verdade(new Set(m.campos.map((x) => Math.round(x.c.y))).size === 1, "1366: os quatro campos na mesma linha");
+    if (l === 1366) verdade(new Set(m.campos.map((x) => Math.round(x.c.y))).size === 1, "1366: os cinco campos na mesma linha");
     if (l === 1366) verdade(new Set(m.data.map((x) => Math.round(x.b))).size === 1, "1366: datas e botões alinhados pela base");
-    if (l === 390) verdade(new Set(m.campos.map((x) => Math.round(x.c.y))).size === 4, "390: um campo por linha");
+    if (l === 390) verdade(new Set(m.campos.map((x) => Math.round(x.c.y))).size === 5, "390: um campo por linha");
     if (process.env.FOTOS) await pg.foto(join(process.env.FOTOS, `filtro-ocorrencia-${l}.png`));
   }
   await pg.tamanho(1366, 768);

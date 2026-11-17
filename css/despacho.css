@@ -131,3 +131,36 @@ dt { color: var(--fraco); } dd { margin: 0; word-break: break-word; }
 
 @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .c-tags { width: auto; } .dados { margin-left: 0; } }
 @media (max-width: 700px) { .pagina, .topo { padding-left: 10px; padding-right: 10px; } .c-hora, th:nth-child(4) { display: none; } dl { grid-template-columns: 1fr; } }
+
+/* ---------------- 2.1: duas fontes (Incidentes.xlsx), status, equipes, exceções — cores discretas */
+.fontes-topo { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.fontes-topo .dados { margin-left: 0; }
+.rot-fonte { color: #8ea3c0; font-size: 11.5px; text-transform: uppercase; letter-spacing: .4px; }
+.dados.falha { border-color: rgba(255, 85, 102, .6); }
+.dados.vazio .ponto { background: var(--fraco); }
+.fonte-inc { display: grid; gap: 6px; margin-bottom: 10px; }
+.fonte-inc .fonte { margin-bottom: 0; }
+.fonte.s-aviso { border-color: var(--laranja); }
+.atualidade { display: flex; flex-direction: column; gap: 2px; padding: 6px 12px; border-left: 3px solid var(--laranja); background: var(--laranja-fundo); border-radius: 0 7px 7px 0; font-size: 12.5px; color: var(--laranja2); }
+.status-ind { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.status-ind .sep { width: 1px; height: 20px; background: var(--borda2); margin: 0 2px; }
+.status-ind .eq { font-size: 12px; margin-left: 4px; }
+.chip-st { display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; color: var(--suave); background: var(--painel); border: 1px solid var(--borda); }
+.chip-st b { color: var(--texto); font-size: 13.5px; }
+.chip-st:hover:not(:disabled) { border-color: var(--azul); }
+.chip-st.ativo { border-color: var(--laranja); background: var(--laranja-fundo); color: var(--laranja2); }
+.chip-st.interrompido b { color: #ffcf8a; }
+.chip-st.sem-equipe b, .chip-st.inconsistente b { color: var(--laranja2); }
+.tag.st { color: #cfd9ea; background: var(--painel2); }
+.tag.interrompido { color: #ffcf8a; border-color: rgba(255, 179, 107, .7); border-style: dashed; font-weight: 600; }
+.tag.sem-equipe { color: var(--laranja2); border-color: rgba(255, 138, 31, .45); }
+.tag.inconsistente { color: #ffd98a; border-color: rgba(255, 217, 138, .5); }
+.c-status { width: 130px; } .c-equipe { width: 170px; font-size: 12.5px; white-space: nowrap; }
+.equipe { font-family: var(--mono); font-size: 12px; color: #cfd9ea; }
+.obs { white-space: pre-line; color: #cfd9ea; }
+.conf-inc { flex-basis: 100%; }
+.excecoes { flex-basis: 100%; background: var(--painel); border: 1px dashed var(--borda2); border-radius: 7px; padding: 8px 10px; font-size: 12.5px; }
+.excecoes table { margin-top: 6px; }
+.excecoes td { vertical-align: top; }
+#f-status, #f-equipe { max-width: 200px; }
+@media (max-width: 1100px) { .fontes-topo { margin-left: 0; } .c-equipe { width: auto; } }

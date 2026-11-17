@@ -1,83 +1,126 @@
-CENTRAL DE CALLBACK COI - DESPACHO OTIMIZADO (versao 2.0.0)
+CENTRAL DE CALLBACK COI - DESPACHO OTIMIZADO (versao 2.1.0)
 ==========================================================
-Apoio ao despacho em contingencia: organiza as INCs do arquivo de chamadas em LOTES por polo, municipio e bairro, para
-copiar e lancar no SIGODE. Nada e despachado automaticamente: a decisao e o lancamento sao do operador.
+Apoio ao despacho em contingencia: organiza as INCs em LOTES por polo, municipio e bairro, para copiar e lancar no SIGODE.
+Nada e despachado automaticamente: a decisao e o lancamento sao do operador. A confirmacao do despacho e SEMPRE no SIGODE.
 
-FONTE DE DADOS (unica)
-- chamadas_incidentes.csv: o MESMO arquivo da Central, lido pela MESMA conexao/autorizacao da pasta ADMS que a Central
-  guardou neste navegador (pasta ou o proprio arquivo). Nao le Incidentes, LOG nem outro arquivo. Nao importa nada para o
-  banco da Central (so le o arquivo, em memoria).
-- Leitura, cabecalhos aceitos (formato da pasta ADMS: 26 colunas, "," e AM/PM; e do Navegador de Chamadas: ";" e dd/mm),
-  linhas validas/descartadas e CALL repetida: as mesmas regras da Central (js/nucleo.js).
-- O arquivo NAO informa equipe, despacho nem execucao. Por isso a tela diz: "CONFIRMACAO DO DESPACHO: consultar no SIGODE."
-  Nenhuma INC e escondida por nao se saber se ja foi despachada.
+FONTES DE DADOS (pasta ADMS: \\fs-bi\ESE\DTEC\DEOP\ADMS)
+1. chamadas_incidentes.csv (o MESMO arquivo da Central): endereco, bairro, localizacao e dados das chamadas. E a BASE dos
+   lotes. Leitura e regras de validade da Central (js/nucleo.js).
+2. Incidentes.xlsx, aba "incidentes" (SO o Despacho le; a Central continua usando so o CSV): numero da INC, status, equipe(s),
+   municipio (campo "local"), alimentador e subestacao, horarios de atribuicao, envio e deslocamento, observacao.
+Nao sao lidos: Incidentes_encerrados.xlsx, arquivos de clientes, manobras, log.txt.
+Os dois arquivos sao regravados pelo robo do ADMS a cada ~5-7 min, em momentos diferentes, substituindo o arquivo inteiro.
 
-COMO ABRIR E USAR
-1. Na Central, botao DESPACHO OTIMIZADO (topo). Abre despacho.html na mesma aba; o botao "Central" volta.
-2. Se o Edge pedir, clique em "Autorizar leitura" (a mesma autorizacao da Central; nao precisa escolher a pasta de novo).
-   Sem conexao na Central: "Selecionar arquivo" (guardado so para este modulo) ou "Abrir arquivo avulso" (sem atualizacao).
-3. Escolha o POLO no topo. Os municipios do polo sao reconhecidos automaticamente (regionalizacao oficial da Central,
-   js/localidades.js). Ex.: Polo Aracaju = Aracaju, Barra dos Coqueiros, Nossa Senhora do Socorro.
-4. Lotes: um por bairro dentro de cada municipio (nunca mistura municipios). Clique no lote para ver as INCs (so um lote
-   aberto por vez); "Detalhes" mostra a Localizacao original, a origem do bairro, as chamadas e as indicacoes.
-5. "Copiar lote" copia as INCs do lote; ou marque INCs (ou o lote inteiro) e use "Copiar selecionadas" na barra inferior.
-   Formato: numos in (123456789, 123456790) - so os numeros, separados por virgula e espaco, sem "INC", sem repeticao,
-   na ordem da tela; um incidente so = numos in (123456789). Confira no SIGODE antes de lancar.
-6. Atualizar: rele o arquivo na hora. Alem disso, a cada 60 s (com a pagina visivel) o modulo confere a data/tamanho do
-   arquivo e so rele se mudou. Selo do topo: data em que o ADMS gravou o arquivo e hora da leitura (laranja = arquivo com
-   mais de 60 min; vermelho = falha). Em falha, a ULTIMA leitura valida continua na tela, com o aviso.
+CONEXAO (uma autorizacao so)
+- O Despacho usa a conexao que a Central guardou neste navegador (faixa Pasta ADMS). Pasta conectada = os dois arquivos com a
+  MESMA autorizacao; nenhuma segunda autorizacao e pedida.
+- Se a Central guardou so o ARQUIVO chamadas_incidentes.csv (e nao a pasta), o Despacho pede uma vez "Selecionar
+  Incidentes.xlsx" (guardado so para este modulo). Melhor: conectar a PASTA na Central.
+- Sem conexao: "Abrir arquivo avulso" aceita o CSV e o Incidentes.xlsx (sem atualizacao automatica).
 
-INDICADORES
-INCs identificadas · Lotes (por municipio e bairro) · Localizacao nao identificada · Indicacao de falta de fase
-(confirmada / possivel). Linha "Fonte": linhas lidas -> chamadas validas -> INCs, com as chamadas repetidas do mesmo INC
-consolidadas e as chamadas sem INC (listadas a parte: nao ha INC para lancar).
+BOTAO ATUALIZAR (um so botao)
+1. Localiza chamadas_incidentes.csv e Incidentes.xlsx na pasta autorizada (nome sem diferenciar maiusculas).
+2. Le cada arquivo so quando ESTAVEL: tamanho e data de modificacao iguais antes e depois da leitura dos bytes (ate 4
+   tentativas). Arquivo sendo gravado = "em gravacao", nada e lido pela metade.
+3. Valida cada fonte por inteiro: CSV pelo leitor da Central; XLSX pelo leitor proprio (ZIP + CRC de cada parte + XML), aba
+   "incidentes", cabecalho e colunas obrigatorias. Arquivo vazio, que nao e XLSX, incompleto (gravacao interrompida),
+   corrompido, sem a aba ou sem coluna obrigatoria = RECUSADO.
+4. Protecao: leitura nova com data de modificacao ANTERIOR a da leitura em uso (extracao antiga) ou sem nenhum registro
+   (quando a anterior tinha) = recusada.
+5. So depois das duas leituras: normaliza os numeros de INC, cruza, consolida e redesenha a tela UMA vez (sem estado
+   intermediario).
+Fonte que falhar: mantem a SUA ultima leitura valida, mostra o aviso daquela fonte (faixa propria) e permite "Tentar de
+novo"; a outra fonte segue normalmente. A cada 60 s (pagina visivel) as duas sao conferidas e so e relido o que mudou.
 
-COMO CADA DADO E OBTIDO (nada e inventado)
-- INC: coluna Incidente. Varias chamadas do mesmo INC = UMA INC (Nucleo.agruparIncidentes; a comunicacao principal vem
-  primeiro). Cada INC entra em UM lote so.
-- Municipio e polo: Localidades.classificarIncidente (codigo + nome do municipio na Localizacao). Municipio nao reconhecido,
-  divergente ou fora de SE: secao "MUNICIPIO NAO IDENTIFICADO OU DIVERGENTE" (em Todos os polos; divergente entre municipios
-  do polo escolhido tambem aparece no polo).
-- Bairro: endereco do ADMS na Localizacao, "LOGRADOURO_NUMERO[_COMPLEMENTO]_BAIRRO; COD_MUNICIPIO" -> ultimo trecho apos "_".
-  * Bairro generico (AREA RURAL, ZONA RURAL, AREA URBANA, POVOADO, CONJUNTO, ASSENTAMENTO...): se o logradouro for uma
-    localidade nomeada (POV X, ASSENT X, FAZ X, DIST X, PROJETO X...), o lote usa esse nome ("localidade"); senao a INC vai
-    para LOCALIZACAO NAO IDENTIFICADA do municipio. Nome da cidade no lugar do bairro, "S/N" ou numero: nao e bairro.
-  * Sem endereco no formato (ex.: so "ESE_Municipio_Pesquisa: X"): campo "BAIRRO:" do comentario do atendimento, se houver.
-  * Chamadas do mesmo INC em bairros diferentes: vale o mais citado; os demais aparecem em Detalhes para conferir.
-  * Dentro do lote, as INCs ficam ordenadas por logradouro e numero (mesma rua junto). Sem coordenadas: nenhuma
-    proximidade geografica e presumida alem do bairro/rua informados.
-- Alimentador / circuito / subestacao / equipamento: SO se o arquivo tiver a coluna ("Alimentador origem", "Alimentador",
-  "Circuito", "Subestacao", "Dispositivo") ou o trecho "Dispositivo:" na Localizacao. O chamadas_incidentes.csv auditado
-  (11/2026) NAO tem essas colunas: os filtros ficam desativados com "sem dado no arquivo". Se o ADMS passar a exportar,
-  funcionam sozinhos (nomes aceitos em js/despacho-config.js).
-- Falta de fase: CONFIRMADA = Motivo/Submotivos (campos estruturados do ADMS) citam falta de fase; POSSIVEL = citada so no
-  texto da chamada (mesmos termos da Central: falta de fase, sem fase, meia fase, uma fase...); SEM INFORMACAO = o resto.
-  Oscilacao, tensao ou falta de energia NUNCA viram falta de fase. No arquivo auditado nao ha campo estruturado de fase.
-- Risco de vida: regra da Central (sigla RV / emergencia / subtipo de risco = classificado; termo no texto = indicio).
-  Cliente prioritario: "Cust. prioritarias" 01 Industria, 04 VIP, 11 Essencial (quando a coluna existe).
+REGRA CENTRAL DE STATUS (js/despacho-incidentes.js, classificarStatus; tabela em js/despacho-config.js)
+  Aguardando Envio, Aguardando Reenvio, Enviado, Em Execucao ......... exibidos (operacionais)
+  Interrompido ....................................................... exibido, com identificacao propria
+  Concluido, Arquivado, Cancelado .................................... EXCLUIDOS no processamento
+  Vazio, desconhecido, diferente entre linhas da mesma INC ........... EXCECOES (area propria, fora dos lotes)
+A exclusao acontece em DespachoMotor.consolidar(), ANTES de montar lotes: a tela so recebe as INCs operacionais. Excluidas e
+excecoes nao entram em lotes, selecao, contadores, contagem por polo nem na copia (a copia ainda filtra de novo, por
+garantia). Aparecem so como contagem ("fora dos lotes") e, as excecoes, na lista "N excecao(oes)".
 
-CONFERENCIA COM O ARQUIVO REAL (11/2026, so contagens)
-311 linhas -> 311 chamadas validas -> 138 INCs (170 chamadas repetidas do mesmo INC consolidadas) + 3 chamadas sem INC.
-Soma dos lotes = 138 (cada INC uma vez). Polos: Aracaju 40, Sao Cristovao 9, Itabaiana 16, Lagarto 18, Gloria 31,
-Propria 18, Maruim 6. Bairro reconhecido em 116 INCs; 22 em LOCALIZACAO NAO IDENTIFICADA (quase todas "AREA RURAL" sem
-povoado no endereco). Falta de fase: 0 confirmada (o arquivo nao tem campo para isso), 7 possiveis.
+CRUZAMENTO (chave = numero da INC: coluna Incidente do CSV x "num ocorrencia" do XLSX; "INC 123" e "123" sao a mesma)
+- Nas duas fontes: localizacao, endereco e bairro das CHAMADAS; status, equipes e horarios do INCIDENTES.
+- So no Incidentes.xlsx: municipio do campo "local"; bairro e endereco NAO sao inventados (lote LOCALIZACAO NAO IDENTIFICADA do
+  municipio, marcada "localizacao incompleta"); "local" vazio ou nao reconhecido = secao MUNICIPIO NAO IDENTIFICADO.
+- So nas chamadas (com Incidentes.xlsx lido): "sem_registro_adms" = excecao (INC nova ainda nao exportada ou ja encerrada).
+- Varias linhas da mesma INC no XLSX = UMA INC; equipes somadas sem repetir ("Equipe: X | Equipe: Y"). Problema, causa,
+  elemento e situacao de energia podem variar por linha (no arquivo real a coluna Problema varia): todos sao guardados.
+  Status, municipio, alimentador, subestacao ou horarios diferentes entre linhas = INCONSISTENCIA sinalizada.
+- Quantidade de chamadas, de equipes e de INCs sao contadas separadamente.
+INCONSISTENCIAS (sinalizadas, nunca corrigidas): municipio diferente entre as fontes (o lote usa o das chamadas); envio antes
+da atribuicao; deslocamento antes do envio; Enviado/Em Execucao sem equipe; Aguardando Envio com deslocamento; data em
+formato nao reconhecido; valores diferentes entre linhas da mesma INC.
 
-LIMITACOES (dependem do SIGODE/ADMS)
-- Despacho, equipe, posicao e disponibilidade de equipe: nao estao no arquivo. Conferencia manual no SIGODE.
-- Alimentador/circuito: ausentes no arquivo atual.
+O QUE E EXIBIDO (quando existe no arquivo) E O QUE NAO E
+Exibido: status do ADMS, equipe(s), horarios de atribuicao, envio e deslocamento, alimentador/subestacao, observacao (com as
+quebras de linha), problema/causa, ultima alteracao.
+NAO exibido nem inventado: aceite da equipe, chegada ao local, conclusao, confirmacao definitiva do despacho. (As colunas
+"data hora chegada" e "data final" existem no arquivo, mas estavam vazias na auditoria e nao sao usadas.)
+
+ATUALIDADE
+- Selos no topo (Chamadas / Incidentes): data em que o ADMS gravou cada arquivo e hora da leitura. Laranja = sem atualizacao
+  ha 15 min ou mais; vermelho = sem leitura valida ou ultima tentativa falhou.
+- Aviso de fonte desatualizada (>= 15 min) e de fontes distantes (diferenca >= 15 min entre as gravacoes). Nao rejeitam a
+  leitura: as fontes sao gravadas em momentos diferentes.
+
+INTERFACE
+Indicadores (INCs operacionais, lotes, localizacao nao identificada, falta de fase) · indicadores por status (clique filtra) ·
+sem equipe · com inconsistencia · equipes distintas. Filtros: polo, municipio, bairro, alimentador, circuito, indicacao,
+status, equipe (sem / com / com inconsistencia), busca (INC, rua, bairro, equipe). Na INC: colunas Status e Equipe e, em
+Detalhes, os dados operacionais do ADMS. Linha "Incidentes.xlsx": registros -> INCs -> operacionais, "fora dos lotes" por
+status e o botao das excecoes.
+
+SEM Incidentes.xlsx (nunca lido com sucesso): funcionamento da versao 2.0 (so chamadas), com aviso de que nada foi filtrado
+por status. Se ja houve uma leitura valida, ela continua em uso.
+
+ARQUIVOS DO MODULO
+despacho.html · css\despacho.css · js\despacho-config.js · js\despacho-xlsx.js (leitor XLSX, sem biblioteca) ·
+js\despacho-incidentes.js (Incidentes.xlsx e status) · js\despacho-motor.js (lotes e consolidacao) · js\despacho-app.js (tela)
+Reutiliza da Central (sem alterar): js\armazenamento.js, js\localidades-dados.js, js\localidades.js, js\modelos.js, js\nucleo.js.
+Leitor XLSX: o navegador descompacta com DecompressionStream (Edge/Chrome atuais); nenhuma biblioteca, CDN ou servico externo.
+
+TESTES
+node testes\despacho\testes-despacho.mjs [chamadas_incidentes.csv real]                 (unitarios 2.0)
+node testes\despacho\testes-incidentes.mjs [Incidentes.xlsx real] [chamadas real]       (unitarios 2.1; com os reais: so contagens)
+node testes\ponta-a-ponta\e2e-despacho.mjs [navegador]                                  (2.0 / sem Incidentes.xlsx)
+node testes\ponta-a-ponta\e2e-despacho-incidentes.mjs [navegador]                       (2.1: duas fontes no navegador)
+Dados ficticios: testes\despacho\dados-ficticios.mjs e incidentes-ficticio.mjs (XLSX montado na estrutura real: aba
+incidentes, cabecalho na linha 3 com a coluna A vazia, 48 colunas, datas como data do Excel ou como texto AM/PM).
+
+CONFERENCIA COM DADOS REAIS (16/11/2026, so contagens)
+Feita com o CONTEUDO real do Incidentes.xlsx (copiado do Excel em texto pela auditoria) + o chamadas_incidentes.csv da mesma
+coleta: 375 linhas -> 295 INCs; status Em Execucao 75, Enviado 110, Aguardando Envio 86, Aguardando Reenvio 4, Interrompido
+5, Concluido 11, Arquivado 3, Cancelado 1; 435/435 datas reconhecidas; 140 equipes; 91 INCs sem equipe. Consolidacao: 280
+operacionais (267 nas duas fontes, 28 so no Incidentes), 15 excluidas, 15 excecoes (sem registro no ADMS); 170 lotes (+26
+nao identificados); nenhuma INC excluida/excecao em lote ou na copia. Inconsistencias reais: 11 municipios diferentes entre
+as fontes, 1 envio antes da atribuicao.
+ATENCAO: o ARQUIVO BINARIO Incidentes.xlsx gravado pelo robo NAO foi testado (nenhuma copia do .xlsx estava disponivel).
+
+COMO TESTAR NA PASTA ADMS DA EMPRESA
+1. Copie Incidentes.xlsx e chamadas_incidentes.csv da pasta ADMS para uma pasta local (nao altere os originais) e rode:
+   node testes\despacho\testes-incidentes.mjs C:\copia\Incidentes.xlsx C:\copia\chamadas_incidentes.csv
+   Esperado: os testes REAL aprovados, cabecalho na linha 3, todas as datas reconhecidas, status com os 8 nomes conhecidos.
+   Erro "arquivo corrompido/incompleto/nao suportado": anote a mensagem exata (o formato gravado pelo robo difere do previsto).
+2. No Edge: Central > faixa Pasta ADMS > Selecionar pasta (a PASTA ADMS, nao o arquivo) > Despacho Otimizado.
+   Esperado: selos "Chamadas" e "Incidentes" verdes, sem faixa vermelha; linha "Incidentes.xlsx" com registros e INCs.
+3. Confira com o Excel aberto no Incidentes.xlsx: quantidade por status (indicadores) e 3 ou 4 INCs (status, equipe,
+   horarios em Detalhes). Concluido/Arquivado/Cancelado nao podem aparecer em lote algum.
+4. Atualizar durante a gravacao do robo: deve mostrar "gravando" e manter a leitura anterior.
+
+LIMITACOES
+- Formato binario real do Incidentes.xlsx nao validado (ver acima). O leitor cobre: compressao deflate ou sem compressao, textos
+  compartilhados ou embutidos, datas como data do Excel (sistemas 1900 e 1904) ou texto AM/PM, celulas vazias, rich text.
+  Nao suporta: XLSX protegido por senha, ZIP64 (arquivos > 4 GB), formato .xls antigo ou .xlsb.
+- Arquivo REMOVIDO e uma extracao nova nao sao distinguidos de uma falha da rede: a leitura anterior fica com o aviso.
+- Extracao antiga e detectada pela data de modificacao do arquivo; se o robo regravar com data nova um conteudo antigo, nao ha
+  como saber.
+- Aceite, chegada, conclusao e confirmacao do despacho: so no SIGODE.
 - Proximidade fisica: sem coordenadas; o agrupamento vai ate bairro/localidade e rua.
 
 DADOS E SEGURANCA
-Dados so em memoria. Guardados no navegador: polo escolhido (localStorage) e, so nesta aba, selecao e INCs copiadas.
-Pagina com politica de seguranca propria (sem conexao externa, sem mapa, sem geocodificacao, sem bibliotecas externas).
-O banco da Central e so LIDO (para obter a autorizacao da pasta). Modo servidor: o gateway serve despacho.html.
-
-ARQUIVOS DO MODULO
-despacho.html · css\despacho.css · js\despacho-config.js · js\despacho-motor.js · js\despacho-app.js
-Reutiliza da Central (sem alterar): js\armazenamento.js, js\localidades-dados.js, js\localidades.js, js\modelos.js, js\nucleo.js.
-Central: botao em index.html + js\link-despacho.js + 1 regra em css\estilo.css; gateway\servidor.mjs serve despacho.html.
-
-TESTES
-node testes\despacho\testes-despacho.mjs [chamadas_incidentes.csv real]   (unitarios; com o real: so consistencia)
-node testes\ponta-a-ponta\e2e-despacho.mjs [navegador]                     (Central -> Despacho no Chrome ou Edge)
-Dados ficticios em testes\despacho\dados-ficticios.mjs, nos dois formatos reais do chamadas_incidentes.csv.
+Dados so em memoria. Guardados no navegador: polo escolhido (localStorage) e, so nesta aba, selecao e INCs copiadas; no banco
+proprio do modulo, so os identificadores de arquivo selecionados aqui. Sem conexao externa, sem mapa, sem bibliotecas externas.
+O banco da Central e so LIDO (para obter a autorizacao da pasta).

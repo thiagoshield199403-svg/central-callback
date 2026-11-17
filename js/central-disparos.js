@@ -9,8 +9,8 @@
   const N = window.Nucleo, D = window.Disparos, $ = (s) => document.querySelector(s);
   const UI = () => window.CentralUI, srv = () => UI().servico, esc = (v) => UI().esc(v), toast = (m, e) => UI().toastErro(m, !!e);
   const MODOS = { individual: ["1", "Envio individual", "Abra um incidente na lista e envie pelo WhatsApp Web, como sempre."],
-    lote: ["2", "Envio em lote", "Selecione os incidentes e atenda um a um pelo WhatsApp Web. Você confirma cada callback e decide quando avançar."],
-    manual: ["3", "CALLBACK MANUAL", "Acesse a ferramenta para informar manualmente o incidente, telefone e escolher a mensagem que deseja enviar."] };
+    lote: ["2", "Envio em lote", "Selecione os incidentes e atenda um a um pelo WhatsApp Web. Você confirma cada callback e decide quando avançar."] };
+  /* O callback manual saiu destas abas: é acessado só pelo botão "Callback manual" do cabeçalho (js/callback-manual.js). */
   /* "selecao" fica só para exibir filas antigas. */
   const MODALIDADE = { selecao: "Seleção manual", lote: "Envio em lote" };
   const SITUACAO = { revisao: "Em revisão", autorizada: "Em execução", atendimento: "Em atendimento", pausada: "Pausada", concluida: "Concluída", cancelada: "Cancelada" };
@@ -29,8 +29,9 @@
   const conteudo = (h) => { $("#disparos-conteudo").innerHTML = h; };
 
   function abas() {
-    $("#disparos-abas").innerHTML = Object.entries(MODOS).map(([k, [n, t, d]]) => `<button type="button" class="modo-card${k === modo ? " ativo" : ""}" data-modo="${k}" aria-pressed="${k === modo}">
-      <span class="modo-num">${n}</span><span class="modo-txt"><b>${esc(t)}</b><span class="mini">${esc(d)}</span></span></button>`).join("");
+    // Abas compactas: a descrição de cada modo fica na dica (e para leitores de tela), não ocupa a tela.
+    $("#disparos-abas").innerHTML = Object.entries(MODOS).map(([k, [n, t, d]]) => `<button type="button" class="modo-card${k === modo ? " ativo" : ""}" data-modo="${k}" aria-pressed="${k === modo}" title="${esc(d)}">
+      <span class="modo-num">${n}</span><span class="modo-txt"><b>${esc(t)}</b><span class="so-leitor">${esc(d)}</span></span></button>`).join("");
   }
 
   /* ------------------------------------------------------------ desenho geral */
@@ -53,8 +54,8 @@
     vista = alvo;
   }
   function desenharIndividual(ativa) {
-    conteudo(`<p class="ajuda sem-margem">Clique em um incidente na lista abaixo. A mensagem é preparada conforme a ocorrência e o WhatsApp Web abre para você conferir e enviar.</p>
-      ${ativa ? `<p class="faixa-conector producao">Há um atendimento em lote ${esc((SITUACAO[ativa.situacao] || "").toLowerCase())}. <button type="button" class="link-botao" data-acao="ver-fila">Voltar ao atendimento</button></p>` : ""}`);
+    // Envio individual: a própria lista é a tela de trabalho (sem bloco de instrução repetido); só avisa se há atendimento em lote.
+    conteudo(ativa ? `<p class="faixa-conector producao">Há um atendimento em lote ${esc((SITUACAO[ativa.situacao] || "").toLowerCase())}. <button type="button" class="link-botao" data-acao="ver-fila">Voltar ao atendimento</button></p>` : "");
   }
   /* Fila preparada na versão anterior (revisão/API): só pode ser encerrada. Nada mais é enviado por ela. */
   function desenharFilaAntiga(f) {
@@ -292,7 +293,7 @@
     try { const r = await f(); UI().avisar(); atualizar(); if (msg) toast(msg); return r === undefined ? true : r; }
     catch (e) { toast(e.message, true); if (e instanceof Armazenamento.ErroConcorrencia) atualizar(); return null; }
   }
-  $("#disparos-abas").addEventListener("click", (ev) => { const b = ev.target.closest("[data-modo]"); if (!b) return; if (b.dataset.modo === "manual") { window.CentralManual.abrir(); return; } modo = b.dataset.modo; vista = ""; atualizar(); });
+  $("#disparos-abas").addEventListener("click", (ev) => { const b = ev.target.closest("[data-modo]"); if (!b || !MODOS[b.dataset.modo]) return; modo = b.dataset.modo; vista = ""; atualizar(); });
   $("#btn-historico-disparos").onclick = abrirHistorico;
   const areaC = $("#disparos-conteudo");
   areaC.addEventListener("click", async (ev) => {

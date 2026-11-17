@@ -68,7 +68,7 @@ await teste("Turno e importação funcionam pelo endereço do gateway; Central d
   await pg.cmd("DOM.setFileInputFiles", { nodeId, files: [join(raiz, "exemplos", "navegador-chamadas-ADMS2026-FICTICIO.csv")] });
   await pg.aguardar("!!document.querySelector('#btn-confirmar-import')"); await clicar("#btn-confirmar-import");
   await pg.aguardar("document.querySelectorAll('#linhas tr[data-id]').length > 0");
-  igual(await js(`[...document.querySelectorAll(".modo-card b")].map((b) => b.textContent)`), ["Envio individual", "Envio em lote", "CALLBACK MANUAL"]);
+  igual(await js(`[...document.querySelectorAll(".modo-card b")].map((b) => b.textContent)`), ["Envio individual", "Envio em lote"]); // callback manual saiu das abas (refinamento)
   verdade(await visivel("#linhas"), "modo individual é o padrão e mostra a lista");
   await foto("d1-modo-individual");
 });
@@ -81,11 +81,11 @@ await teste("Modo 1 (individual) continua igual: abre o WhatsApp Web e não pass
   igual(meta.recebidas.length, 0, "não pode chamar a API"); await clicar("#p-fechar");
 });
 let lista;
-await teste("Opção 3: abre a tela CALLBACK WHATSAPP existente; as opções 1 e 2 continuam e a seleção à parte saiu", async () => {
-  igual(await js(`[...document.querySelectorAll("#disparos-abas .modo-card b")].map((b) => b.textContent)`), ["Envio individual", "Envio em lote", "CALLBACK MANUAL"]);
-  verdade((await texto('[data-modo="manual"]')).includes("informar manualmente o incidente, telefone e escolher a mensagem"), "descrição");
+await teste("Callback manual fora das abas do WhatsApp: abre pelo cabeçalho; as opções 1 e 2 continuam e a seleção à parte saiu", async () => {
+  igual(await js(`[...document.querySelectorAll("#disparos-abas .modo-card b")].map((b) => b.textContent)`), ["Envio individual", "Envio em lote"]);
+  igual(await js("document.querySelectorAll('[data-modo=\"manual\"]').length"), 0, "sem aba órfã");
   igual(await js("document.querySelectorAll('#callback-manual').length"), 1, "uma única ferramenta");
-  await clicar('[data-modo="manual"]'); await pg.aguardar("!!document.querySelector('#cm-enviar').offsetParent"); verdade(!(await visivel("#central-disparos")), "abre direto a tela manual");
+  await clicar("#btn-manual"); await pg.aguardar("!!document.querySelector('#cm-enviar').offsetParent"); verdade(!(await visivel("#central-disparos")), "abre direto a tela manual");
   await clicar("#btn-manual"); await pg.aguardar("!!document.querySelector('#central-disparos').offsetParent"); verdade(!(await js("!!document.querySelector('#ds-linhas')")), "sem tela de seleção");
   lista = await js(`${srvJs}.incidentesParaDisparo()`);
 });
