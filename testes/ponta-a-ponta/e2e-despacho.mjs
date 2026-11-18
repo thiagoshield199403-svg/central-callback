@@ -67,13 +67,17 @@ await teste("1. Central → Despacho: mesmo ?bd=, MESMO arquivo e MESMA autoriza
   verdade((await js("location.search")).includes(bd), "mesmo banco");
   igual([await js("window.__nPasta"), await js("window.DespachoUI.estado().con.origem"), await js("window.DespachoUI.estado().arquivo.nome")], [0, "central", "chamadas_incidentes.csv"]);
 });
-await teste("Tela: cabeçalho, data da última atualização, aviso do SIGODE e conferência com a fonte", async () => {
+await teste("Tela compacta: cabeçalho, data do arquivo no selo, sem faixas de texto; conferência com a fonte nos detalhes (ⓘ)", async () => {
   igual((await texto(".titulo h1")).trim(), "DESPACHO OTIMIZADO");
-  verdade(/Arquivo de \d{2}\/\d{2}.* · lido às \d{2}:\d{2}/.test(await texto("#dados-texto")), await texto("#dados-texto"));
-  verdade((await texto(".sigode")).includes("CONFIRMAÇÃO DO DESPACHO: consultar no SIGODE."), "aviso SIGODE");
+  verdade(/^\d{2}\/\d{2},? \d{2}:\d{2}$/.test(await texto("#dados-texto")), await texto("#dados-texto"));
+  verdade(/Arquivo|gravou .* lido às \d{2}:\d{2}/.test(await js(`document.querySelector("#dados").title`)), await js(`document.querySelector("#dados").title`));
+  igual(await js(`[!!document.querySelector(".sigode"), !!document.querySelector("#status-ind"), document.querySelector("#conferencia").classList.contains("oculto")]`), [false, false, true], "sem faixa SIGODE, sem botões de status, detalhes recolhidos");
+  await clicar("#btn-detalhes"); igual(await js(`document.querySelector("#conferencia").classList.contains("oculto")`), false, "ⓘ abre os detalhes");
+  verdade((await texto("#conferencia")).includes("confirmar o despacho no SIGODE"), "SIGODE nos detalhes");
   const c = await texto("#conferencia");
   verdade(c.includes("20 linha(s)") && c.includes("19 chamada(s) válida(s)") && c.includes("16 INC(s)") && c.includes("2 chamada(s) repetida(s)") && c.includes("1 chamada(s) sem INC") && c.includes("1 CALL repetida"), c);
   igual(await kpis(), { incs: 16, lotes: 9, nao_ident: 3, fase: 2 });
+  await clicar("#btn-detalhes"); igual(await js(`document.querySelector("#conferencia").classList.contains("oculto")`), true, "ⓘ fecha os detalhes");
   await foto("desp-1-todos");
 });
 await teste("3/4/6. Polo Aracaju: só Aracaju, Barra e Socorro; lotes por município e bairro; não identificados por último", async () => {
@@ -82,7 +86,7 @@ await teste("3/4/6. Polo Aracaju: só Aracaju, Barra e Socorro; lotes por munic�
   igual(await nomesLotes(), [
     ["ARACAJU", ["BAIRRO TESTE A=3 INCs", "BAIRRO TESTE B=2 INCs", "BAIRRO TESTE C=1 INC", "CENTRO=1 INC", "POV TESTE VERDE=1 INC", "LOCALIZAÇÃO NÃO IDENTIFICADA=2 INCs"]],
     ["BARRA DOS COQUEIROS", ["CENTRO=1 INC"]], ["NOSSA SENHORA DO SOCORRO", ["BAIRRO TESTE D=1 INC"]]]);
-  verdade((await texto("#conferencia")).includes("Polo Aracaju: Aracaju, Barra dos Coqueiros, Nossa Senhora do Socorro"), "municípios do polo");
+  igual(await js(`document.querySelector('#polo option[value="aracaju"]').title`), "Aracaju, Barra dos Coqueiros, Nossa Senhora do Socorro", "municípios do polo (dica da opção)");
   igual(await js(`[...document.querySelectorAll("#polo option")].map((o) => o.textContent)`), ["Todos os polos (16)", "Polo Aracaju (12)", "Polo São Cristóvão (0)", "Polo Itabaiana (1)",
     "Polo Lagarto (2)", "Polo Glória (0)", "Polo Propriá (0)", "Polo Maruim (0)"]);
   igual(await js("document.querySelectorAll('.lote.aberto').length"), 0, "nada expandido ao abrir");
@@ -90,7 +94,7 @@ await teste("3/4/6. Polo Aracaju: só Aracaju, Barra e Socorro; lotes por munic�
 });
 await teste("7. Sem coluna no arquivo: filtros de Alimentador e Circuito desativados e explicados (nada inventado)", async () => {
   igual(await js(`[document.querySelector("#f-alimentador").disabled, document.querySelector("#f-circuito").disabled, document.querySelector("#f-alimentador").options[0].textContent]`),
-    [true, true, "Alimentador: sem dado no arquivo"]);
+    [true, true, "Alimentador: sem dado"]);
 });
 await teste("Lote expande ao clicar; só UM aberto por vez; detalhes da INC com o texto original e 'consultar no SIGODE'", async () => {
   await clicar('.lote-cab[data-abrir="001|BAIRRO TESTE A"]');
@@ -102,12 +106,12 @@ await teste("Lote expande ao clicar; só UM aberto por vez; detalhes da INC com 
   verdade(d.includes("RUA TESTE TRES_7_BAIRRO TESTE B; 1_ARACAJU") && d.includes("possível") && d.includes("consultar no SIGODE"), d);
   await foto("desp-3-lote-aberto");
 });
-await teste("10. Copiar lote: 'numos in (...)' com os números, sem duplicidade; lote marcado como copiado", async () => {
+await teste("10. Copiar lote: só os números 'n1, n2, n3', sem duplicidade; lote marcado como copiado", async () => {
   await clicar('[data-copiar="001|BAIRRO TESTE A"]'); await espera(300);
-  igual(await lerClip(), "numos in (900000013, 900000001, 900000002)");
+  igual(await lerClip(), "900000013, 900000001, 900000002");
   verdade((await texto("#toast")).startsWith("3 INC(s) copiada(s)"), await texto("#toast"));
   await clicar('[data-copiar="001|BAIRRO TESTE C"]'); await espera(300);
-  igual(await lerClip(), "numos in (900000007)", "lote com um só incidente");
+  igual(await lerClip(), "900000007", "lote com um só incidente");
   verdade((await texto('[data-lote="001|BAIRRO TESTE A"] .copiado')).startsWith("copiado"), "selo copiado");
 });
 await teste("10b. Seleção manual (INCs de lotes diferentes + lote inteiro) e cópia só das selecionadas, sem duplicar", async () => {
@@ -120,6 +124,34 @@ await teste("10b. Seleção manual (INCs de lotes diferentes + lote inteiro) e c
   await foto("desp-4-selecao");
   await clicar("#sel-limpar"); igual(await texto("#sel-n"), "0");
   igual(await js(`document.querySelector("#sel-copiar").disabled`), true, "sem seleção: botão desativado (validação mantida)");
+});
+await teste("10c. Copiar INC individual: só o número, sem mexer na seleção, no lote aberto nem na altura da linha", async () => {
+  const sel = '[data-copiar-inc="INC 900000003"]';
+  igual(await js(`document.querySelector(${JSON.stringify(sel)}).title`), "Copiar número do incidente", "tooltip");
+  igual(await js(`(() => { const b = document.querySelector(${JSON.stringify(sel)}); return b.previousSibling.textContent + "|" + b.closest("td").className + "|" + b.closest("td").nextElementSibling.className; })()`),
+    "INC 900000003|c-inc|c-end", "entre o número e o endereço");
+  const centro = await js(`(() => { const b = document.querySelector(${JSON.stringify(sel)}), td = b.closest("td"), r = document.createRange(); r.selectNodeContents(td.firstChild);
+    const t = r.getBoundingClientRect(), c = b.getBoundingClientRect(); return Math.abs((t.top + t.bottom) / 2 - (c.top + c.bottom) / 2); })()`);
+  verdade(centro <= 1.5, "alinhado ao centro do número (diferença " + centro + "px)");
+  const alturas = await js(`(() => { const tr = document.querySelector(${JSON.stringify(sel)}).closest("tr"), b = tr.querySelector("[data-copiar-inc]"); const com = tr.getBoundingClientRect().height;
+    b.style.display = "none"; const sem = tr.getBoundingClientRect().height; b.style.display = ""; return [com, sem]; })()`);
+  verdade(alturas[0] <= alturas[1] + 0.5, "a linha não ficou mais alta: " + alturas.join(" vs "));
+  const aberto = await js(`!!document.querySelector('[data-lote="001|BAIRRO TESTE B"].aberto')`);
+  await clicar(sel); await espera(200);
+  igual(await lerClip(), "900000003", "só o número da INC");
+  igual(await texto("#sel-n"), "0", "seleção não mudou");
+  igual(await js(`document.querySelector('[data-sel="INC 900000003"]').checked`), false, "checkbox não foi marcado");
+  igual(await js(`!!document.querySelector('[data-lote="001|BAIRRO TESTE B"].aberto')`), aberto, "lote continua como estava");
+  igual(await js(`document.querySelector(${JSON.stringify(sel)}).classList.contains("feito")`), true, "retorno visual (✓)");
+  await foto("desp-4b-copiar-inc");
+  await espera(1400);
+  igual(await js(`document.querySelector(${JSON.stringify(sel)}).classList.contains("feito")`), false, "retorno visual some sozinho");
+  // com a INC selecionada: copia do mesmo jeito e a seleção continua
+  await clicar('[data-sel="INC 900000006"]'); igual(await texto("#sel-n"), "1");
+  await clicar('[data-copiar-inc="INC 900000006"]'); await espera(200);
+  igual(await lerClip(), "900000006", "INC selecionada");
+  igual(await texto("#sel-n"), "1", "seleção mantida");
+  await clicar("#sel-limpar");
 });
 await teste("Filtros: município + bairro + indicação + busca funcionam em conjunto com o polo", async () => {
   await escolher("#f-municipio", "001"); await escolher("#f-bairro", "BAIRRO TESTE B");
@@ -135,7 +167,8 @@ await teste("2/7b. Atualizar: arquivo novo (com Alimentador e Circuito) é relid
   igual(await js(`document.querySelector("#f-alimentador").disabled`), false);
   await escolher("#f-alimentador", "AL-T01"); igual((await kpis()).incs, 2);
   await escolher("#f-circuito", "C-12"); igual((await kpis()).incs, 1);
-  verdade((await texto(".lote-cab .eletrica")).includes("AL-T01"), "alimentador no lote");
+  verdade(!(await texto(".lote-cab")).includes("AL-T01"), "cabeçalho do lote sem alimentador");
+  await clicar(".lote-cab[data-abrir]"); igual((await texto("tr.inc .c-alim")).trim(), "AL-T01", "alimentador na linha da INC");
   await foto("desp-5-alimentador");
   await clicar("#f-limpar");
 });

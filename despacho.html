@@ -11,31 +11,27 @@
 <body>
   <header class="topo">
     <div class="marca">COI</div>
-    <div class="titulo"><h1>DESPACHO OTIMIZADO</h1><div class="sub">Central de Callback COI · fontes: chamadas_incidentes.csv + Incidentes.xlsx</div></div>
+    <div class="titulo"><h1>DESPACHO OTIMIZADO</h1></div>
     <div class="fontes-topo">
       <div class="dados" id="dados" title="Situação do arquivo chamadas_incidentes.csv"><span class="ponto"></span><span class="rot-fonte">Chamadas</span><span id="dados-texto">Sem dados</span></div>
       <div class="dados" id="dados-inc" title="Situação do arquivo Incidentes.xlsx"><span class="ponto"></span><span class="rot-fonte">Incidentes</span><span id="dados-inc-texto">não lido</span></div>
     </div>
-    <label class="polo">Polo
-      <select id="polo" aria-label="Polo"><option value="">Todos os polos</option></select>
-    </label>
+    <select id="polo" class="polo-sel" aria-label="Polo" title="Polo"><option value="">Todos os polos</option></select>
     <button type="button" class="primario" id="btn-atualizar">Atualizar</button>
+    <button type="button" class="icone" id="btn-detalhes" aria-expanded="false" aria-controls="conferencia" title="Detalhes das fontes e exceções"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span class="badge oculto" id="det-badge"></span></button>
     <a class="botao-link" id="btn-central" href="index.html">Central</a>
   </header>
 
   <div class="pagina">
-    <div class="sigode" role="note"><strong>CONFIRMAÇÃO DO DESPACHO: consultar no SIGODE.</strong>
-      <span>Status, equipes e horários vêm do Incidentes.xlsx do ADMS; aceite, chegada e conclusão não são informados. Confira cada INC no SIGODE antes de lançar o lote.</span></div>
     <div id="fonte" class="fonte oculto"></div>
     <div id="fonte-inc" class="fonte-inc oculto" aria-live="polite"></div>
 
     <section class="kpis" aria-label="Resumo operacional">
-      <div class="kpi kpi-incs"><div class="rot">INCs identificadas</div><div class="val" data-kpi="incs">—</div><div class="det" data-kpi-det="incs"></div></div>
-      <div class="kpi"><div class="rot">Lotes</div><div class="val" data-kpi="lotes">—</div><div class="det" data-kpi-det="lotes"></div></div>
-      <div class="kpi alerta-laranja"><div class="rot">Localização não identificada</div><div class="val" data-kpi="nao_ident">—</div><div class="det">INCs sem bairro reconhecido</div></div>
-      <div class="kpi"><div class="rot">Indicação de falta de fase</div><div class="val" data-kpi="fase">—</div><div class="det" data-kpi-det="fase"></div></div>
+      <div class="kpi kpi-incs"><div class="val" data-kpi="incs">—</div><div class="txt"><div class="rot">INCs identificadas</div><div class="det" data-kpi-det="incs"></div></div></div>
+      <div class="kpi"><div class="val" data-kpi="lotes">—</div><div class="txt"><div class="rot">Lotes</div><div class="det" data-kpi-det="lotes"></div></div></div>
+      <div class="kpi alerta-laranja"><div class="val" data-kpi="nao_ident">—</div><div class="txt"><div class="rot">Localização não identificada</div><div class="det">INCs sem bairro reconhecido</div></div></div>
+      <div class="kpi"><div class="val" data-kpi="fase">—</div><div class="txt"><div class="rot">Indicação de falta de fase</div><div class="det" data-kpi-det="fase"></div></div></div>
     </section>
-    <div class="status-ind oculto" id="status-ind" role="group" aria-label="Indicadores por status do ADMS"></div>
 
     <div class="filtros" id="filtros">
       <select id="f-municipio" aria-label="Município"></select>
@@ -55,10 +51,10 @@
         <option value="com">Com equipe</option>
         <option value="inconsistente">Com inconsistência</option>
       </select>
-      <input type="search" id="f-busca" placeholder="Buscar INC, rua, bairro ou equipe" autocomplete="off" aria-label="Buscar">
-      <button type="button" class="fantasma mini" id="f-limpar">Limpar filtros</button>
+      <input type="search" id="f-busca" placeholder="Buscar INC, rua, bairro, equipe" title="Buscar por INC, rua, bairro ou equipe" autocomplete="off" aria-label="Buscar">
+      <button type="button" class="fantasma mini" id="f-limpar" title="Limpar todos os filtros">Limpar filtros</button>
     </div>
-    <div class="conferencia" id="conferencia"></div>
+    <div class="conferencia oculto" id="conferencia"></div>
 
     <main id="lotes" aria-label="Lotes por município e bairro"></main>
   </div>

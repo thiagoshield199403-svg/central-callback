@@ -157,6 +157,17 @@ teste("10. Cópia: 'numos in (n1, n2)', sem 'INC', sem quebra de linha, sem dupl
   igual(PASTA.incs[0].id.startsWith("INC "), true, "a tela continua exibindo 'INC n'");
   igual(M.textoCopia([]), "", "nenhuma INC: nada a copiar (validação da tela)");
 });
+teste("10c. Copiar lote: só os números 'n1, n2, n3' (sem 'numos in', parênteses ou 'INC'), na ordem do lote; INC individual", () => {
+  const l = M.montar(PASTA.incs, { polo: "aracaju" }).secoes[0].lotes[0];
+  igual(M.textoNumeros(l.incs.map((i) => i.id)), "900000013, 900000001, 900000002", "lote, mesma ordem");
+  igual(M.textoNumeros(["INC 900000006"]), "900000006", "um só incidente");
+  igual(M.textoNumeros(["INC 900000006", "INC 900000006", "900000007"]), "900000006, 900000007", "sem repetição");
+  const t = M.textoNumeros(PASTA.incs.map((i) => i.id));
+  verdade(/^\d+(, \d+)*$/.test(t) && !/numos|\(|\)|INC|\n|\r/.test(t), "nenhum texto além dos números: " + t);
+  igual(M.textoNumeros([]), "", "nenhuma INC: nada a copiar");
+  igual(M.numeroInc("INC 144061719"), "144061719", "número de uma INC (botão ao lado do número)");
+  igual(M.textoCopia(["INC 900000001", "INC 900000002"]), "numos in (900000001, 900000002)", "Copiar selecionadas mantém o formato");
+});
 teste("Nenhum campo de despacho/equipe é produzido (o arquivo não informa)", () => {
   const chaves = new Set(PASTA.incs.flatMap((i) => Object.keys(i)));
   for (const k of ["equipe", "equipes", "status", "situacao", "despachado"]) verdade(!chaves.has(k), "campo indevido: " + k);

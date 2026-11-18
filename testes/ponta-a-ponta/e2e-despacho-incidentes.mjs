@@ -51,9 +51,10 @@ await teste("Central conecta a pasta; Despacho lê chamadas + Incidentes.xlsx co
   await clicar('#pasta-adms [data-adms="selecionar"]'); await pg.aguardar(`document.querySelector("#pasta-adms").dataset.conexao === "directory"`, 20000);
   await clicar("#btn-despacho");
   await pg.aguardar("location.pathname.endsWith('despacho.html') && document.body.dataset.pronto === '1' && !!(window.DespachoUI.estado().dados || {}).incidentes", 20000);
-  verdade(/Arquivo de \d{2}\/\d{2}.* · lido às \d{2}:\d{2}/.test(await texto("#dados-inc-texto")), await texto("#dados-inc-texto"));
-  verdade(/Arquivo de/.test(await texto("#dados-texto")), "selo das chamadas");
-  verdade((await texto(".sigode")).includes("CONFIRMAÇÃO DO DESPACHO: consultar no SIGODE."), "faixa SIGODE mantida");
+  verdade(/^\d{2}\/\d{2},? \d{2}:\d{2}$/.test(await texto("#dados-inc-texto")), await texto("#dados-inc-texto"));
+  verdade(/^\d{2}\/\d{2},? \d{2}:\d{2}$/.test(await texto("#dados-texto")), "selo das chamadas");
+  verdade(/lido às \d{2}:\d{2}/.test(await js(`document.querySelector("#dados-inc").title`)), "leitura completa na dica do selo");
+  igual(await js(`[!!document.querySelector(".sigode"), !!document.querySelector("#status-ind")]`), [false, false], "tela compacta: sem faixa SIGODE e sem botões de status");
   igual(await js("document.querySelector('#fonte-inc').classList.contains('oculto')"), true, "sem aviso com as duas fontes ok");
 });
 await teste("Só INCs operacionais nos contadores e nos lotes; Concluído/Arquivado/Cancelado e exceções fora", async () => {
@@ -76,16 +77,18 @@ await teste("Cópia de TODOS os lotes e seleção de TODOS os lotes: nenhuma INC
   const sel = await lerClip(); for (const n of FORA) verdade(!sel.includes(n), "selecionada fora: " + n);
   await clicar("#sel-limpar");
 });
-await teste("Indicadores por status e filtros (status, sem equipe, inconsistência) em conjunto", async () => {
-  const chips = await js(`Object.fromEntries([...document.querySelectorAll("#status-ind [data-ind]")].map((e) => [e.dataset.ind, Number(e.textContent)]))`);
+await teste("Status com quantidades no filtro único (ordem operacional) e filtros (status, sem equipe, inconsistência) em conjunto", async () => {
+  const chips = await js(`Object.fromEntries([...document.querySelectorAll("#f-status option")].filter((o) => o.value).map((o) => [o.value, Number(/\\((\\d+)\\)$/.exec(o.textContent)[1])]))`);
   igual([chips.em_execucao, chips.enviado, chips.aguardando_envio, chips.aguardando_reenvio, chips.interrompido], [2, 4, 3, 1, 1], JSON.stringify(chips));
-  await clicar('#status-ind [data-valor="interrompido"]'); igual((await kpis()).incs, 1);
-  await clicar('#status-ind [data-valor="interrompido"]'); igual((await kpis()).incs, ESPERADO_INC.operacionais.length, "clicar de novo tira o filtro");
-  await escolher("#f-equipe", "sem"); igual((await kpis()).incs, chips.sem);
-  await escolher("#polo", "aracaju"); verdade((await kpis()).incs <= chips.sem, "polo + sem equipe");
+  igual(await js(`[...document.querySelectorAll("#f-status option")].filter((o) => o.value).map((o) => o.value)`), await js(`window.DespachoIncidentes.STATUS_OPERACIONAIS.map((s) => s.codigo)`), "ordem operacional");
+  const eq = await js(`Object.fromEntries([...document.querySelectorAll("#f-equipe option")].filter((o) => o.value).map((o) => [o.value, Number(o.dataset.n)]))`);
+  await escolher("#f-status", "interrompido"); igual((await kpis()).incs, 1);
+  await escolher("#f-status", ""); igual((await kpis()).incs, ESPERADO_INC.operacionais.length, "Todos os status tira o filtro");
+  await escolher("#f-equipe", "sem"); igual((await kpis()).incs, eq.sem, "quantidade da opção Sem equipe");
+  await escolher("#polo", "aracaju"); verdade((await kpis()).incs <= eq.sem, "polo + sem equipe");
   await clicar("#f-limpar"); await escolher("#polo", "");
   await escolher("#f-status", "enviado"); igual((await kpis()).incs, 4); await clicar("#f-limpar");
-  await escolher("#f-equipe", "inconsistente"); verdade((await kpis()).incs >= 2, "INC 013 e 030"); await clicar("#f-limpar");
+  await escolher("#f-equipe", "inconsistente"); verdade((await kpis()).incs >= 2, "INC 013 e 030"); igual((await kpis()).incs, eq.inconsistente, "quantidade da opção"); await clicar("#f-limpar");
   igual(await js(`document.querySelector("#f-alimentador").disabled`), false, "alimentador vem do Incidentes.xlsx");
 });
 await teste("Detalhes da INC: status, equipes, horários, observação multilinha e 'confirmar no SIGODE' (nada inventado)", async () => {
@@ -141,6 +144,8 @@ await teste("Aviso de fonte desatualizada (> 15 min) e de fontes distantes", asy
   await js(`(() => { const r = Date.now; window.__dnow = r; Date.now = () => r() + 20 * 60000; window.DespachoUI.render(); return true; })()`);
   verdade(/sem atualização há (2\d|19) min/.test(await texto("[data-atualidade]")), await texto("#fonte-inc"));
   igual(await js(`document.querySelector("#dados-inc").classList.contains("velho")`), true);
+  verdade(/há (2\d|19) min/.test(await texto("#dados-inc-texto")), "idade no selo: " + await texto("#dados-inc-texto"));
+  igual(await js(`[document.querySelector("#btn-detalhes").classList.contains("alerta"), document.querySelector("#det-badge").textContent]`), [true, "!"], "ⓘ em laranja com aviso");
   await js(`(Date.now = window.__dnow, window.DespachoUI.render(), true)`);
 });
 await teste("Layout 1366 e 1920 sem rolagem horizontal; nada sai do computador; sem erros de JavaScript", async () => {

@@ -33,7 +33,7 @@
     con: null, conInc: null, estado: "verificando", aviso: "", arquivo: null, lidoEm: null, verificadoEm: null, dados: null, lendo: false,
     fontes: { chamadas: novaFonte(), incidentes: novaFonte() },
     f: { polo: ler(localStorage, K_POLO, ""), municipio: "", bairro: "", alimentador: "", circuito: "", prioridade: "", status: "", equipe: "", busca: "" },
-    aberto: null, detalhe: null, verSemInc: false, verExcecoes: false,
+    aberto: null, detalhe: null, verSemInc: false, verExcecoes: false, verDetalhes: false,
     sel: new Set(ler(sessionStorage, K_SEL, [])), copiados: new Map(ler(sessionStorage, K_COP, [])),
   };
 
@@ -194,16 +194,19 @@
   }
 
   /* ------------------------------------------------------------ cópia (só INCs operacionais) */
-  async function copiar(ids, oque) {
+  async function paraAreaTransf(texto) {
+    try { await navigator.clipboard.writeText(texto); return true; }
+    catch (e) {
+      try { const t = document.createElement("textarea"); t.value = texto; t.setAttribute("readonly", ""); t.style.position = "fixed"; t.style.opacity = "0"; document.body.appendChild(t); t.select(); const ok = document.execCommand("copy"); t.remove(); return ok; } catch (x) { return false; }
+    }
+  }
+  /* formato: M.textoCopia ("numos in (...)", Copiar selecionadas) ou M.textoNumeros ("n1, n2", Copiar lote). */
+  async function copiar(ids, oque, formato = M.textoCopia) {
     const validos = new Set(S.dados ? S.dados.incs.map((i) => i.id) : []);
     ids = ids.filter((id) => validos.has(id)); // garantia: INC excluída/exceção nunca vai para o SIGODE
-    const texto = M.textoCopia(ids);
+    const texto = formato(ids);
     if (!texto) { toast("Nenhuma INC para copiar.", true); return false; }
-    let ok = false;
-    try { await navigator.clipboard.writeText(texto); ok = true; }
-    catch (e) {
-      try { const t = document.createElement("textarea"); t.value = texto; t.setAttribute("readonly", ""); t.style.position = "fixed"; t.style.opacity = "0"; document.body.appendChild(t); t.select(); ok = document.execCommand("copy"); t.remove(); } catch (x) { ok = false; }
-    }
+    const ok = await paraAreaTransf(texto);
     if (!ok) { toast("O navegador não permitiu copiar. Tente de novo.", true); return false; }
     const n = texto.split(CFG.copia.separador).length, agora = Date.now();
     for (const id of ids) S.copiados.set(id, agora);
@@ -237,21 +240,29 @@
     const e = i.adms.equipes;
     return `<span class="equipe" title="${esc(e.join(", "))}">${esc(e[0])}${e.length > 1 ? ` <span class="fraco">+${e.length - 1}</span>` : ""}</span>`;
   }
-  function eletrica(itens) {
-    const p = [];
-    if (itens.alimentadores.length) p.push("Alim. " + itens.alimentadores.join(", "));
-    if (itens.circuitos.length) p.push("Circ. " + itens.circuitos.join(", "));
-    if (itens.subestacoes && itens.subestacoes.length) p.push("SE " + itens.subestacoes.join(", "));
-    return p.length ? `<span class="eletrica">${esc(p.join(" · "))}</span>` : "";
+  /* Alimentador DA INC: o do registro dela no Incidentes.xlsx (todas as linhas; valores diferentes = todos, sem escolher) e o
+     das chamadas dela, se o CSV tiver a coluna. Sem dado = traço. Nunca o do lote ou do bairro. */
+  function alimentadoresDa(i) { return [...new Set([...(i.adms ? i.adms.alimentadores : []), ...i.alimentadores].filter(Boolean))]; }
+  function celAlim(i) {
+    const a = alimentadoresDa(i);
+    if (!a.length) return `<span class="fraco" title="Alimentador não informado">—</span>`;
+    const normal = i.adms && i.adms.alimentadorNormal && !a.includes(i.adms.alimentadorNormal) ? ` · normal ${i.adms.alimentadorNormal}` : "";
+    const dica = (a.length > 1 ? "Mais de um alimentador no registro desta INC: " : "Alimentador: ") + a.join(", ") + normal + (i.adms && i.adms.subestacao ? ` · SE ${i.adms.subestacao}` : "");
+    return `<span class="alim${a.length > 1 ? " varios" : ""}" title="${esc(dica)}">${a.map((x) => `<span>${esc(x)}</span>`).join("")}</span>`;
   }
   const hora = (h) => (h && h.iso ? isoCurto(h.iso) : h && h.original ? `${h.original} (formato não reconhecido)` : "não informado");
+  /* Ícones Lucide "copy" e "check" (inline, sem dependência externa). */
+  const svg = (d) => `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const ICO_COPIAR = svg('<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>');
+  const ICO_OK = svg('<path d="M20 6 9 17l-5-5"/>');
   function linhaInc(i, lote) {
     const end = [i.logradouro, i.numeroEnd, i.complemento].filter(Boolean).join(", ") || (i.localizacoes[0] || (i.localizacaoIncompleta ? "localização incompleta (só município)" : "sem endereço"));
     const aberto = S.detalhe === i.id, adms = comAdms();
     let h = `<tr class="inc${S.sel.has(i.id) ? " sel" : ""}" data-inc="${esc(i.id)}">
       <td class="c-sel"><input type="checkbox" data-sel="${esc(i.id)}"${S.sel.has(i.id) ? " checked" : ""} aria-label="Selecionar ${esc(i.id)}"></td>
-      <td class="c-inc">${esc(i.id)}${S.copiados.has(i.id) ? `<span class="ok" title="Copiada às ${hhmm(S.copiados.get(i.id))}">✓</span>` : ""}</td>
+      <td class="c-inc">${esc(i.id)}<button type="button" class="copiar-inc" data-copiar-inc="${esc(i.id)}" title="Copiar número do incidente" aria-label="Copiar número do incidente ${esc(M.numeroInc(i.id))}">${ICO_COPIAR}</button>${S.copiados.has(i.id) ? `<span class="ok" title="Copiada às ${hhmm(S.copiados.get(i.id))}">✓</span>` : ""}</td>
       <td class="c-end" title="${esc(i.localizacoes.join(" | "))}">${esc(end)}${lote.tipo === "nao_identificado" ? ` <span class="fraco">· ${esc(i.bairroMotivo)}</span>` : ""}</td>
+      <td class="c-alim">${celAlim(i)}</td>
       ${adms ? `<td class="c-status">${tagStatus(i)}</td><td class="c-equipe">${celEquipe(i)}</td>` : ""}
       <td class="c-hora">${esc(isoCurto(i.primeira))}</td>
       <td class="c-tags">${tagsInc(i)}</td>
@@ -279,7 +290,7 @@
       d.push(["Chamadas", i.calls.length ? i.calls.map((c) => `${esc(c.call_id)} · ${esc(isoCurto(c.horario))} · ${esc(c.motivo || "—")}`).join("<br>") : "nenhuma chamada no chamadas_incidentes.csv"]);
       d.push(["Despacho", adms ? "<strong>confirmar no SIGODE</strong> (o Incidentes.xlsx informa status, equipe e horários do ADMS; aceite, chegada e conclusão não são informados)"
         : "<strong>consultar no SIGODE</strong> (o arquivo de chamadas não informa equipe nem despacho)"]);
-      h += `<tr class="detalhe"><td></td><td colspan="${adms ? 7 : 5}"><dl>${d.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}</dl></td></tr>`;
+      h += `<tr class="detalhe"><td></td><td colspan="${adms ? 8 : 6}"><dl>${d.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}</dl></td></tr>`;
     }
     return h;
   }
@@ -293,24 +304,25 @@
     if (l.nInterrompido) tags.push(tag("interrompido", `${l.nInterrompido} interrompido`));
     if (l.nSemEquipe) tags.push(tag("sem-equipe", `${l.nSemEquipe} sem equipe`));
     if (l.nInconsistente) tags.push(tag("inconsistente", `${l.nInconsistente} inconsistência`));
+    // alimentadores NÃO vão no cabeçalho: cada INC mostra o seu na coluna Alimentador (um bairro pode ter vários)
     return `<div class="lote${aberto ? " aberto" : ""}${l.tipo === "nao_identificado" ? " nao-ident" : ""}" data-lote="${esc(l.chave)}">
       <div class="lote-cab" data-abrir="${esc(l.chave)}" tabindex="0" role="button" aria-expanded="${aberto}">
         <input type="checkbox" data-sel-lote="${esc(l.chave)}" aria-label="Selecionar o lote"${nSel === ids.length ? " checked" : ""}${nSel && nSel < ids.length ? ' data-parcial="1"' : ""}>
         <span class="seta" aria-hidden="true"></span>
-        <span class="nome"><span class="mun">${esc(l.municipio)}</span><span class="bairro">${esc(l.bairro)}</span>${l.tipo === "localidade" ? '<span class="fraco"> · localidade</span>' : ""}</span>
+        <span class="nome"><span class="mun">${esc(l.municipio)}</span><span class="bairro"${l.tipo === "nao_identificado" ? ' title="Bairro não reconhecido no endereço do ADMS (ou INC sem chamada): o texto original está em Detalhes. Confira a localização antes de juntar com outro lote."' : ""}>${esc(l.bairro)}</span>${l.tipo === "localidade" ? '<span class="fraco"> · localidade</span>' : ""}</span>
         <span class="qtd">${l.n} INC${l.n > 1 ? "s" : ""}</span>
-        ${tags.join("")}${eletrica(l)}
+        ${tags.join("")}
         <span class="esp"></span>
         ${todosCop ? `<span class="copiado">copiado ${hhmm(ult)}</span>` : ""}
         <button type="button" class="copiar" data-copiar="${esc(l.chave)}">Copiar lote</button>
       </div>
-      ${aberto ? `<div class="lote-corpo">${l.tipo === "nao_identificado" ? `<p class="nota">Bairro não reconhecido no endereço do ADMS (ou INC sem chamada): o texto original está em Detalhes. Confira a localização antes de juntar com outro lote.</p>` : ""}
-        <table><thead><tr><th></th><th>INC</th><th>Endereço (ADMS)</th>${adms ? "<th>Status</th><th>Equipe</th>" : ""}<th>1ª chamada</th><th>Indicações</th><th></th></tr></thead><tbody>${l.incs.map((i) => linhaInc(i, l)).join("")}</tbody></table></div>` : ""}
+      ${aberto ? `<div class="lote-corpo">
+        <table><thead><tr><th></th><th>INC</th><th>Endereço (ADMS)</th><th class="c-alim">Alimentador</th>${adms ? "<th>Status</th><th>Equipe</th>" : ""}<th class="c-hora">1ª chamada</th><th>Indicações</th><th class="c-mais">Ações</th></tr></thead><tbody>${l.incs.map((i) => linhaInc(i, l)).join("")}</tbody></table></div>` : ""}
     </div>`;
   }
   function preencherSelect(el, todos, ops, valor, indisponivel, dica) {
-    const tem = ops.some((o) => o.valor === valor);
-    el.innerHTML = `<option value="">${esc(indisponivel || todos)}</option>` + ops.map((o) => `<option value="${esc(o.valor)}"${o.valor === valor ? " selected" : ""}>${esc(o.rotulo)} (${o.n})</option>`).join("");
+    const tem = ops.some((o) => o.valor === valor && o.n); // opção com 0 INC (status listado desabilitado) não mantém o filtro: mesma regra de antes
+    el.innerHTML = `<option value="">${esc(indisponivel || todos)}</option>` + ops.map((o) => `<option value="${esc(o.valor)}"${o.valor === valor ? " selected" : ""}${o.n ? "" : " disabled"}>${esc(o.rotulo)} (${o.n})</option>`).join("");
     el.disabled = !!indisponivel; el.title = indisponivel ? dica || "Coluna ausente no chamadas_incidentes.csv: não há como filtrar sem inventar o dado" : "";
     return tem ? valor : "";
   }
@@ -332,7 +344,7 @@
   }
   /* Faixa da 2ª fonte (Incidentes.xlsx) + avisos de atualidade das duas fontes. Separada da faixa das chamadas. */
   function renderFonteInc() {
-    const el = $("#fonte-inc"), F = S.fontes.incidentes, tem = !!F.leitura, manter = tem ? " A última leitura válida do Incidentes.xlsx continua em uso." : " Sem ele: lotes como na versão 2.0, sem status nem equipe — nada foi filtrado por status.";
+    const el = $("#fonte-inc"), F = S.fontes.incidentes, tem = !!F.leitura, manter = tem ? " Mantida a última leitura válida." : " Sem ele: lotes sem status nem equipe.";
     const linhas = [];
     if (S.estado !== "manual" && S.con && S.estado !== "permissao") {
       const m = {
@@ -345,11 +357,6 @@
       }[F.estado];
       if (m) linhas.push(`<div class="fonte s-${F.estado === "erro" || F.estado === "recusado" ? "erro" : "aviso"}" data-fonte-inc="${F.estado}"><span>${esc(m[0])}</span><span class="botoes">${m[1]}</span></div>`);
     } else if (S.estado === "manual" && !tem) linhas.push(`<div class="fonte s-aviso" data-fonte-inc="manual"><span>${esc(`Sem ${NOME_INC}: lotes sem status nem equipe. Abra também o ${NOME_INC} avulso, se tiver.`)}</span><span class="botoes">${b("manual", `Abrir ${NOME_INC} avulso`)}</span></div>`);
-    const nomes = { chamadas: "chamadas_incidentes.csv", incidentes: NOME_INC };
-    const avisos = M.avisosAtualidade({ chamadas: S.fontes.chamadas.leitura, incidentes: F.leitura }, Date.now());
-    if (avisos.length) linhas.push(`<div class="atualidade" data-atualidade>${avisos.map((a) => a.tipo === "desatualizada"
-      ? `<span>${esc(nomes[a.fonte])} sem atualização há ${a.minutos} min (o ADMS regrava a cada ~5-7 min): dados podem estar desatualizados.</span>`
-      : `<span>As fontes estão distantes: ${esc(nomes[a.fonte])} foi gravado ${a.minutos} min antes da outra. Status e endereço podem não corresponder ao mesmo momento.</span>`).join("")}</div>`);
     el.innerHTML = linhas.join("");
     el.classList.toggle("oculto", !linhas.length);
   }
@@ -359,28 +366,19 @@
     el.className = "dados " + (S.lendo ? "lendo" : estadoOk === "ok" ? (idade >= CFG.atualidade.desatualizadaMin ? "velho" : "ok") : "falha");
     el.title = `${rotulo}: o ADMS gravou ${L.arquivo.nome} em ${dataHora(L.arquivo.lastModified)}; lido às ${hhmm(L.lidoEm)}` + (idade >= CFG.atualidade.desatualizadaMin ? `. ATENÇÃO: sem atualização há ${Math.floor(idade)} min.` : "");
   }
+  /* Selo compacto: data/hora em que o ADMS gravou o arquivo (+ idade, se desatualizado). Leitura completa no title. */
+  const idadeMin = (L) => (L.arquivo.lastModified ? Math.floor((Date.now() - L.arquivo.lastModified) / 60000) : 0);
+  const textoSelo = (L) => dataHora(L.arquivo.lastModified) + (idadeMin(L) >= CFG.atualidade.desatualizadaMin ? ` · há ${idadeMin(L)} min` : "");
   function renderDados() {
     const el = $("#dados"), t = $("#dados-texto"), c = S.fontes.chamadas.leitura;
     if (!S.dados || !c) { el.className = "dados " + (S.lendo ? "lendo" : "vazio"); t.textContent = S.lendo ? "Lendo…" : "Sem dados"; }
     else {
       selo(el, t, c, S.estado === "ok" || S.estado === "manual" ? "ok" : "falha", "Chamadas");
-      t.textContent = `Arquivo de ${dataHora(c.arquivo.lastModified)} · lido às ${hhmm(c.lidoEm)}${S.estado === "manual" ? " (avulso)" : ""}`;
+      t.textContent = textoSelo(c) + (S.estado === "manual" ? " (avulso)" : "");
     }
     const ei = $("#dados-inc"), ti = $("#dados-inc-texto"), F = S.fontes.incidentes, i = F.leitura;
     if (!i) { ei.className = "dados " + (S.lendo ? "lendo" : "falha"); ti.textContent = S.lendo ? "Lendo…" : "não lido"; ei.title = `${NOME_INC}: nenhuma leitura válida ainda`; }
-    else { selo(ei, ti, i, F.estado === "ok" ? "ok" : "falha", NOME_INC); ti.textContent = `Arquivo de ${dataHora(i.arquivo.lastModified)} · lido às ${hhmm(i.lidoEm)}`; }
-  }
-  /* Indicadores por status (2.1): clique filtra. Contados com os demais filtros, sem o de status/equipe. */
-  function renderStatus(d) {
-    const el = $("#status-ind");
-    if (!d || !d.incidentes) { el.innerHTML = ""; el.classList.add("oculto"); return; }
-    const k = M.montar(d.incs, { ...S.f, status: "", equipe: "" }).indicadores;
-    const chip = (attr, v, rot, n, cls = "") => `<button type="button" class="chip-st ${cls}${S.f[attr] === v ? " ativo" : ""}" data-filtro="${attr}" data-valor="${esc(v)}" aria-pressed="${S.f[attr] === v}"><b data-ind="${esc(v)}">${n}</b> ${esc(rot)}</button>`;
-    el.innerHTML = DI.STATUS_OPERACIONAIS.map((s) => chip("status", s.codigo, s.rotulo, k.porStatus[s.codigo] || 0, s.destaque ? "interrompido" : "")).join("")
-      + `<span class="sep"></span>` + chip("equipe", "sem", "sem equipe", k.semEquipe, k.semEquipe ? "sem-equipe" : "")
-      + chip("equipe", "inconsistente", "com inconsistência", k.inconsistencias, k.inconsistencias ? "inconsistente" : "")
-      + `<span class="fraco eq">${k.equipes} equipe(s) distinta(s) associada(s)</span>`;
-    el.classList.remove("oculto");
+    else { selo(ei, ti, i, F.estado === "ok" ? "ok" : "falha", NOME_INC); ti.textContent = textoSelo(i); }
   }
   function htmlExcecoes(d) {
     const c = d.consol, linha = (i) => `<tr><td class="c-inc">${esc(i.id)}</td><td>${esc(i.situacao.rotulo)}${i.situacao.original && i.situacao.original !== i.situacao.rotulo ? ` <span class="fraco">("${esc(i.situacao.original)}")</span>` : ""}</td>
@@ -390,25 +388,71 @@
       ${c.excecoes.length ? `<table><thead><tr><th>INC</th><th>Status</th><th>Motivo</th><th>Município</th><th>Origem</th></tr></thead><tbody>${c.excecoes.map(linha).join("")}</tbody></table>` : '<p class="fraco">Nenhuma exceção.</p>'}
       ${desc.length ? `<p class="fraco">${desc.length} linha(s) do ${NOME_INC} descartada(s): ${desc.map((x) => `linha ${x.linha} — ${esc(x.motivo)}`).join("; ")}</p>` : ""}</div>`;
   }
+  /* Filtro de equipe: as mesmas 4 opções (mesma regra do motor), com a quantidade de INCs de cada uma nos filtros atuais. */
+  function renderEquipe(d, adms) {
+    const el = $("#f-equipe");
+    if (!adms) S.f.equipe = "";
+    const k = adms ? M.montar(d.incs, { ...S.f, equipe: "" }).indicadores : null;
+    el.innerHTML = [["", "Com e sem equipe"], ["sem", "Sem equipe"], ["com", "Com equipe"], ["inconsistente", "Com inconsistência"]].map(([v, r]) => {
+      const q = v && adms ? M.montar(d.incs, { ...S.f, equipe: v }).indicadores.incs : null;
+      return `<option value="${v}"${v === S.f.equipe ? " selected" : ""}${q !== null ? ` data-n="${q}"` : ""}>${r}${q !== null ? ` (${q})` : ""}</option>`;
+    }).join("");
+    el.disabled = !adms; el.value = S.f.equipe;
+    el.dataset.equipes = k ? String(k.equipes) : "";
+    el.title = k ? `${k.equipes} equipe(s) distinta(s) associada(s)` : `Equipe vem do ${NOME_INC} (não lido)`;
+  }
+  /* Detalhes recolhidos (botão ⓘ do cabeçalho): números das fontes, avisos de atualidade, chamadas sem INC e exceções.
+     O selo do botão mostra a quantidade de exceções e fica laranja ("!") se houver aviso de atualidade. */
+  function renderDetalhes() {
+    const el = $("#conferencia"), bt = $("#btn-detalhes"), badge = $("#det-badge"), d = S.dados;
+    const nomes = { chamadas: "chamadas_incidentes.csv", incidentes: NOME_INC };
+    const avisos = M.avisosAtualidade({ chamadas: S.fontes.chamadas.leitura, incidentes: S.fontes.incidentes.leitura }, Date.now());
+    const htmlAvisos = avisos.length ? `<div class="atualidade" data-atualidade>${avisos.map((a) => a.tipo === "desatualizada"
+      ? `<span>${esc(nomes[a.fonte])} sem atualização há ${a.minutos} min (o ADMS regrava a cada ~5-7 min): dados podem estar desatualizados.</span>`
+      : `<span>As fontes estão distantes: ${esc(nomes[a.fonte])} foi gravado ${a.minutos} min antes da outra. Status e endereço podem não corresponder ao mesmo momento.</span>`).join("")}</div>` : "";
+    const adms = !!(d && d.incidentes), nExc = adms ? d.consol.resumo.excecoes : 0;
+    badge.textContent = avisos.length ? "!" : nExc ? String(nExc) : "";
+    badge.classList.toggle("oculto", !avisos.length && !nExc);
+    bt.classList.toggle("alerta", !!avisos.length);
+    bt.title = ["Detalhes das fontes e exceções", nExc ? `${nExc} exceção(ões)` : "",
+      ...avisos.map((a) => (a.tipo === "desatualizada" ? `${nomes[a.fonte]} sem atualização há ${a.minutos} min` : "fontes distantes no tempo"))].filter(Boolean).join(" · ");
+    const aberto = S.verDetalhes || S.verExcecoes || S.verSemInc;
+    el.classList.toggle("oculto", !aberto); bt.setAttribute("aria-expanded", String(aberto));
+    if (!d) { el.innerHTML = htmlAvisos; return; }
+    const R = d.resumo, C = d.consol.resumo;
+    const fora = adms ? Object.entries(C.excluidasPorStatus).map(([s, n]) => `${n} ${s}`).join(", ") : "";
+    el.innerHTML = htmlAvisos + `<span><strong>Chamadas:</strong> ${R.linhas_lidas} linha(s) · ${R.chamadas_validas} chamada(s) válida(s) → <strong>${R.incs} INC(s)</strong>`
+      + ` (${R.consolidadas} chamada(s) repetida(s) do mesmo INC consolidada(s))${R.chamadas_sem_inc ? ` · <button type="button" class="link" data-sem-inc>${R.chamadas_sem_inc} chamada(s) sem INC</button>` : ""}`
+      + `${R.linhas_com_erro ? ` · ${R.linhas_com_erro} linha(s) com erro descartada(s)` : ""}${R.calls_repetidas ? ` · ${R.calls_repetidas} CALL repetida(s) contada(s) uma vez` : ""}`
+      + `${R.periodo ? ` · de ${isoCurto(R.periodo[0])} a ${isoCurto(R.periodo[1])}` : ""}</span>`
+      + (adms ? `<span class="conf-inc" data-conf-inc><strong>${NOME_INC}:</strong> ${d.incidentes.resumo.registros} linha(s) → ${d.incidentes.resumo.incs} INC(s) · operacionais ${C.incs}`
+        + ` (${C.ambas} nas duas fontes, ${C.soIncidentes} só no Incidentes)${fora ? ` · <strong>fora dos lotes:</strong> ${esc(fora)}` : ""}`
+        + ` · <button type="button" class="link" data-excecoes>${C.excecoes} exceção(ões)</button></span>` : "")
+      + `<span class="fraco">Aceite, chegada e conclusão não vêm nos arquivos do ADMS: confirmar o despacho no SIGODE.</span>`
+      + (S.verSemInc ? `<div class="sem-inc"><strong>Chamadas sem número de INC</strong> (não entram em lotes: não há INC para lançar):<br>${d.semInc.map((c) => `${esc(c.call_id)} · ${esc(isoCurto(c.horario))} · ${esc(c.motivo || "—")} · ${esc(c.localizacao || "Localização vazia")}`).join("<br>")}</div>` : "")
+      + (adms && S.verExcecoes ? htmlExcecoes(d) : "");
+  }
   function render() {
     renderFonte(); renderFonteInc(); renderDados();
     $("#btn-atualizar").disabled = S.lendo;
     const d = S.dados, main = $("#lotes");
     const pol = $("#polo"), polos = d ? M.contarPolos(d.incs) : M.POLOS.map((p) => ({ ...p, n: null }));
     pol.innerHTML = `<option value="">Todos os polos${d ? ` (${d.incs.length})` : ""}</option>` + polos.map((p) => `<option value="${p.id}"${p.id === S.f.polo ? " selected" : ""} title="${esc(p.municipios.join(", "))}">${esc(p.nome)}${p.n !== null ? ` (${p.n})` : ""}</option>`).join("");
-    renderStatus(d);
     if (!d) {
       main.innerHTML = `<div class="vazio">${S.lendo ? "Lendo o arquivo…" : "Nenhum dado carregado."}</div>`;
-      $("#conferencia").innerHTML = ""; document.querySelectorAll("[data-kpi]").forEach((e) => (e.textContent = "—")); renderBandeja(); return;
+      renderDetalhes(); document.querySelectorAll("[data-kpi]").forEach((e) => (e.textContent = "—")); renderBandeja(); return;
     }
     // filtros (em conjunto): opções calculadas com os demais filtros aplicados
     const op = M.opcoes(d.incs, S.f), adms = !!d.incidentes, temAlim = d.incs.some((i) => i.alimentadores.length);
     S.f.municipio = preencherSelect($("#f-municipio"), "Todos os municípios", op.municipio, S.f.municipio);
     S.f.bairro = preencherSelect($("#f-bairro"), "Todos os bairros", op.bairro, S.f.bairro);
-    S.f.alimentador = preencherSelect($("#f-alimentador"), "Todos os alimentadores", op.alimentador, S.f.alimentador, temAlim ? "" : "Alimentador: sem dado no arquivo");
-    S.f.circuito = preencherSelect($("#f-circuito"), "Todos os circuitos", op.circuito, S.f.circuito, d.colunas.circuito ? "" : "Circuito: sem dado no arquivo");
-    S.f.status = preencherSelect($("#f-status"), "Todos os status", op.status, S.f.status, adms ? "" : "Status: sem Incidentes.xlsx", `Status vem do ${NOME_INC} (não lido)`);
-    $("#f-equipe").disabled = !adms; if (!adms) S.f.equipe = ""; $("#f-equipe").value = S.f.equipe;
+    S.f.alimentador = preencherSelect($("#f-alimentador"), "Todos os alimentadores", op.alimentador, S.f.alimentador, temAlim ? "" : "Alimentador: sem dado");
+    S.f.circuito = preencherSelect($("#f-circuito"), "Todos os circuitos", op.circuito, S.f.circuito, d.colunas.circuito ? "" : "Circuito: sem dado");
+    // status: único controle, na ordem operacional, com a quantidade de cada (status sem INC nos filtros atuais: desabilitado)
+    const codSt = DI.STATUS_OPERACIONAIS.map((x) => x.codigo);
+    const opSt = [...DI.STATUS_OPERACIONAIS.map((x) => op.status.find((o) => o.valor === x.codigo) || { valor: x.codigo, rotulo: x.rotulo, n: 0 }), ...op.status.filter((o) => !codSt.includes(o.valor))];
+    S.f.status = preencherSelect($("#f-status"), "Todos os status", opSt, S.f.status, adms ? "" : "Status: sem Incidentes.xlsx", `Status vem do ${NOME_INC} (não lido)`);
+    renderEquipe(d, adms);
     $("#f-prioridade").value = S.f.prioridade;
     const r = M.montar(d.incs, S.f), k = r.indicadores;
     const kp = (n, v) => { const e = document.querySelector(`[data-kpi="${n}"]`); e.textContent = v; e.dataset.atual = v; };
@@ -418,23 +462,10 @@
     document.querySelector('[data-kpi-det="fase"]').textContent = `${k.faseConfirmada} confirmada(s) · ${k.fasePossivel} possível(is)`;
     document.querySelector('[data-kpi="nao_ident"]').closest(".kpi").classList.toggle("zero", !k.naoIdentificados);
     $(".kpi-incs .rot").textContent = adms ? "INCs operacionais" : "INCs identificadas";
-    // conferência com as fontes
-    const R = d.resumo, polo = M.POLOS.find((p) => p.id === S.f.polo), C = d.consol.resumo;
-    const fora = adms ? Object.entries(C.excluidasPorStatus).map(([s, n]) => `${n} ${s}`).join(", ") : "";
-    $("#conferencia").innerHTML = `<span><strong>Fonte:</strong> ${R.linhas_lidas} linha(s) · ${R.chamadas_validas} chamada(s) válida(s) → <strong>${R.incs} INC(s)</strong>`
-      + ` (${R.consolidadas} chamada(s) repetida(s) do mesmo INC consolidada(s))${R.chamadas_sem_inc ? ` · <button type="button" class="link" data-sem-inc>${R.chamadas_sem_inc} chamada(s) sem INC</button>` : ""}`
-      + `${R.linhas_com_erro ? ` · ${R.linhas_com_erro} linha(s) com erro descartada(s)` : ""}${R.calls_repetidas ? ` · ${R.calls_repetidas} CALL repetida(s) contada(s) uma vez` : ""}</span>`
-      + `<span>${polo ? `<strong>${esc(polo.nome)}:</strong> ${esc(polo.municipios.join(", "))} · ` : ""}Exibindo ${k.incs} INC(s)`
-      + `${R.periodo ? ` · chamadas de ${isoCurto(R.periodo[0])} a ${isoCurto(R.periodo[1])}` : ""}</span>`
-      + (adms ? `<span class="conf-inc" data-conf-inc><strong>${NOME_INC}:</strong> ${d.incidentes.resumo.registros} linha(s) → ${d.incidentes.resumo.incs} INC(s) · operacionais ${C.incs}`
-        + ` (${C.ambas} nas duas fontes, ${C.soIncidentes} só no Incidentes)${fora ? ` · <strong>fora dos lotes:</strong> ${esc(fora)}` : ""}`
-        + ` · <button type="button" class="link" data-excecoes>${C.excecoes} exceção(ões)</button></span>` : "")
-      + (S.verSemInc ? `<div class="sem-inc"><strong>Chamadas sem número de INC</strong> (não entram em lotes: não há INC para lançar):<br>${d.semInc.map((c) => `${esc(c.call_id)} · ${esc(isoCurto(c.horario))} · ${esc(c.motivo || "—")} · ${esc(c.localizacao || "Localização vazia")}`).join("<br>")}</div>` : "")
-      + (adms && S.verExcecoes ? htmlExcecoes(d) : "");
+    renderDetalhes();
     // lotes por município
     main.innerHTML = r.secoes.length ? r.secoes.map((s) => `<section class="secao${s.especial ? " especial" : ""}">
-        <h2><span>${esc(s.nome)}</span><span class="info">${s.n} INC(s) · ${s.lotes.length} lote(s)${s.nNaoIdent ? ` · ${s.nNaoIdent} sem bairro` : ""}${s.nFase ? ` · ${s.nFase} falta de fase` : ""}${s.nRisco ? ` · ${s.nRisco} com risco` : ""}</span></h2>
-        ${s.especial ? `<p class="nota">Município não reconhecido ou divergente na Localização: confira o endereço antes de despachar.</p>` : ""}
+        <h2><span${s.especial ? ' title="Município não reconhecido ou divergente na Localização: confira o endereço antes de despachar."' : ""}>${esc(s.nome)}</span><span class="info">${s.n} INC(s) · ${s.lotes.length} lote(s)${s.nNaoIdent ? ` · ${s.nNaoIdent} sem bairro` : ""}${s.nFase ? ` · ${s.nFase} falta de fase` : ""}${s.nRisco ? ` · ${s.nRisco} com risco` : ""}</span></h2>
         ${s.lotes.map(htmlLote).join("")}</section>`).join("")
       : `<div class="vazio">Nenhuma INC com os filtros atuais.</div>`;
     main.querySelectorAll("[data-parcial]").forEach((x) => (x.indeterminate = true));
@@ -453,22 +484,31 @@
   /* ------------------------------------------------------------ eventos */
   const loteDe = (chave) => { const r = M.montar(S.dados.incs, S.f); for (const s of r.secoes) for (const l of s.lotes) if (l.chave === chave) return l; return null; };
   const salvarSel = () => gravar(sessionStorage, K_SEL, [...S.sel]);
+  /* Botão ao lado do número: copia SÓ o número daquela INC. Não mexe na seleção, no lote nem no selo "copiado" e não
+     redesenha a tela; o retorno é só o ícone virar ✓ por um instante. */
+  async function copiarInc(bt) {
+    const ok = await paraAreaTransf(M.numeroInc(bt.dataset.copiarInc));
+    if (!ok) { toast("O navegador não permitiu copiar. Tente de novo.", true); return; }
+    bt.classList.add("feito"); bt.innerHTML = ICO_OK; bt.title = "Copiado";
+    clearTimeout(bt._tm); bt._tm = setTimeout(() => { bt.classList.remove("feito"); bt.innerHTML = ICO_COPIAR; bt.title = "Copiar número do incidente"; }, 1200);
+  }
   $("#lotes").addEventListener("click", (ev) => {
     const t = ev.target;
     if (t.matches("[data-sel]")) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); salvarSel(); render(); return; }
     if (t.matches("[data-sel-lote]")) { ev.stopPropagation(); const l = loteDe(t.dataset.selLote); if (l) { const todos = l.incs.every((i) => S.sel.has(i.id)); l.incs.forEach((i) => (todos ? S.sel.delete(i.id) : S.sel.add(i.id))); salvarSel(); render(); } return; }
-    const cp = t.closest("[data-copiar]"); if (cp) { ev.stopPropagation(); const l = loteDe(cp.dataset.copiar); if (l) copiar(l.incs.map((i) => i.id), `${l.municipio} · ${l.bairro}`); return; }
+    const ci = t.closest("[data-copiar-inc]"); if (ci) { ev.stopPropagation(); copiarInc(ci); return; }
+    const cp = t.closest("[data-copiar]"); if (cp) { ev.stopPropagation(); const l = loteDe(cp.dataset.copiar); if (l) copiar(l.incs.map((i) => i.id), `${l.municipio} · ${l.bairro}`, M.textoNumeros); return; }
     const dt = t.closest("[data-detalhe]"); if (dt) { S.detalhe = S.detalhe === dt.dataset.detalhe ? null : dt.dataset.detalhe; render(); return; }
     const ab = t.closest("[data-abrir]"); if (ab) { S.aberto = S.aberto === ab.dataset.abrir ? null : ab.dataset.abrir; S.detalhe = null; render(); }
   });
   $("#lotes").addEventListener("keydown", (ev) => { const ab = ev.target.closest && ev.target.matches("[data-abrir]") && ev.target; if (ab && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); ab.click(); } });
   $("#conferencia").addEventListener("click", (ev) => {
-    if (ev.target.closest("[data-sem-inc]")) { S.verSemInc = !S.verSemInc; render(); }
-    if (ev.target.closest("[data-excecoes]")) { S.verExcecoes = !S.verExcecoes; render(); }
+    if (ev.target.closest("[data-sem-inc]")) { S.verSemInc = !S.verSemInc; if (S.verSemInc) S.verDetalhes = true; renderDetalhes(); }
+    if (ev.target.closest("[data-excecoes]")) { S.verExcecoes = !S.verExcecoes; if (S.verExcecoes) S.verDetalhes = true; renderDetalhes(); }
   });
-  $("#status-ind").addEventListener("click", (ev) => {
-    const c = ev.target.closest("[data-filtro]"); if (!c) return;
-    S.f[c.dataset.filtro] = S.f[c.dataset.filtro] === c.dataset.valor ? "" : c.dataset.valor; S.aberto = null; render();
+  $("#btn-detalhes").addEventListener("click", () => {
+    const abrir = !(S.verDetalhes || S.verExcecoes || S.verSemInc);
+    S.verDetalhes = abrir; if (!abrir) S.verExcecoes = S.verSemInc = false; renderDetalhes();
   });
   const acaoFonte = (ev) => {
     const a = ev.target.closest("[data-fonte]"); if (!a) return;
@@ -492,7 +532,7 @@
   // conferência periódica (só data/tamanho; relê só o que mudou) e ao voltar para a aba
   setInterval(() => { if (document.visibilityState === "visible" && S.con && S.estado !== "manual" && !S.lendo) atualizar(false, false); }, CFG.verificarACadaSeg * 1000);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.con && S.estado === "ok") atualizar(false, false); });
-  setInterval(() => { if (S.dados) { renderDados(); renderFonteInc(); } }, 30000); // idade dos arquivos nos selos e avisos de atualidade
+  setInterval(() => { if (S.dados) { renderDados(); renderFonteInc(); renderDetalhes(); } }, 30000); // idade dos arquivos nos selos e avisos de atualidade
 
   window.DespachoUI = { estado: () => S, atualizar, render, M };
   render();

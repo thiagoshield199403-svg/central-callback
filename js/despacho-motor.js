@@ -155,7 +155,8 @@
   const numeroDe = (inc) => { const m = /^\s*(?:INC\s*)?(\d+)\s*$/i.exec(inc || ""); return m ? m[1] : ""; };
   function admsDe(x) {
     const c = x.campos;
-    return { status: x.situacao, equipes: x.equipes, horarios: x.horarios, alimentador: x.alimentador, subestacao: x.subestacao,
+    const alimentadores = x.conflitos && x.conflitos.alimentador_atual ? unicos([...x.conflitos.alimentador_atual]) : unicos([x.alimentador]);
+    return { status: x.situacao, equipes: x.equipes, horarios: x.horarios, alimentador: x.alimentador, alimentadores, subestacao: x.subestacao,
       alimentadorNormal: c.alimentador_normal || "", subestacaoNormal: c.subestacao_normal || "", local: c.local || "", subregiao: c.subregiao || "",
       powerStatus: c.power_status || "", elemento: c.elemento || "", tipoElemento: c.tipo_elemento || "", causa: c.causa || "", subCausa: c.sub_causa || "",
       problema: c.problema || "", incidentePai: c.incidente_pai || "", obs: x.obs, usuarios: x.usuarios, ultimaAlteracao: x.ultimaAlteracao, linhas: x.linhas.length };
@@ -323,7 +324,10 @@
     const ns = unicos(ids.map(numeroInc));
     return ns.length ? CFG.copia.abertura + ns.join(CFG.copia.separador) + CFG.copia.fechamento : "";
   }
+  /* Texto do botão "Copiar lote": SÓ os números, "n1, n2, n3" (sem "numos in", sem parênteses, sem "INC"), sem repetição,
+     na ordem do lote. Também serve para um incidente só (botão de copiar ao lado do número). */
+  function textoNumeros(ids) { return unicos(ids.map(numeroInc)).join(CFG.copia.separador); }
 
-  raiz.DespachoMotor = { processar, consolidar, aceitarLeitura, avisosAtualidade, montar, opcoes, contarPolos, textoCopia, endereco, bairroDaChamada, bairroDoComentario, colunasEletricas, faltaDeFase, rotuloInc, passa,
+  raiz.DespachoMotor = { processar, consolidar, aceitarLeitura, avisosAtualidade, montar, opcoes, contarPolos, textoCopia, textoNumeros, numeroInc, endereco, bairroDaChamada, bairroDoComentario, colunasEletricas, faltaDeFase, rotuloInc, passa,
     numeroDe, POLOS, NAO_IDENT, SEM_MUN };
 })(typeof window !== "undefined" ? window : globalThis);

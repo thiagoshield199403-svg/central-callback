@@ -3,6 +3,12 @@ CENTRAL DE CALLBACK COI - DESPACHO OTIMIZADO (versao 2.1.0)
 Apoio ao despacho em contingencia: organiza as INCs em LOTES por polo, municipio e bairro, para copiar e lancar no SIGODE.
 Nada e despachado automaticamente: a decisao e o lancamento sao do operador. A confirmacao do despacho e SEMPRE no SIGODE.
 
+COPIA
+- Copiar lote: so os numeros das INCs do lote, separados por virgula e espaco, na ordem do lote (ex.: 144061719, 144062328).
+- Copiar selecionadas: numos in (n1, n2, ...).
+- Botao com icone de copiar ao lado do numero de cada INC: copia so o numero daquela INC. Nao altera a selecao, o lote
+  aberto nem o selo "copiado"; o icone vira um visto por ~1 s.
+
 FONTES DE DADOS (pasta ADMS: \\fs-bi\ESE\DTEC\DEOP\ADMS)
 1. chamadas_incidentes.csv (o MESMO arquivo da Central): endereco, bairro, localizacao e dados das chamadas. E a BASE dos
    lotes. Leitura e regras de validade da Central (js/nucleo.js).
@@ -61,17 +67,28 @@ NAO exibido nem inventado: aceite da equipe, chegada ao local, conclusao, confir
 "data hora chegada" e "data final" existem no arquivo, mas estavam vazias na auditoria e nao sao usadas.)
 
 ATUALIDADE
-- Selos no topo (Chamadas / Incidentes): data em que o ADMS gravou cada arquivo e hora da leitura. Laranja = sem atualizacao
-  ha 15 min ou mais; vermelho = sem leitura valida ou ultima tentativa falhou.
-- Aviso de fonte desatualizada (>= 15 min) e de fontes distantes (diferenca >= 15 min entre as gravacoes). Nao rejeitam a
-  leitura: as fontes sao gravadas em momentos diferentes.
+- Selos no topo (Chamadas / Incidentes): data em que o ADMS gravou cada arquivo (hora da leitura na dica do selo). Laranja =
+  sem atualizacao ha 15 min ou mais (o selo mostra "ha N min"); vermelho = sem leitura valida ou ultima tentativa falhou.
+- Aviso de fonte desatualizada (>= 15 min) e de fontes distantes (diferenca >= 15 min entre as gravacoes): botao (i) do
+  cabecalho fica laranja com "!" e o texto do aviso fica nos detalhes. Nao rejeitam a leitura: as fontes sao gravadas em
+  momentos diferentes.
 
-INTERFACE
-Indicadores (INCs operacionais, lotes, localizacao nao identificada, falta de fase) · indicadores por status (clique filtra) ·
-sem equipe · com inconsistencia · equipes distintas. Filtros: polo, municipio, bairro, alimentador, circuito, indicacao,
-status, equipe (sem / com / com inconsistencia), busca (INC, rua, bairro, equipe). Na INC: colunas Status e Equipe e, em
-Detalhes, os dados operacionais do ADMS. Linha "Incidentes.xlsx": registros -> INCs -> operacionais, "fora dos lotes" por
-status e o botao das excecoes.
+INTERFACE (compacta)
+Ordem: cabecalho (selos, polo, Atualizar, botao (i), Central) · indicadores (INCs operacionais, lotes, localizacao nao
+identificada, falta de fase) · UMA linha de filtros: municipio | bairro | alimentador | circuito | indicacao | status | equipe |
+busca | Limpar filtros (em telas menores a linha quebra) · lista de municipios e lotes.
+- Status: filtro unico "Todos os status", com os status operacionais na ordem do ADMS e a quantidade de INCs de cada um
+  (status sem INC nos filtros atuais aparece desabilitado). Equipe: com e sem / sem equipe / com equipe / com inconsistencia,
+  com a quantidade de cada; a dica do filtro informa as equipes distintas.
+- Botao (i) do cabecalho (o numero e a quantidade de excecoes): abre os detalhes recolhidos — linhas, chamadas validas,
+  repetidas e sem INC (lista), registros do Incidentes.xlsx -> INCs -> operacionais, "fora dos lotes" por status, o botao
+  das excecoes, avisos de atualidade e o lembrete de confirmar no SIGODE.
+- Tabela da INC: INC | Endereco (ADMS) | Alimentador | Status | Equipe | 1a chamada | Indicacoes | Acoes. O cabecalho do lote
+  mostra so municipio, bairro, quantidade e indicadores (sem lista de alimentadores: um bairro pode ter varios).
+- Alimentador: o do REGISTRO da propria INC no Incidentes.xlsx (alimentador atual; sem ele, o normal) e o das chamadas dela,
+  se o CSV tiver a coluna. Nunca o do bairro ou do lote. Linhas da mesma INC com alimentador atual diferente: mostra TODOS
+  ("A / B", com inconsistencia sinalizada), sem escolher um. Sem dado: traco (—). Dica: alimentador normal e subestacao.
+- Em Detalhes, os dados operacionais do ADMS.
 
 SEM Incidentes.xlsx (nunca lido com sucesso): funcionamento da versao 2.0 (so chamadas), com aviso de que nada foi filtrado
 por status. Se ja houve uma leitura valida, ela continua em uso.
@@ -105,8 +122,8 @@ COMO TESTAR NA PASTA ADMS DA EMPRESA
    Esperado: os testes REAL aprovados, cabecalho na linha 3, todas as datas reconhecidas, status com os 8 nomes conhecidos.
    Erro "arquivo corrompido/incompleto/nao suportado": anote a mensagem exata (o formato gravado pelo robo difere do previsto).
 2. No Edge: Central > faixa Pasta ADMS > Selecionar pasta (a PASTA ADMS, nao o arquivo) > Despacho Otimizado.
-   Esperado: selos "Chamadas" e "Incidentes" verdes, sem faixa vermelha; linha "Incidentes.xlsx" com registros e INCs.
-3. Confira com o Excel aberto no Incidentes.xlsx: quantidade por status (indicadores) e 3 ou 4 INCs (status, equipe,
+   Esperado: selos "Chamadas" e "Incidentes" verdes, sem faixa vermelha; no botao (i), linha "Incidentes.xlsx" com registros e INCs.
+3. Confira com o Excel aberto no Incidentes.xlsx: quantidade por status (filtro Status) e 3 ou 4 INCs (status, equipe,
    horarios em Detalhes). Concluido/Arquivado/Cancelado nao podem aparecer em lote algum.
 4. Atualizar durante a gravacao do robo: deve mostrar "gravando" e manter a leitura anterior.
 

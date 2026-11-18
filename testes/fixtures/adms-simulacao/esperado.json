@@ -1,0 +1,1395 @@
+{
+  "gerado_em": "2026-11-18T00:31:46.482Z",
+  "rodada": 1,
+  "mudancas": [],
+  "csv": {
+    "linhas": 297,
+    "chamadas_validas": 295,
+    "call_repetidas": 2,
+    "sem_inc": 4,
+    "incs_distintas": 119
+  },
+  "xlsx": {
+    "linhas": 173,
+    "incs_distintas": 121,
+    "linhas_descartadas": 1,
+    "incs_com_varias_linhas": [
+      "950210421",
+      "950210537",
+      "950210799",
+      "950211421",
+      "950211617",
+      "950211898",
+      "950212441",
+      "950212561",
+      "950212694",
+      "950212849",
+      "950212872",
+      "950213455",
+      "950214671",
+      "950214956",
+      "950215737",
+      "950215744",
+      "950215795",
+      "950215916",
+      "950216404",
+      "950216839",
+      "950217079",
+      "950217568",
+      "950217735",
+      "950217855",
+      "950218313",
+      "950218795",
+      "950219059",
+      "950219174"
+    ],
+    "status": {
+      "Cancelado": 6,
+      "Aguardando Envio": 30,
+      "Arquivado": 7,
+      "Em Execução": 22,
+      "Enviado": 22,
+      "Interrompido": 5,
+      "Concluído": 14,
+      "Aguardando Reenvio": 9,
+      "Em Análise": 1,
+      "Pendente Validação": 1,
+      "(vazio)": 2,
+      "Em Execução / Enviado (divergente)": 1,
+      "Enviado / Aguardando Reenvio (divergente)": 1
+    }
+  },
+  "incs_distintas_total": 127,
+  "cruzamento": {
+    "ambas": 113,
+    "so_chamadas": 6,
+    "so_incidentes": 8
+  },
+  "operacionais": [
+    "950210206",
+    "950210421",
+    "950210537",
+    "950210666",
+    "950210761",
+    "950210799",
+    "950210832",
+    "950210933",
+    "950211047",
+    "950211157",
+    "950211282",
+    "950211341",
+    "950211540",
+    "950211617",
+    "950211634",
+    "950211639",
+    "950211740",
+    "950211898",
+    "950212059",
+    "950212197",
+    "950212318",
+    "950212441",
+    "950212476",
+    "950212561",
+    "950212694",
+    "950212720",
+    "950212872",
+    "950212937",
+    "950213009",
+    "950213035",
+    "950213280",
+    "950213360",
+    "950213438",
+    "950213455",
+    "950213628",
+    "950213704",
+    "950213819",
+    "950213959",
+    "950214080",
+    "950214244",
+    "950214407",
+    "950214504",
+    "950214752",
+    "950214868",
+    "950214889",
+    "950214956",
+    "950215062",
+    "950215172",
+    "950215277",
+    "950215286",
+    "950215346",
+    "950215393",
+    "950215586",
+    "950215611",
+    "950215737",
+    "950215744",
+    "950215795",
+    "950215916",
+    "950216104",
+    "950216205",
+    "950216344",
+    "950216563",
+    "950216738",
+    "950216771",
+    "950216839",
+    "950216951",
+    "950217022",
+    "950217079",
+    "950217259",
+    "950217429",
+    "950217434",
+    "950217582",
+    "950217648",
+    "950217715",
+    "950217735",
+    "950217743",
+    "950217855",
+    "950217949",
+    "950218062",
+    "950218190",
+    "950218313",
+    "950218438",
+    "950218496",
+    "950218546",
+    "950218619",
+    "950218689",
+    "950218795",
+    "950219016"
+  ],
+  "por_status": {
+    "aguardando_envio": 30,
+    "em_execucao": 22,
+    "enviado": 22,
+    "interrompido": 5,
+    "aguardando_reenvio": 9
+  },
+  "status_por_inc": {
+    "950210206": "aguardando_envio",
+    "950210421": "em_execucao",
+    "950210537": "em_execucao",
+    "950210666": "enviado",
+    "950210761": "aguardando_envio",
+    "950210799": "aguardando_envio",
+    "950210832": "enviado",
+    "950210933": "enviado",
+    "950211047": "em_execucao",
+    "950211157": "aguardando_envio",
+    "950211282": "enviado",
+    "950211341": "interrompido",
+    "950211540": "aguardando_envio",
+    "950211617": "em_execucao",
+    "950211634": "interrompido",
+    "950211639": "em_execucao",
+    "950211740": "enviado",
+    "950211898": "enviado",
+    "950212059": "enviado",
+    "950212197": "aguardando_envio",
+    "950212318": "em_execucao",
+    "950212441": "aguardando_reenvio",
+    "950212476": "enviado",
+    "950212561": "enviado",
+    "950212694": "enviado",
+    "950212720": "em_execucao",
+    "950212872": "em_execucao",
+    "950212937": "aguardando_reenvio",
+    "950213009": "aguardando_reenvio",
+    "950213035": "enviado",
+    "950213280": "interrompido",
+    "950213360": "aguardando_envio",
+    "950213438": "aguardando_reenvio",
+    "950213455": "em_execucao",
+    "950213628": "em_execucao",
+    "950213704": "aguardando_envio",
+    "950213819": "aguardando_envio",
+    "950213959": "em_execucao",
+    "950214080": "em_execucao",
+    "950214244": "aguardando_envio",
+    "950214407": "em_execucao",
+    "950214504": "em_execucao",
+    "950214752": "enviado",
+    "950214868": "aguardando_envio",
+    "950214889": "aguardando_reenvio",
+    "950214956": "aguardando_envio",
+    "950215062": "aguardando_envio",
+    "950215172": "enviado",
+    "950215277": "aguardando_envio",
+    "950215286": "em_execucao",
+    "950215346": "aguardando_envio",
+    "950215393": "enviado",
+    "950215586": "aguardando_reenvio",
+    "950215611": "em_execucao",
+    "950215737": "aguardando_reenvio",
+    "950215744": "aguardando_envio",
+    "950215795": "enviado",
+    "950215916": "aguardando_envio",
+    "950216104": "aguardando_reenvio",
+    "950216205": "interrompido",
+    "950216344": "em_execucao",
+    "950216563": "enviado",
+    "950216738": "aguardando_envio",
+    "950216771": "aguardando_reenvio",
+    "950216839": "em_execucao",
+    "950216951": "enviado",
+    "950217022": "aguardando_envio",
+    "950217079": "enviado",
+    "950217259": "aguardando_envio",
+    "950217429": "enviado",
+    "950217434": "em_execucao",
+    "950217582": "aguardando_envio",
+    "950217648": "enviado",
+    "950217715": "aguardando_envio",
+    "950217735": "interrompido",
+    "950217743": "enviado",
+    "950217855": "aguardando_envio",
+    "950217949": "aguardando_envio",
+    "950218062": "aguardando_envio",
+    "950218190": "enviado",
+    "950218313": "em_execucao",
+    "950218438": "aguardando_envio",
+    "950218496": "em_execucao",
+    "950218546": "em_execucao",
+    "950218619": "aguardando_envio",
+    "950218689": "aguardando_envio",
+    "950218795": "aguardando_envio",
+    "950219016": "aguardando_envio"
+  },
+  "excluidas": {
+    "Concluído": [
+      "950211831",
+      "950211967",
+      "950213572",
+      "950213636",
+      "950214211",
+      "950214335",
+      "950214574",
+      "950214671",
+      "950215383",
+      "950215440",
+      "950215533",
+      "950216404",
+      "950216502",
+      "950217348"
+    ],
+    "Arquivado": [
+      "950210335",
+      "950210700",
+      "950210924",
+      "950212374",
+      "950212849",
+      "950216696",
+      "950219027"
+    ],
+    "Cancelado": [
+      "950210096",
+      "950211421",
+      "950216042",
+      "950216201",
+      "950217038",
+      "950217168"
+    ]
+  },
+  "excecoes": {
+    "status_vazio": [
+      "950217568",
+      "950218897"
+    ],
+    "status_desconhecido": [
+      "950213141",
+      "950215302"
+    ],
+    "status_divergente": [
+      "950219059",
+      "950219174"
+    ],
+    "sem_registro_adms": [
+      "950219299",
+      "950219314",
+      "950219326",
+      "950219427",
+      "950219494",
+      "950219594"
+    ]
+  },
+  "equipes": {
+    "distintas_no_arquivo": 18,
+    "lista": [
+      "ESE-S-AJUSIM01",
+      "ESE-S-AJUSIM02",
+      "ESE-S-AJUSIM03",
+      "ESE-S-AJUSIM04",
+      "ESE-S-AJUSIM05",
+      "ESE-S-GLOSIM01",
+      "ESE-S-GLOSIM02",
+      "ESE-S-ITBSIM01",
+      "ESE-S-ITBSIM02",
+      "ESE-S-ITBSIM03",
+      "ESE-S-LAGSIM01",
+      "ESE-S-LAGSIM02",
+      "ESE-S-LAGSIM03",
+      "ESE-S-MRMSIM01",
+      "ESE-S-PRPSIM01",
+      "ESE-S-PRPSIM02",
+      "ESE-S-SCRSIM01",
+      "ESE-S-SCRSIM02"
+    ],
+    "por_inc": {
+      "950210206": [],
+      "950210421": [],
+      "950210537": [
+        "ESE-S-ITBSIM01",
+        "ESE-S-ITBSIM02"
+      ],
+      "950210666": [
+        "ESE-S-PRPSIM02"
+      ],
+      "950210761": [],
+      "950210799": [],
+      "950210832": [],
+      "950210933": [],
+      "950211047": [
+        "ESE-S-AJUSIM01"
+      ],
+      "950211157": [],
+      "950211282": [
+        "ESE-S-AJUSIM03"
+      ],
+      "950211341": [
+        "ESE-S-AJUSIM02"
+      ],
+      "950211540": [],
+      "950211617": [
+        "ESE-S-MRMSIM01"
+      ],
+      "950211634": [
+        "ESE-S-PRPSIM01"
+      ],
+      "950211639": [
+        "ESE-S-AJUSIM03"
+      ],
+      "950211740": [
+        "ESE-S-AJUSIM04",
+        "ESE-S-AJUSIM05"
+      ],
+      "950211898": [
+        "ESE-S-AJUSIM03",
+        "ESE-S-AJUSIM04"
+      ],
+      "950212059": [
+        "ESE-S-PRPSIM02"
+      ],
+      "950212197": [],
+      "950212318": [
+        "ESE-S-AJUSIM03"
+      ],
+      "950212441": [
+        "ESE-S-ITBSIM02",
+        "ESE-S-ITBSIM03"
+      ],
+      "950212476": [
+        "ESE-S-AJUSIM02"
+      ],
+      "950212561": [
+        "ESE-S-AJUSIM05"
+      ],
+      "950212694": [
+        "ESE-S-SCRSIM02"
+      ],
+      "950212720": [
+        "ESE-S-LAGSIM03"
+      ],
+      "950212872": [
+        "ESE-S-PRPSIM01",
+        "ESE-S-PRPSIM02"
+      ],
+      "950212937": [
+        "ESE-S-GLOSIM02"
+      ],
+      "950213009": [],
+      "950213035": [
+        "ESE-S-MRMSIM01"
+      ],
+      "950213280": [
+        "ESE-S-AJUSIM01"
+      ],
+      "950213360": [],
+      "950213438": [],
+      "950213455": [
+        "ESE-S-GLOSIM01"
+      ],
+      "950213628": [
+        "ESE-S-LAGSIM03"
+      ],
+      "950213704": [],
+      "950213819": [],
+      "950213959": [
+        "ESE-S-AJUSIM03"
+      ],
+      "950214080": [
+        "ESE-S-ITBSIM03"
+      ],
+      "950214244": [],
+      "950214407": [
+        "ESE-S-LAGSIM03"
+      ],
+      "950214504": [
+        "ESE-S-AJUSIM01"
+      ],
+      "950214752": [
+        "ESE-S-PRPSIM02"
+      ],
+      "950214868": [],
+      "950214889": [],
+      "950214956": [],
+      "950215062": [],
+      "950215172": [
+        "ESE-S-SCRSIM01"
+      ],
+      "950215277": [],
+      "950215286": [
+        "ESE-S-AJUSIM04"
+      ],
+      "950215346": [],
+      "950215393": [
+        "ESE-S-LAGSIM02"
+      ],
+      "950215586": [],
+      "950215611": [
+        "ESE-S-MRMSIM01"
+      ],
+      "950215737": [],
+      "950215744": [],
+      "950215795": [
+        "ESE-S-LAGSIM03"
+      ],
+      "950215916": [],
+      "950216104": [
+        "ESE-S-MRMSIM01"
+      ],
+      "950216205": [
+        "ESE-S-ITBSIM02"
+      ],
+      "950216344": [
+        "ESE-S-AJUSIM04"
+      ],
+      "950216563": [
+        "ESE-S-AJUSIM01"
+      ],
+      "950216738": [],
+      "950216771": [
+        "ESE-S-LAGSIM02"
+      ],
+      "950216839": [
+        "ESE-S-GLOSIM01"
+      ],
+      "950216951": [
+        "ESE-S-AJUSIM01"
+      ],
+      "950217022": [],
+      "950217079": [
+        "ESE-S-ITBSIM01"
+      ],
+      "950217259": [],
+      "950217429": [
+        "ESE-S-AJUSIM05"
+      ],
+      "950217434": [
+        "ESE-S-SCRSIM01"
+      ],
+      "950217582": [],
+      "950217648": [
+        "ESE-S-ITBSIM02"
+      ],
+      "950217715": [],
+      "950217735": [
+        "ESE-S-MRMSIM01"
+      ],
+      "950217743": [
+        "ESE-S-GLOSIM01"
+      ],
+      "950217855": [],
+      "950217949": [],
+      "950218062": [],
+      "950218190": [
+        "ESE-S-GLOSIM01"
+      ],
+      "950218313": [
+        "ESE-S-GLOSIM01"
+      ],
+      "950218438": [],
+      "950218496": [
+        "ESE-S-AJUSIM01"
+      ],
+      "950218546": [
+        "ESE-S-MRMSIM01"
+      ],
+      "950218619": [],
+      "950218689": [],
+      "950218795": [],
+      "950219016": []
+    },
+    "operacionais_sem_equipe": [
+      "950210206",
+      "950210421",
+      "950210761",
+      "950210799",
+      "950210832",
+      "950210933",
+      "950211157",
+      "950211540",
+      "950212197",
+      "950213009",
+      "950213360",
+      "950213438",
+      "950213704",
+      "950213819",
+      "950214244",
+      "950214868",
+      "950214889",
+      "950214956",
+      "950215062",
+      "950215277",
+      "950215346",
+      "950215586",
+      "950215737",
+      "950215744",
+      "950215916",
+      "950216738",
+      "950217022",
+      "950217259",
+      "950217582",
+      "950217715",
+      "950217855",
+      "950217949",
+      "950218062",
+      "950218438",
+      "950218619",
+      "950218689",
+      "950218795",
+      "950219016"
+    ],
+    "distintas_operacionais": 17
+  },
+  "grupos": {
+    "950210206": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM BETA",
+      "localidade": false
+    },
+    "950210421": {
+      "municipio": 30,
+      "bairro": "POV SIM CAJUEIRO",
+      "localidade": true
+    },
+    "950210537": {
+      "municipio": 30,
+      "bairro": "POV SIM CAJUEIRO",
+      "localidade": true
+    },
+    "950210666": {
+      "municipio": 468,
+      "bairro": null
+    },
+    "950210761": {
+      "municipio": 180,
+      "bairro": "POV SIM COLONIA NOVA",
+      "localidade": true
+    },
+    "950210799": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM GAMA"
+    },
+    "950210832": {
+      "municipio": 20,
+      "bairro": "BAIRRO SIM PALMEIRA",
+      "localidade": false
+    },
+    "950210933": {
+      "municipio": 220,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950211047": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM GAMA",
+      "localidade": false
+    },
+    "950211157": {
+      "municipio": 1,
+      "bairro": null
+    },
+    "950211282": {
+      "municipio": 1,
+      "bairro": "JARDIM SIM DELTA",
+      "localidade": false
+    },
+    "950211341": {
+      "municipio": 10,
+      "bairro": "BAIRRO SIM ATLANTICO",
+      "localidade": false
+    },
+    "950211540": {
+      "municipio": 30,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950211617": {
+      "municipio": 270,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950211634": {
+      "municipio": 468,
+      "bairro": null
+    },
+    "950211639": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM GAMA",
+      "localidade": false
+    },
+    "950211740": {
+      "municipio": 10,
+      "bairro": null
+    },
+    "950211898": {
+      "municipio": 1,
+      "bairro": "JARDIM SIM DELTA",
+      "localidade": false
+    },
+    "950212059": {
+      "municipio": 468,
+      "bairro": "BAIRRO SIM RIBEIRINHO",
+      "localidade": false
+    },
+    "950212197": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM GAMA",
+      "localidade": false
+    },
+    "950212318": {
+      "municipio": 1,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950212441": {
+      "municipio": 30,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950212476": {
+      "municipio": 1,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950212561": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM ALFA",
+      "localidade": false
+    },
+    "950212694": {
+      "municipio": 620,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950212720": {
+      "municipio": null,
+      "bairro": null
+    },
+    "950212872": {
+      "municipio": 468,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950212937": {
+      "municipio": 430,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950213009": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM ALFA",
+      "localidade": false
+    },
+    "950213035": {
+      "municipio": 220,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950213280": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM GAMA",
+      "localidade": false
+    },
+    "950213360": {
+      "municipio": 20,
+      "bairro": "BAIRRO SIM PALMEIRA",
+      "localidade": false
+    },
+    "950213438": {
+      "municipio": 180,
+      "bairro": "POV SIM COLONIA NOVA",
+      "localidade": true
+    },
+    "950213455": {
+      "municipio": 461,
+      "bairro": "POV SIM ILHA DO RIO",
+      "localidade": true
+    },
+    "950213628": {
+      "municipio": 180,
+      "bairro": "BAIRRO SIM LARANJAL",
+      "localidade": false
+    },
+    "950213704": {
+      "municipio": 1,
+      "bairro": null
+    },
+    "950213819": {
+      "municipio": 30,
+      "bairro": "POV SIM CAJUEIRO",
+      "localidade": true
+    },
+    "950213959": {
+      "municipio": 1,
+      "bairro": "JARDIM SIM DELTA",
+      "localidade": false
+    },
+    "950214080": {
+      "municipio": 30,
+      "bairro": "POV SIM CAJUEIRO",
+      "localidade": true
+    },
+    "950214244": {
+      "municipio": 10,
+      "bairro": "BAIRRO SIM ATLANTICO",
+      "localidade": false
+    },
+    "950214407": {
+      "municipio": 180,
+      "bairro": "BAIRRO SIM LARANJAL",
+      "localidade": false
+    },
+    "950214504": {
+      "municipio": 1,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950214752": {
+      "municipio": 468,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950214868": {
+      "municipio": 30,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950214889": {
+      "municipio": 1,
+      "bairro": "JARDIM SIM DELTA",
+      "localidade": false
+    },
+    "950214956": {
+      "municipio": 1,
+      "bairro": null
+    },
+    "950215062": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM BETA",
+      "localidade": false
+    },
+    "950215172": {
+      "municipio": 620,
+      "bairro": "BAIRRO SIM HISTORICO",
+      "localidade": false
+    },
+    "950215277": {
+      "municipio": 210,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950215286": {
+      "municipio": 20,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950215346": {
+      "municipio": 20,
+      "bairro": "BAIRRO SIM AURORA",
+      "localidade": false
+    },
+    "950215393": {
+      "municipio": 180,
+      "bairro": "POV SIM COLONIA NOVA",
+      "localidade": true
+    },
+    "950215586": {
+      "municipio": 20,
+      "bairro": "BAIRRO SIM AURORA",
+      "localidade": false
+    },
+    "950215611": {
+      "municipio": 220,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950215737": {
+      "municipio": 430,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950215744": {
+      "municipio": 20,
+      "bairro": null
+    },
+    "950215795": {
+      "municipio": 180,
+      "bairro": "BAIRRO SIM LARANJAL",
+      "localidade": false
+    },
+    "950215916": {
+      "municipio": 180,
+      "bairro": "BAIRRO SIM LARANJAL",
+      "localidade": false
+    },
+    "950216104": {
+      "municipio": 220,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950216205": {
+      "municipio": 110,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950216344": {
+      "municipio": 10,
+      "bairro": "BAIRRO SIM ATLANTICO",
+      "localidade": false
+    },
+    "950216563": {
+      "municipio": 20,
+      "bairro": "BAIRRO SIM PALMEIRA",
+      "localidade": false
+    },
+    "950216738": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM ALFA",
+      "localidade": false
+    },
+    "950216771": {
+      "municipio": 180,
+      "bairro": "BAIRRO SIM LARANJAL",
+      "localidade": false
+    },
+    "950216839": {
+      "municipio": 430,
+      "bairro": null
+    },
+    "950216951": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM GAMA",
+      "localidade": false
+    },
+    "950217022": {
+      "municipio": 20,
+      "bairro": "BAIRRO SIM PALMEIRA",
+      "localidade": false
+    },
+    "950217079": {
+      "municipio": 30,
+      "bairro": "POV SIM CAJUEIRO",
+      "localidade": true
+    },
+    "950217259": {
+      "municipio": 620,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950217429": {
+      "municipio": 1,
+      "bairro": "JARDIM SIM DELTA",
+      "localidade": false
+    },
+    "950217434": {
+      "municipio": 620,
+      "bairro": "BAIRRO SIM HISTORICO",
+      "localidade": false
+    },
+    "950217582": {
+      "municipio": 20,
+      "bairro": "BAIRRO SIM PALMEIRA",
+      "localidade": false
+    },
+    "950217648": {
+      "municipio": 30,
+      "bairro": "POV SIM CAJUEIRO",
+      "localidade": true
+    },
+    "950217715": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM GAMA",
+      "localidade": false
+    },
+    "950217735": {
+      "municipio": 270,
+      "bairro": null
+    },
+    "950217743": {
+      "municipio": 461,
+      "bairro": "POV SIM ILHA DO RIO",
+      "localidade": true
+    },
+    "950217855": {
+      "municipio": 20,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950217949": {
+      "municipio": 20,
+      "bairro": "BAIRRO SIM AURORA",
+      "localidade": false
+    },
+    "950218062": {
+      "municipio": 620,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950218190": {
+      "municipio": 430,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950218313": {
+      "municipio": 461,
+      "bairro": "POV SIM ILHA DO RIO",
+      "localidade": true
+    },
+    "950218438": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM ALFA",
+      "localidade": false
+    },
+    "950218496": {
+      "municipio": 10,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950218546": {
+      "municipio": 270,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950218619": {
+      "municipio": 620,
+      "bairro": "BAIRRO SIM HISTORICO",
+      "localidade": false
+    },
+    "950218689": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM ALFA",
+      "localidade": false
+    },
+    "950218795": {
+      "municipio": 1,
+      "bairro": "CENTRO",
+      "localidade": false
+    },
+    "950219016": {
+      "municipio": 1,
+      "bairro": "BAIRRO SIM ALFA",
+      "localidade": false
+    }
+  },
+  "alimentadores": {
+    "950210206": [
+      "AJS-03F4"
+    ],
+    "950210421": [
+      "ITB-01F2"
+    ],
+    "950210537": [
+      "ITB-01F2"
+    ],
+    "950210666": [
+      "PRP-01F2"
+    ],
+    "950210761": [],
+    "950210799": [
+      "AJN-02F3"
+    ],
+    "950210832": [
+      "NSS-01F1"
+    ],
+    "950210933": [
+      "MRM-01F1"
+    ],
+    "950211047": [
+      "AJN-02F3"
+    ],
+    "950211157": [
+      "AJS-03F1"
+    ],
+    "950211282": [
+      "AJS-03F1"
+    ],
+    "950211341": [],
+    "950211540": [],
+    "950211617": [
+      "MRM-02F1"
+    ],
+    "950211634": [
+      "PRP-01F2"
+    ],
+    "950211639": [
+      "AJS-03F1"
+    ],
+    "950211740": [
+      "BCQ-01F1"
+    ],
+    "950211898": [
+      "AJS-03F1"
+    ],
+    "950212059": [
+      "PRP-01F1"
+    ],
+    "950212197": [
+      "AJS-03F1"
+    ],
+    "950212318": [
+      "AJN-01F1"
+    ],
+    "950212441": [
+      "ITB-02F1"
+    ],
+    "950212476": [
+      "AJS-03F1"
+    ],
+    "950212561": [
+      "AJN-01F2"
+    ],
+    "950212694": [
+      "SCR-01F1"
+    ],
+    "950212720": [
+      "LAG-01F1"
+    ],
+    "950212872": [
+      "PRP-01F2",
+      "PRP-01F1"
+    ],
+    "950212937": [
+      "GLO-01F1"
+    ],
+    "950213009": [
+      "AJN-01F1"
+    ],
+    "950213035": [
+      "MRM-01F1"
+    ],
+    "950213280": [
+      "AJN-02F3"
+    ],
+    "950213360": [
+      "NSS-02F2"
+    ],
+    "950213438": [
+      "LAG-01F1"
+    ],
+    "950213455": [
+      "GLO-02F1"
+    ],
+    "950213628": [
+      "LAG-01F1"
+    ],
+    "950213704": [
+      "AJS-03F1"
+    ],
+    "950213819": [
+      "ITB-01F2"
+    ],
+    "950213959": [
+      "AJN-01F1"
+    ],
+    "950214080": [
+      "ITB-01F2"
+    ],
+    "950214244": [
+      "BCQ-01F2"
+    ],
+    "950214407": [
+      "LAG-02F2"
+    ],
+    "950214504": [
+      "AJS-03F4"
+    ],
+    "950214752": [
+      "PRP-01F1"
+    ],
+    "950214868": [
+      "ITB-02F1"
+    ],
+    "950214889": [
+      "AJN-01F1"
+    ],
+    "950214956": [
+      "AJN-01F1"
+    ],
+    "950215062": [
+      "AJN-01F1"
+    ],
+    "950215172": [
+      "SCR-01F3"
+    ],
+    "950215277": [
+      "SMD-01F1"
+    ],
+    "950215286": [
+      "NSS-02F2"
+    ],
+    "950215346": [
+      "NSS-02F2"
+    ],
+    "950215393": [
+      "LAG-01F1"
+    ],
+    "950215586": [
+      "NSS-02F2"
+    ],
+    "950215611": [
+      "MRM-01F1"
+    ],
+    "950215737": [
+      "GLO-01F2"
+    ],
+    "950215744": [
+      "NSS-02F2"
+    ],
+    "950215795": [
+      "LAG-01F4"
+    ],
+    "950215916": [
+      "LAG-02F2"
+    ],
+    "950216104": [
+      "MRM-01F1"
+    ],
+    "950216205": [
+      "ITB-03F1"
+    ],
+    "950216344": [
+      "BCQ-01F2"
+    ],
+    "950216563": [
+      "NSS-02F2"
+    ],
+    "950216738": [
+      "AJN-01F2"
+    ],
+    "950216771": [
+      "LAG-02F2"
+    ],
+    "950216839": [
+      "GLO-01F2"
+    ],
+    "950216951": [
+      "AJN-02F3"
+    ],
+    "950217022": [
+      "NSS-01F1"
+    ],
+    "950217079": [
+      "ITB-01F2"
+    ],
+    "950217259": [
+      "SCR-01F3"
+    ],
+    "950217429": [
+      "AJS-03F4"
+    ],
+    "950217434": [
+      "SCR-01F1"
+    ],
+    "950217582": [
+      "NSS-01F1"
+    ],
+    "950217648": [
+      "ITB-01F2"
+    ],
+    "950217715": [
+      "AJS-03F4"
+    ],
+    "950217735": [
+      "MRM-02F1"
+    ],
+    "950217743": [
+      "GLO-02F1"
+    ],
+    "950217855": [
+      "NSS-01F1"
+    ],
+    "950217949": [
+      "NSS-01F1"
+    ],
+    "950218062": [
+      "SCR-01F1"
+    ],
+    "950218190": [
+      "GLO-01F2"
+    ],
+    "950218313": [
+      "GLO-02F1"
+    ],
+    "950218438": [
+      "AJS-03F4"
+    ],
+    "950218496": [
+      "BCQ-01F2"
+    ],
+    "950218546": [
+      "MRM-02F1"
+    ],
+    "950218619": [
+      "SCR-01F3"
+    ],
+    "950218689": [
+      "AJS-03F1"
+    ],
+    "950218795": [
+      "AJN-02F3"
+    ],
+    "950219016": [
+      "AJN-01F1"
+    ]
+  },
+  "polo": {
+    "950210206": "aracaju",
+    "950210421": "itabaiana",
+    "950210537": "itabaiana",
+    "950210666": "propria",
+    "950210761": "lagarto",
+    "950210799": "aracaju",
+    "950210832": "aracaju",
+    "950210933": "maruim",
+    "950211047": "aracaju",
+    "950211157": "aracaju",
+    "950211282": "aracaju",
+    "950211341": "aracaju",
+    "950211540": "itabaiana",
+    "950211617": "maruim",
+    "950211634": "propria",
+    "950211639": "aracaju",
+    "950211740": "aracaju",
+    "950211898": "aracaju",
+    "950212059": "propria",
+    "950212197": "aracaju",
+    "950212318": "aracaju",
+    "950212441": "itabaiana",
+    "950212476": "aracaju",
+    "950212561": "aracaju",
+    "950212694": "sao_cristovao",
+    "950212720": null,
+    "950212872": "propria",
+    "950212937": "gloria",
+    "950213009": "aracaju",
+    "950213035": "maruim",
+    "950213280": "aracaju",
+    "950213360": "aracaju",
+    "950213438": "lagarto",
+    "950213455": "gloria",
+    "950213628": "lagarto",
+    "950213704": "aracaju",
+    "950213819": "itabaiana",
+    "950213959": "aracaju",
+    "950214080": "itabaiana",
+    "950214244": "aracaju",
+    "950214407": "lagarto",
+    "950214504": "aracaju",
+    "950214752": "propria",
+    "950214868": "itabaiana",
+    "950214889": "aracaju",
+    "950214956": "aracaju",
+    "950215062": "aracaju",
+    "950215172": "sao_cristovao",
+    "950215277": "lagarto",
+    "950215286": "aracaju",
+    "950215346": "aracaju",
+    "950215393": "lagarto",
+    "950215586": "aracaju",
+    "950215611": "maruim",
+    "950215737": "gloria",
+    "950215744": "aracaju",
+    "950215795": "lagarto",
+    "950215916": "lagarto",
+    "950216104": "maruim",
+    "950216205": "itabaiana",
+    "950216344": "aracaju",
+    "950216563": "aracaju",
+    "950216738": "aracaju",
+    "950216771": "lagarto",
+    "950216839": "gloria",
+    "950216951": "aracaju",
+    "950217022": "aracaju",
+    "950217079": "itabaiana",
+    "950217259": "sao_cristovao",
+    "950217429": "aracaju",
+    "950217434": "sao_cristovao",
+    "950217582": "aracaju",
+    "950217648": "itabaiana",
+    "950217715": "aracaju",
+    "950217735": "maruim",
+    "950217743": "gloria",
+    "950217855": "aracaju",
+    "950217949": "aracaju",
+    "950218062": "sao_cristovao",
+    "950218190": "gloria",
+    "950218313": "gloria",
+    "950218438": "aracaju",
+    "950218496": "aracaju",
+    "950218546": "maruim",
+    "950218619": "sao_cristovao",
+    "950218689": "aracaju",
+    "950218795": "aracaju",
+    "950219016": "aracaju"
+  },
+  "situacoes_especiais": {
+    "950210206": "município diferente nas duas fontes",
+    "950210421": "sem equipe com status que exige equipe",
+    "950210537": "uma equipe em cada linha do XLSX",
+    "950210666": "só no Incidentes.xlsx",
+    "950210761": "sem alimentador",
+    "950210799": "sem endereço; bairro só no comentário",
+    "950210832": "sem equipe com status que exige equipe",
+    "950210933": "sem equipe com status que exige equipe",
+    "950211047": "uma chamada em outro bairro (minoria)",
+    "950211157": "sem endereço nenhum",
+    "950211282": "envio anterior à atribuição",
+    "950211341": "sem alimentador",
+    "950211540": "sem alimentador",
+    "950211617": "sem subestação",
+    "950211634": "só no Incidentes.xlsx",
+    "950211639": "sem subestação",
+    "950211740": "AREA RURAL sem localidade",
+    "950211898": "risco de vida",
+    "950212059": "risco de vida",
+    "950212197": "falta de fase confirmada",
+    "950212318": "falta de fase confirmada",
+    "950212441": "falta de fase possível",
+    "950212476": "falta de fase possível",
+    "950212561": "oscilação (não é fase)",
+    "950212720": "só no Incidentes.xlsx, sem município",
+    "950212872": "alimentador atual diferente entre as linhas do XLSX",
+    "950213704": "só no Incidentes.xlsx",
+    "950214956": "só no Incidentes.xlsx",
+    "950215744": "só no Incidentes.xlsx",
+    "950216839": "só no Incidentes.xlsx",
+    "950217735": "só no Incidentes.xlsx",
+    "950219059": "status divergente",
+    "950219174": "status divergente",
+    "950219299": "só nas chamadas",
+    "950219314": "só nas chamadas",
+    "950219326": "só nas chamadas",
+    "950219427": "só nas chamadas",
+    "950219494": "só nas chamadas",
+    "950219594": "só nas chamadas"
+  },
+  "call_extra": []
+}

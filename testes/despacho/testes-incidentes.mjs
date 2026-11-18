@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import { csvPasta } from "./dados-ficticios.mjs";
-import { xlsxIncidentes, ESPERADO_INC } from "./incidentes-ficticio.mjs";
+import { xlsxIncidentes, linhasIncidentes, ESPERADO_INC } from "./incidentes-ficticio.mjs";
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ctx = { TextDecoder, TextEncoder, console, Blob, Response, DecompressionStream }; ctx.globalThis = ctx; ctx.window = ctx; vm.createContext(ctx);
@@ -88,6 +88,20 @@ await teste("Troca de leitura: extração antiga e arquivo sem registros recusad
   igual(M.aceitarLeitura(ant, { arquivo: { lastModified: 2000 }, total: 8 }).aceita, true);
   const av = M.avisosAtualidade({ chamadas: { arquivo: { lastModified: AGORA - 5 * 60000 } }, incidentes: { arquivo: { lastModified: AGORA - 20 * 60000 } } }, AGORA);
   igual(av.map((a) => [a.fonte, a.tipo]), [["incidentes", "desatualizada"], ["incidentes", "distantes"]]);
+});
+await teste("Alimentador da INC (coluna da tela): o do registro dela; linhas com alimentador diferente = todos, sem escolher; vazio = nenhum", async () => {
+  const L = linhasIncidentes(AGORA);
+  const um = L.find((l) => l["num ocorrencia"] === "INC 900000001") || L.find((l) => /900000001/.test(String(l["num ocorrencia"])));
+  verdade(um, "linha da INC 900000001");
+  const doisAlim = L.map((l) => (l["num ocorrencia"] === um["num ocorrencia"] ? { ...l, "alimentador atual": "ALM-X1" } : l)).concat([{ ...um, "alimentador atual": "ALM-X2" }]);
+  const vazio = doisAlim.map((l) => (/900000002/.test(String(l["num ocorrencia"])) ? { ...l, "alimentador atual": "", "alimentador normal": "" } : l));
+  const c = M.consolidar(CH, DI.processar(await X.ler(xlsxIncidentes(AGORA, { linhas: vazio }), { aba: "incidentes" })));
+  const todas = [...c.incs, ...c.excluidas, ...c.excecoes], de = (n) => todas.find((i) => i.id === "INC " + n);
+  igual(de("900000001").adms.alimentadores, ["ALM-X1", "ALM-X2"], "duas linhas, dois alimentadores");
+  verdade(de("900000001").inconsistencias.some((x) => x.includes("alimentador atual")), "divergência sinalizada");
+  igual(de("900000002").adms.alimentadores, [], "sem alimentador: nada inventado");
+  const outros = todas.filter((i) => i.adms && !["INC 900000001", "INC 900000002"].includes(i.id));
+  for (const i of outros) igual(i.adms.alimentadores, i.adms.alimentador ? [i.adms.alimentador] : [], "alimentador único de " + i.id);
 });
 await teste("Sem Incidentes.xlsx: modo 2.0 preservado (mesmas INCs e lotes)", async () => {
   const c = M.consolidar(CH, null);

@@ -66,7 +66,8 @@
     /* "Cust. prioritárias" do ADMS: código antes do " - " (00 = não é VIP). */
     clientesPrioritarios: { "01": "Indústria", "04": "VIP", "11": "Essencial" },
 
-    /* prefixo: só para EXIBIR "INC n" na tela. Cópia para o SIGODE: numos in (n1, n2, ...). */
+    /* prefixo: só para EXIBIR "INC n" na tela. "Copiar selecionadas": numos in (n1, n2, ...). "Copiar lote" e o botão de
+       cada INC: só os números, "n1, n2, ..." (mesmo separador). */
     copia: { prefixo: "INC ", abertura: "numos in (", separador: ", ", fechamento: ")" },
   };
 })(typeof window !== "undefined" ? window : globalThis);

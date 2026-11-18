@@ -65,10 +65,11 @@ export function linhasIncidentes(agora, registros = REGISTROS) {
   }
   return linhas;
 }
-/* opções: compressao "deflate"|"store"; textos "compartilhados"|"embutidos"; datas "excel"|"texto"; aba (nome); semColuna (nome a omitir). */
-export function xlsxIncidentes(agora, { registros = REGISTROS, compressao = "deflate", textos = "compartilhados", datas = "excel", aba = "incidentes", semColuna = null, linhaCabecalho = 3 } = {}) {
+/* opções: compressao "deflate"|"store"; textos "compartilhados"|"embutidos"; datas "excel"|"texto"; aba (nome); semColuna (nome a omitir);
+   linhas: linhas já montadas ({ coluna do CABECALHO: valor }), no lugar de registros (usado pela base de simulação em testes/fixtures). */
+export function xlsxIncidentes(agora, { registros = REGISTROS, linhas: prontas = null, compressao = "deflate", textos = "compartilhados", datas = "excel", aba = "incidentes", semColuna = null, linhaCabecalho = 3 } = {}) {
   const cab = CABECALHO.map((c) => (c === semColuna ? "coluna removida" : c));
-  const linhas = linhasIncidentes(agora, registros);
+  const linhas = prontas || linhasIncidentes(agora, registros);
   const compart = [], idx = new Map();
   const texto = (s) => { if (!idx.has(s)) { idx.set(s, compart.length); compart.push(s); } return idx.get(s); };
   const celula = (ref, v) => {
